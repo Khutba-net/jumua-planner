@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  firebaseUid String @unique
+  email     String   @unique
+  name      String
+  role      String   @default("khatib") // khatib, admin, viewer
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mosqueId  String?
+  mosque    Mosque?  @relation(fields: [mosqueId], references: [id])
+  sermons   Sermon[]
+}
+
+model Mosque {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  city      String?
+  country   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  themes    Theme[]
+  sermons   Sermon[]
+}
+
+model Theme {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  month       Int      // 1-12
+  year        Int
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  mosqueId    String
+  mosque      Mosque   @relation(fields: [mosqueId], references: [id])
+  subTopics   SubTopic[]
+  sermons     Sermon[]
+}
+
+model SubTopic {
+  id        String   @id @default(cuid())
+  name      String
+  weekNumber Int
+  createdAt DateTime @default(now())
+
+  themeId   String
+  theme     Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
+  sermon    Sermon?
+}
+
+model Sermon {
+  id          String   @id @default(cuid())
+  title       String
+  content     String?  // rich text / markdown
+  outline     String?
+  status      String   @default("draft") // draft, ready, delivered
+  scheduledDate DateTime?
+  deliveredDate DateTime?
+  duration    Int?     // minutes
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  mosqueId    String
+  mosque      Mosque   @relation(fields: [mosqueId], references: [id])
+  themeId     String?
+  theme       Theme?   @relation(fields: [themeId], references: [id])
+  subTopicId  String?  @unique
+  subTopic    SubTopic? @relation(fields: [subTopicId], references: [id])
+  feedback    Feedback[]
+  references  Reference[]
+}
+
+model Feedback {
+  id         String   @id @default(cuid())
+  rating     Int?     // 1-5
+  comment    String?
+  attendance Int?
+  createdAt  DateTime @default(now())
+
+  sermonId   String
+  sermon     Sermon   @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+}
+
+model Reference {
+  id        String   @id @default(cuid())
+  type      String   // quran, hadith, book, article, video
+  title     String
+  source    String?
+  url       String?
+  content   String?
+  createdAt DateTime @default(now())
+
+  sermonId  String
+  sermon    Sermon   @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+}

@@ -1,0 +1,381 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>JumuaPlanner - Professional Khutbah Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Noto+Naskh+Arabic:wght@400;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@100..900&display=swap" rel="stylesheet">
+<style>
+        .font-plus-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .font-noto-arabic { font-family: 'Noto Naskh Arabic', serif; }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .geometric-pattern {
+            background-color: #00666d;
+            background-image: url("https://www.transparenttextures.com/patterns/islamic-art.png");
+        }
+
+        .ambient-shadow {
+            box-shadow: 0 20px 40px -10px rgba(0, 102, 109, 0.08);
+        }
+
+        .lift-hover {
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+        }
+
+        .lift-hover:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 30px 60px -12px rgba(0, 102, 109, 0.12);
+        }
+
+        .hero-text-shadow {
+            text-shadow: 0 2px 4px rgba(255,255,255,0.8);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface": "#f9f9fc",
+                        "surface-container-highest": "#e2e2e5",
+                        "outline": "#6d797a",
+                        "primary": "#00666d",
+                        "primary-container": "#00818a",
+                        "secondary": "#755b18",
+                        "secondary-container": "#fdd88a",
+                        "accent-gold": "#C4A35A",
+                        "cream-bg": "#FAF7F2",
+                        "on-surface": "#1a1c1e",
+                        "on-surface-variant": "#3d494a",
+                        "outline-variant": "#bcc9ca",
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "20px",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "gutter": "20px",
+                        "sm": "12px",
+                        "base": "8px",
+                        "xs": "4px",
+                        "lg": "40px",
+                        "md": "24px",
+                        "margin-desktop": "120px",
+                        "margin-mobile": "20px",
+                        "xl": "64px"
+                    },
+                    fontFamily: {
+                        "label-caps": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "arabic": ["Noto Naskh Arabic"]
+                    },
+                    fontSize: {
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface font-body-md text-on-surface overflow-x-hidden">
+<!-- TopAppBar Navigation -->
+<header class="sticky top-0 w-full z-50 bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 shadow-sm">
+<div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-4">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary text-3xl">grid_view</span>
+<h1 class="font-display-lg text-headline-md text-primary tracking-tight">JumuaPlanner</h1>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-primary font-bold border-b-2 border-primary py-1" href="#">Features</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-200" href="#">Themes</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-200" href="#">Pricing</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-200" href="#">Resources</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="hidden lg:block text-primary font-semibold hover:opacity-80 px-4 py-2">Sign in</button>
+<button class="bg-primary text-white font-bold px-6 py-2.5 rounded-full hover:opacity-90 transition-all scale-100 active:scale-95">Get started free</button>
+</div>
+</div>
+</header>
+<main>
+<!-- Hero Section -->
+<section class="relative min-h-[600px] md:min-h-[750px] flex items-center justify-center overflow-hidden transition-all duration-1000 opacity-100 translate-y-0">
+<!-- Full Bleed Background -->
+<div class="absolute inset-0 z-0">
+<img alt="Hassan II Mosque Watercolor Illustration" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida/AP1WRLtr4toB2pY71TUDV7bBQqGRY7h2Yo2Fs26yDhI_XxmM3NfsRURZiqJYcJobXDgiIZu8i4FTSACfZ5DkfabzQyUo2FJGfvynEYF6AtFJPzB-26IKoMyY3mVQ_6WJ3pzdAPROBCerLv1e0UktIs-_ig6qqJbtwr6-rvJzM-wlx3NEUyx4Ut6oD91M9vnEPhAEJW19PDpKFEApKXSLMZnDfqfq-UjZlCjGRttngGxbN1W38rJ59FqiDqv_FUxv">
+<!-- Soft semi-transparent overlay to enhance text legibility -->
+<div class="absolute inset-0 bg-gradient-to-b from-white/40 via-white/30 to-white/60"></div>
+</div>
+<div class="relative z-10 w-full px-margin-mobile md:px-margin-desktop py-12 md:py-16 flex flex-col items-center text-center">
+<h1 class="font-display-lg text-5xl md:text-7xl text-primary mb-6 leading-tight hero-text-shadow">
+                Plan, Prepare,<br> Deliver.
+            </h1>
+<p class="font-noto-arabic text-2xl md:text-3xl text-secondary mb-8 leading-relaxed hero-text-shadow">
+                نظام متكامل لتنظيم وتقديم خطب الجمعة بفعالية وإتقان
+            </p>
+<p class="text-lg text-on-surface-variant mb-10 max-w-2xl mx-auto hero-text-shadow font-semibold">
+                The first professional khutbah management platform designed for Khatibs and Mosques to deliver impactful messages with data-driven planning.
+            </p>
+<div class="flex flex-col sm:flex-row gap-4 justify-center">
+<button class="bg-primary text-white px-10 py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-xl transition-all scale-100 hover:scale-105 active:scale-95">Start Your Planner</button>
+<button class="bg-white/80 backdrop-blur-md border-2 border-primary/20 text-primary px-10 py-4 rounded-full font-bold text-lg hover:bg-white transition-all scale-100 hover:scale-105 active:scale-95">Watch Demo</button>
+</div>
+</div>
+</section>
+<!-- Core Features -->
+<section class="bg-cream-bg px-margin-mobile md:px-margin-desktop transition-all duration-1000 opacity-100 translate-y-0 md:py-32">
+<div class="text-center max-w-2xl mx-auto mb-16">
+<h2 class="font-headline-lg text-primary text-4xl mb-4">Everything you need to plan your year</h2>
+<div class="h-1 w-20 bg-accent-gold mx-auto rounded-full"></div>
+<p class="mt-6 text-on-surface-variant">Streamline your preparation from research to delivery with tools built specifically for the pulpit.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-y-20 md:gap-y-32 items-center">
+<!-- Feature 1: Large Left -->
+<div class="md:col-span-7 relative group">
+<span class="absolute -top-16 -left-4 text-[120px] font-bold text-primary/5 select-none z-0">01</span>
+<div class="relative z-10">
+<div class="w-16 h-1.5 bg-accent-gold mb-8"></div>
+<h3 class="font-display-lg text-4xl md:text-5xl text-primary mb-6 leading-tight">Annual Planning</h3>
+<p class="text-on-surface-variant text-lg leading-relaxed max-w-xl">Create main topic themes with carefully curated sub-topics. Set your themes at the start of the year and let the structure guide every Friday.</p>
+</div>
+</div>
+<div class="hidden md:block md:col-span-5"></div>
+<!-- Feature 2: Right Aligned -->
+<div class="hidden md:block md:col-span-4"></div>
+<div class="md:col-span-8 relative group md:text-right flex flex-col md:items-end">
+<span class="absolute -top-16 -right-4 text-[120px] font-bold text-primary/5 select-none z-0">02</span>
+<div class="relative z-10">
+<div class="w-16 h-1.5 bg-primary mb-8 md:ml-auto"></div>
+<h3 class="font-display-lg text-4xl md:text-5xl text-primary mb-6 leading-tight">Weekly Cycle</h3>
+<p class="text-on-surface-variant text-lg leading-relaxed max-w-xl md:ml-auto">Each week: prepare your outline, deliver on Friday, log attendance and feedback. The dashboard shows exactly what needs attention.</p>
+</div>
+</div>
+<!-- Feature 3: Centered/Offset -->
+<div class="md:col-start-2 md:col-span-7 relative group">
+<span class="absolute -top-16 -left-4 text-[120px] font-bold text-primary/5 select-none z-0">03</span>
+<div class="relative z-10">
+<div class="w-16 h-1.5 bg-accent-gold mb-8"></div>
+<h3 class="font-display-lg text-4xl md:text-5xl text-primary mb-6 leading-tight">Multi-Khatib Management</h3>
+<p class="text-on-surface-variant text-lg leading-relaxed max-w-xl">Manage rotating khatibs across your organization. Each khatib creates their Friday sermon plan and can collaborate securely.</p>
+</div>
+</div>
+<div class="hidden md:block md:col-span-4"></div>
+</div>
+</section>
+<!-- Annual Themes Grid -->
+<section class="py-24 px-margin-mobile md:px-margin-desktop bg-surface transition-all duration-1000 opacity-100 translate-y-0">
+<div class="max-w-6xl mx-auto">
+<div class="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
+  <!-- Left: Text -->
+  <div class="lg:w-1/2 text-center lg:text-left">
+    <span class="text-accent-gold font-bold text-sm tracking-widest uppercase">Strategic Vision</span>
+    <h2 class="font-headline-lg text-primary text-4xl mt-2 mb-4">Design Your Annual Roadmap</h2>
+    <p class="text-on-surface-variant text-lg leading-relaxed mb-6">Choose themes that matter to your community. Plan 12 months of purposeful khutbahs — your topics, your schedule, your vision.</p>
+    <button class="flex items-center gap-2 bg-primary text-white font-bold px-8 py-3 rounded-full hover:bg-primary/90 transition-all group mx-auto lg:mx-0">
+      Start Planning <span class="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+    </button>
+  </div>
+  <!-- Right: Stacked Cards -->
+  <div class="lg:w-1/2 flex justify-center">
+    <div class="relative w-[320px] h-[320px] md:w-[380px] md:h-[360px] mx-auto">
+      <!-- "Your Theme" card (furthest back) -->
+      <div class="absolute inset-0 overflow-hidden border-2 border-dashed border-primary/30 rounded-2xl transform rotate-[-8deg] -translate-x-6 translate-y-2 z-[0]">
+        <div class="p-5 flex flex-col items-center justify-center h-full">
+          <span class="material-symbols-outlined text-3xl text-primary/30 mb-2">add_circle_outline</span>
+          <p class="text-primary/40 font-bold text-sm">Your Theme</p>
+        </div>
+      </div>
+      <!-- Card 3: March -->
+      <div class="absolute inset-0 overflow-hidden bg-accent-gold/10 border border-accent-gold/20 rounded-2xl shadow-md transform rotate-[-4deg] -translate-x-3 translate-y-1 z-[1]">
+        <div class="p-5 flex flex-col justify-between h-full">
+          <div>
+            <span class="text-accent-gold font-bold text-xs uppercase tracking-widest">March</span>
+            <p class="font-headline-md text-secondary text-lg leading-tight mt-2">The Quranic Message</p>
+          </div>
+          <div class="flex items-center gap-2 text-accent-gold/60">
+            <span class="material-symbols-outlined text-sm">menu_book</span>
+            <span class="text-xs">4 sub-topics</span>
+          </div>
+        </div>
+      </div>
+      <!-- Card 2: February -->
+      <div class="absolute inset-0 overflow-hidden bg-primary/10 border border-primary/20 rounded-2xl shadow-lg transform rotate-[2deg] translate-x-3 -translate-y-1 z-[2]">
+        <div class="p-5 flex flex-col justify-between h-full">
+          <div>
+            <span class="text-primary font-bold text-xs uppercase tracking-widest">February</span>
+            <p class="font-headline-md text-primary text-lg leading-tight mt-2">Pillars of Islam</p>
+          </div>
+          <div class="flex items-center gap-2 text-primary/60">
+            <span class="material-symbols-outlined text-sm">menu_book</span>
+            <span class="text-xs">4 sub-topics</span>
+          </div>
+        </div>
+      </div>
+      <!-- Card 1: January (front) -->
+      <div class="absolute inset-0 overflow-hidden bg-white border border-primary/20 rounded-2xl shadow-xl transform rotate-[6deg] translate-x-6 -translate-y-2 z-[3]">
+        <div class="p-5 flex flex-col justify-between h-full">
+          <div>
+            <span class="text-primary font-bold text-xs uppercase tracking-widest">January</span>
+            <p class="font-headline-md text-primary text-xl leading-tight mt-2">Aqeedah &amp; Faith</p>
+            <p class="text-on-surface-variant text-xs mt-3">Foundations of belief, Tawheed, and strengthening conviction.</p>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-primary/60">
+              <span class="material-symbols-outlined text-sm">menu_book</span>
+              <span class="text-xs">4 sub-topics</span>
+            </div>
+            <div class="flex -space-x-2">
+              <div class="w-6 h-6 rounded-full bg-primary/20 border-2 border-white"></div>
+              <div class="w-6 h-6 rounded-full bg-accent-gold/30 border-2 border-white"></div>
+              <div class="w-6 h-6 rounded-full bg-primary/10 border-2 border-white flex items-center justify-center text-[8px] font-bold text-primary">+9</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</section>
+<!-- Quran Strip -->
+
+<!-- Interface Preview / Mockup -->
+<section class="py-24 px-margin-mobile md:px-margin-desktop bg-white transition-all duration-1000 opacity-100 translate-y-0">
+<div class="text-center mb-16">
+<h2 class="font-headline-lg text-primary text-4xl mb-4">Intuitive Workspace</h2>
+<div class="flex justify-center gap-4 mt-8 bg-surface p-1 rounded-full w-fit mx-auto">
+<button class="px-6 py-2 rounded-full bg-primary text-white font-bold shadow-md">Dashboard</button>
+<button class="px-6 py-2 rounded-full text-on-surface-variant hover:bg-primary/5 transition-all">Sermon Editor</button>
+<button class="px-6 py-2 rounded-full text-on-surface-variant hover:bg-primary/5 transition-all">Media Vault</button>
+</div>
+</div>
+<div class="relative max-w-5xl mx-auto">
+<div class="bg-gray-900 rounded-3xl p-4 shadow-2xl overflow-hidden border-8 border-gray-100">
+<div class="bg-surface min-h-[500px] rounded-xl flex">
+<!-- Mockup Sidebar -->
+<div class="w-20 md:w-64 border-r border-outline-variant/30 flex flex-col p-4">
+<div class="w-10 h-10 bg-primary rounded-lg mb-8 mx-auto md:mx-0"></div>
+<div class="space-y-4">
+<div class="flex items-center gap-3 p-2 bg-primary/10 text-primary rounded-lg">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="hidden md:block font-bold">Overview</span>
+</div>
+<div class="flex items-center gap-3 p-2 text-on-surface-variant">
+<span class="material-symbols-outlined">description</span>
+<span class="hidden md:block">Sermons</span>
+</div>
+<div class="flex items-center gap-3 p-2 text-on-surface-variant">
+<span class="material-symbols-outlined">event</span>
+<span class="hidden md:block">Calendar</span>
+</div>
+</div>
+</div>
+<!-- Mockup Content -->
+<div class="flex-1 p-8">
+<div class="flex justify-between items-center mb-8">
+<h3 class="font-bold text-2xl">Weekly Progress</h3>
+<button class="bg-primary text-white text-xs px-4 py-2 rounded-lg font-bold">+ New Sermon</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-white p-6 rounded-xl border border-outline-variant/20">
+<div class="flex items-center justify-between mb-4">
+<div class="w-8 h-8 rounded bg-primary/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-sm">schedule</span>
+</div>
+<span class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded">DRAFT</span>
+</div>
+<p class="font-bold mb-1">Environmental Stewardship</p>
+<p class="text-xs text-on-surface-variant">Last edited 2h ago</p>
+</div>
+<div class="bg-white p-6 rounded-xl border border-outline-variant/20">
+<div class="flex items-center justify-between mb-4">
+<div class="w-8 h-8 rounded bg-emerald-100 text-emerald-600 flex items-center justify-center">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+</div>
+<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">READY</span>
+</div>
+<p class="font-bold mb-1">The Power of Dua</p>
+<p class="text-xs text-on-surface-variant">Scheduled for Friday</p>
+</div>
+</div>
+<div class="mt-8 p-6 bg-accent-gold/5 rounded-xl border border-accent-gold/20">
+<p class="text-sm font-bold text-accent-gold uppercase mb-2">Recommended Topic</p>
+<p class="text-sm text-on-surface-variant">"Based on recent community feedback, consider discussing 'Mental Health in Islam' for the next open slot."</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Decorative Elements -->
+<div class="absolute -top-10 -right-10 w-40 h-40 bg-accent-gold/10 rounded-full blur-3xl -z-10"></div>
+<div class="absolute -bottom-10 -left-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl -z-10"></div>
+</div>
+</section>
+<!-- Built for Every Level -->
+
+<!-- Pricing -->
+<section class="py-24 px-margin-mobile md:px-margin-desktop bg-cream-bg transition-all duration-1000 opacity-100 translate-y-0">
+<div class="text-center mb-16">
+<h2 class="font-headline-lg text-primary text-4xl mb-4">Simple, honest pricing.</h2>
+<p class="text-on-surface-variant">Choose the plan that fits your mosque's size and mission.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+<!-- Basic -->
+<div class="bg-white p-10 rounded-2xl border border-outline-variant/30 flex flex-col"><h4 class="font-bold text-xl mb-2">Individual</h4><p class="text-3xl font-bold text-primary mb-6">$9 <span class="text-sm font-normal text-on-surface-variant">/mo</span></p><ul class="space-y-4 mb-12 flex-1"><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Arabic+English editor</li><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Friday calendar</li><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Annual theme planner</li><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Export PDF &amp; Word</li></ul><button class="w-full py-3 rounded-full border border-primary text-primary font-bold hover:bg-primary/5 transition-all">Select Plan</button></div>
+<!-- Organization -->
+<div class="bg-white p-10 rounded-2xl border-2 border-primary flex flex-col relative scale-105 shadow-xl"><div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-xs font-bold px-4 py-1 rounded-full uppercase tracking-widest">Most Popular</div><h4 class="font-bold text-xl mb-2">Organization</h4><p class="text-3xl font-bold text-primary mb-6">$49 <span class="text-sm font-normal text-on-surface-variant">/mo</span></p><ul class="space-y-4 mb-12 flex-1"><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Everything in Individual</li><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Full resource library</li><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> 20 free khatib accounts</li><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Moderator review tools</li></ul><button class="w-full py-3 rounded-full bg-primary text-white font-bold hover:shadow-lg transition-all">Select Plan</button></div>
+<!-- Network -->
+<div class="bg-white p-10 rounded-2xl border border-outline-variant/30 flex flex-col"><h4 class="font-bold text-xl mb-2">Network</h4><p class="text-3xl font-bold text-primary mb-6">Pricing TBD</p><ul class="space-y-4 mb-12 flex-1"><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Everything in Organization</li><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> 100 khatib accounts</li><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Multiple org groups</li><li class="flex items-center gap-2 text-sm"><span class="material-symbols-outlined text-primary text-lg">check_circle</span> Priority support</li></ul><button class="w-full py-3 rounded-full border border-primary text-primary font-bold hover:bg-primary/5 transition-all">Contact Sales</button></div>
+</div>
+</section>
+<!-- Final CTA -->
+
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest w-full rounded-t-lg border-t border-outline-variant px-margin-mobile md:px-margin-desktop py-12">
+<div class="flex flex-col md:flex-row justify-between items-center gap-6"><div class="flex flex-col items-center md:items-start gap-4"><div class="font-headline-md text-headline-md text-primary tracking-tight">JumuaPlanner</div><p class="font-body-md text-body-md text-on-surface-variant text-center md:text-left">Built for mosque administration</p></div><nav class="flex flex-wrap justify-center gap-x-8 gap-y-4"><a class="text-label-caps font-label-caps text-on-surface-variant hover:text-primary underline decoration-primary/30 transition-all" href="#">Privacy</a><a class="text-label-caps font-label-caps text-on-surface-variant hover:text-primary underline decoration-primary/30 transition-all" href="#">Terms</a><a class="text-label-caps font-label-caps text-on-surface-variant hover:text-primary underline decoration-primary/30 transition-all" href="#">Support</a><a class="text-label-caps font-label-caps text-on-surface-variant hover:text-primary underline decoration-primary/30 transition-all" href="#">Status</a></nav><div class="flex gap-4"><a class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all" href="#"><span class="material-symbols-outlined text-lg">share</span></a><a class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all" href="#"><span class="material-symbols-outlined text-lg">public</span></a></div></div>
+</footer>
+<script>
+    // Micro-interactions and effects
+    document.addEventListener('DOMContentLoaded', () => {
+        // Smooth reveal animation for sections
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-10');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('section').forEach(section => {
+            // Already handled for Hero with inline classes but observer ensures consistent behavior
+            if (!section.classList.contains('opacity-100')) {
+                section.classList.add('transition-all', 'duration-1000', 'opacity-0', 'translate-y-10');
+                observer.observe(section);
+            }
+        });
+    });
+</script>
+</body></html>
