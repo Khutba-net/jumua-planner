@@ -132,6 +132,7 @@ export default function SermonEditorPage({
   const [refSource, setRefSource] = useState("");
   const [refContent, setRefContent] = useState("");
   const [refSaving, setRefSaving] = useState(false);
+  const [lastFocusedLang, setLastFocusedLang] = useState<"ar" | "en">("ar");
   const sectionRefs = useRef<Record<string, { ar: HTMLTextAreaElement | null; en: HTMLTextAreaElement | null }>>({});
 
   useEffect(() => {
@@ -205,29 +206,14 @@ export default function SermonEditorPage({
     return () => clearInterval(timer);
   }, [sermon, save]);
 
-  function buildReferenceBlock(type: "quran" | "hadith", text: string, title: string, source: string): string {
-    const lines: string[] = [];
-    lines.push("");
-    if (type === "quran") {
-      lines.push(`═══ QURAN ═══`);
-      if (text) lines.push(`﴾ ${text} ﴿`);
-      if (title) lines.push(title);
-      if (source) lines.push(`"${source}"`);
-      lines.push(`═════════════`);
-    } else {
-      lines.push(`─── HADITH ───`);
-      if (text) lines.push(`"${text}"`);
-      if (title) lines.push(title);
-      if (source) lines.push(`— ${source}`);
-      lines.push(`──────────────`);
-    }
-    lines.push("");
-    return lines.join("\n");
+  function buildReferenceMarker(type: "quran" | "hadith", title: string, source: string): string {
+    const label = type === "quran" ? "Quran" : "Hadith";
+    const detail = title || source || "";
+    return `\n[${label} — ${detail}]\n`;
   }
 
   function insertAtCursor(block: string) {
-    const isArabicActive = langMode === "ar-only" || langMode === "ar-first";
-    const lang = isArabicActive ? "ar" : "en";
+    const lang = lastFocusedLang;
     const textarea = sectionRefs.current[activeSection]?.[lang];
 
     if (textarea) {
@@ -268,9 +254,8 @@ export default function SermonEditorPage({
         const ref = await res.json();
         setReferences((prev) => [...prev, ref]);
 
-        const block = buildReferenceBlock(
+        const block = buildReferenceMarker(
           refType,
-          refContent.trim(),
           refTitle.trim(),
           refSource.trim()
         );
@@ -659,7 +644,7 @@ export default function SermonEditorPage({
                             [sec.id]: { ...prev[sec.id], ar: e.target.value },
                           }))
                         }
-                        onFocus={() => setActiveSection(sec.id)}
+                        onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("ar"); }}
                         placeholder={sec.id === "opening" ? "اكتب خطبتك هنا..." : `${sec.label}...`}
                         className="w-full min-h-[80px] sm:min-h-[100px] font-[var(--font-arabic)] leading-[2] text-ink bg-transparent border-none resize-none outline-none text-right"
                         style={{ fontSize: `${editorFontSize}px` }}
@@ -683,7 +668,7 @@ export default function SermonEditorPage({
                             [sec.id]: { ...prev[sec.id], en: e.target.value },
                           }))
                         }
-                        onFocus={() => setActiveSection(sec.id)}
+                        onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("en"); }}
                         placeholder={`${sec.label} in English...`}
                         className="w-full min-h-[60px] sm:min-h-[80px] leading-relaxed text-mute italic bg-transparent border-none resize-none outline-none"
                         style={{ fontSize: `${editorFontSize - 2}px` }}
