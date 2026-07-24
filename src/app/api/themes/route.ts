@@ -14,7 +14,7 @@ export async function GET() {
     ORDER BY t.year DESC, t.month ASC
   `).all(userId);
 
-  const themesWithTopics = themes.map((theme: Record<string, unknown>) => {
+  const themesWithTopics = (themes as Record<string, unknown>[]).map((theme) => {
     const subTopics = db.prepare(
       "SELECT * FROM sub_topics WHERE theme_id = ? ORDER BY week_number ASC"
     ).all(theme.id as string);
@@ -48,5 +48,5 @@ export async function POST(req: Request) {
     "SELECT * FROM sub_topics WHERE theme_id = ? ORDER BY week_number ASC"
   ).all(id);
 
-  return NextResponse.json(toJSON({ ...theme, sub_topics: subTopics }), { status: 201 });
+  return NextResponse.json(toJSON({ ...(theme as Record<string, unknown>), sub_topics: subTopics }), { status: 201 });
 }

@@ -17,7 +17,7 @@ export async function GET(
     "SELECT id, title, status, scheduled_date FROM sermons WHERE theme_id = ? ORDER BY scheduled_date ASC"
   ).all(id);
 
-  return NextResponse.json(toJSON({ ...theme, sub_topics: subTopics, sermons }));
+  return NextResponse.json(toJSON({ ...(theme as Record<string, unknown>), sub_topics: subTopics, sermons }));
 }
 
 export async function PUT(
@@ -56,7 +56,7 @@ export async function PUT(
     "SELECT * FROM sub_topics WHERE theme_id = ? ORDER BY week_number ASC"
   ).all(id);
 
-  return NextResponse.json(toJSON({ ...theme, sub_topics: subTopics }));
+  return NextResponse.json(toJSON({ ...(theme as Record<string, unknown>), sub_topics: subTopics }));
 }
 
 export async function DELETE(
