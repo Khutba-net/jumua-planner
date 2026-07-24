@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "path";
 import { randomBytes } from "crypto";
 
-const dbPath = path.join(process.cwd(), "jumua.db");
+const dbPath = process.env.DB_PATH || path.join(process.cwd(), "jumua.db");
 
 const globalForDb = globalThis as unknown as { db: Database.Database };
 
