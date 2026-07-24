@@ -6,6 +6,7 @@ export async function GET() {
   const userId = await getUserId();
 
   const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const totalSermons = (db.prepare(
     "SELECT COUNT(*) as count FROM sermons WHERE author_id = ?"

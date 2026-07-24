@@ -25,9 +25,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetch("/api/dashboard")
-      .then((r) => r.json())
-      .then((d) => setUser(d.user))
-      .catch(() => {});
+      .then((r) => {
+        if (r.status === 401) { router.push("/auth/login"); return null; }
+        return r.json();
+      })
+      .then((d) => { if (d) setUser(d.user); })
+      .catch(() => { router.push("/auth/login"); });
   }, []);
 
   useEffect(() => {
