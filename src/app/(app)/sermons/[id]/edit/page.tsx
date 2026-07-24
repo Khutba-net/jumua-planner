@@ -29,6 +29,22 @@ function wordCount(text: string | null) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+const SECTION_IDS = ["opening", "main", "second", "dua"] as const;
+const SECTION_DELIM = "\n\n---§---\n\n";
+
+function parseSections(text: string): Record<string, string> {
+  const parts = text.split(SECTION_DELIM);
+  const result: Record<string, string> = {};
+  SECTION_IDS.forEach((id, i) => {
+    result[id] = (parts[i] ?? "").trim();
+  });
+  return result;
+}
+
+function joinSections(data: Record<string, string>): string {
+  return SECTION_IDS.map((id) => data[id] ?? "").join(SECTION_DELIM);
+}
+
 const allStatuses = ["draft", "in_review", "ready", "delivered", "archived"];
 
 const statusLabel: Record<string, string> = {
@@ -95,12 +111,16 @@ export default function SermonEditorPage({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [outline, setOutline] = useState("");
   const [status, setStatus] = useState("draft");
   const [scheduledDate, setScheduledDate] = useState("");
   const [notes, setNotes] = useState("");
   const [activeSection, setActiveSection] = useState("opening");
+  const [sectionData, setSectionData] = useState<Record<string, { ar: string; en: string }>>({
+    opening: { ar: "", en: "" },
+    main: { ar: "", en: "" },
+    second: { ar: "", en: "" },
+    dua: { ar: "", en: "" },
+  });
   const [langMode, setLangMode] = useState("ar-first");
   const [mobilePanel, setMobilePanel] = useState<"editor" | "info" | "checklist">("editor");
   const [userWordTarget, setUserWordTarget] = useState(2500);
@@ -112,8 +132,7 @@ export default function SermonEditorPage({
   const [refSource, setRefSource] = useState("");
   const [refContent, setRefContent] = useState("");
   const [refSaving, setRefSaving] = useState(false);
-  const contentRef = useRef<HTMLTextAreaElement>(null);
-  const outlineRef = useRef<HTMLTextAreaElement>(null);
+  const sectionRefs = useRef<Record<string, { ar: HTMLTextAreaElement | null; en: HTMLTextAreaElement | null }>>({});
 
   useEffect(() => {
     fetch("/api/settings")
@@ -137,8 +156,13 @@ export default function SermonEditorPage({
       .then((data: Sermon) => {
         setSermon(data);
         setTitle(data.title);
-        setContent(data.content ?? "");
-        setOutline(data.outline ?? "");
+        const arSections = parseSections(data.content ?? "");
+        const enSections = parseSections(data.outline ?? "");
+        const parsed: Record<string, { ar: string; en: string }> = {};
+        SECTION_IDS.forEach((id) => {
+          parsed[id] = { ar: arSections[id] ?? "", en: enSections[id] ?? "" };
+        });
+        setSectionData(parsed);
         setStatus(data.status);
         setScheduledDate(
           data.scheduled_date
@@ -152,15 +176,20 @@ export default function SermonEditorPage({
       .catch(() => setLoading(false));
   }, [id]);
 
+  const content = joinSections(Object.fromEntries(SECTION_IDS.map((id) => [id, sectionData[id]?.ar ?? ""])));
+  const outline = joinSections(Object.fromEntries(SECTION_IDS.map((id) => [id, sectionData[id]?.en ?? ""])));
+
   const save = useCallback(async () => {
     setSaving(true);
+    const arJoined = joinSections(Object.fromEntries(SECTION_IDS.map((id) => [id, sectionData[id]?.ar ?? ""])));
+    const enJoined = joinSections(Object.fromEntries(SECTION_IDS.map((id) => [id, sectionData[id]?.en ?? ""])));
     await fetch(`/api/sermons/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title,
-        content,
-        outline,
+        content: arJoined,
+        outline: enJoined,
         status,
         scheduledDate: scheduledDate || null,
         notes,
@@ -168,7 +197,7 @@ export default function SermonEditorPage({
     });
     setLastSaved(new Date());
     setSaving(false);
-  }, [id, title, content, outline, status, scheduledDate, notes]);
+  }, [id, title, sectionData, status, scheduledDate, notes]);
 
   useEffect(() => {
     if (!sermon) return;
@@ -198,7 +227,8 @@ export default function SermonEditorPage({
 
   function insertAtCursor(block: string) {
     const isArabicActive = langMode === "ar-only" || langMode === "ar-first";
-    const textarea = isArabicActive ? contentRef.current : outlineRef.current;
+    const lang = isArabicActive ? "ar" : "en";
+    const textarea = sectionRefs.current[activeSection]?.[lang];
 
     if (textarea) {
       const start = textarea.selectionStart ?? textarea.value.length;
@@ -206,11 +236,10 @@ export default function SermonEditorPage({
       const after = textarea.value.slice(start);
       const newValue = before + block + after;
 
-      if (isArabicActive) {
-        setContent(newValue);
-      } else {
-        setOutline(newValue);
-      }
+      setSectionData((prev) => ({
+        ...prev,
+        [activeSection]: { ...prev[activeSection], [lang]: newValue },
+      }));
 
       requestAnimationFrame(() => {
         const newPos = start + block.length;
@@ -478,7 +507,11 @@ export default function SermonEditorPage({
             {sections.map((sec, i) => (
               <button
                 key={sec.id}
-                onClick={() => { setActiveSection(sec.id); setMobilePanel("editor"); }}
+                onClick={() => {
+                  setActiveSection(sec.id);
+                  setMobilePanel("editor");
+                  document.getElementById(`section-${sec.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
                 className={`flex items-center gap-1.5 text-[11px] px-1.5 py-1.5 text-left transition-colors ${
                   activeSection === sec.id
                     ? "bg-[#f3f0ea] text-ink font-medium"
@@ -591,70 +624,75 @@ export default function SermonEditorPage({
             />
           </div>
 
-          {/* Writing area */}
+          {/* Writing area — all 4 sections stacked */}
           <div className="flex-1 overflow-y-auto px-3 sm:px-4 pb-4">
-            <div className="bg-white border border-line p-3 sm:p-3.5 mb-4">
-              {(() => {
-                const sec = sections.find((s) => s.id === activeSection) ?? sections[0];
-                const secIdx = sections.findIndex((s) => s.id === activeSection);
-                return (
-                  <div className="mb-3 pb-2 border-b border-[#f0ede7]">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary text-base">{sec.icon}</span>
-                        <p className="text-[9px] tracking-[2px] text-mute/60 font-bold">{sec.label.toUpperCase()}</p>
-                        <span className="text-[9px] text-mute/40">{secIdx + 1}/{sections.length}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => { if (secIdx > 0) setActiveSection(sections[secIdx - 1].id); }}
-                          disabled={secIdx === 0}
-                          className="w-6 h-6 flex items-center justify-center border border-line bg-[#f5f2eb] text-mute text-[11px] hover:bg-[#e8e3d6] transition-colors disabled:opacity-30"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          onClick={() => { if (secIdx < sections.length - 1) setActiveSection(sections[secIdx + 1].id); }}
-                          disabled={secIdx === sections.length - 1}
-                          className="w-6 h-6 flex items-center justify-center border border-line bg-[#f5f2eb] text-mute text-[11px] hover:bg-[#e8e3d6] transition-colors disabled:opacity-30"
-                        >
-                          ▼
-                        </button>
-                      </div>
-                    </div>
+            {sections.map((sec, secIdx) => {
+              const secData = sectionData[sec.id] ?? { ar: "", en: "" };
+              const isActive = activeSection === sec.id;
+              return (
+                <div
+                  key={sec.id}
+                  id={`section-${sec.id}`}
+                  className={`bg-white border p-3 sm:p-3.5 mb-3 transition-colors ${
+                    isActive ? "border-primary/40 shadow-sm" : "border-line"
+                  }`}
+                  onClick={() => setActiveSection(sec.id)}
+                >
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#f0ede7]">
+                    <span className={`material-symbols-outlined text-base ${isActive ? "text-primary" : "text-line"}`}>{sec.icon}</span>
+                    <p className="text-[9px] tracking-[2px] text-mute/60 font-bold">{sec.label.toUpperCase()}</p>
+                    <span className="text-[9px] text-mute/40">{secIdx + 1}/{sections.length}</span>
                   </div>
-                );
-              })()}
 
-              {/* Arabic text */}
-              {(langMode === "ar-first" || langMode === "ar-only" || langMode === "en-first") && (
-                <div className={langMode === "en-first" ? "order-2 mt-2 pt-2 border-t border-[#f0ede7]" : ""}>
-                  <textarea
-                    ref={contentRef}
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="اكتب خطبتك هنا..."
-                    className="w-full min-h-[150px] sm:min-h-[200px] font-[var(--font-arabic)] leading-[2] text-ink bg-transparent border-none resize-none outline-none text-right"
-                    style={{ fontSize: `${editorFontSize}px` }}
-                    dir="rtl"
-                  />
-                </div>
-              )}
+                  {/* Arabic text */}
+                  {(langMode === "ar-first" || langMode === "ar-only" || langMode === "en-first") && (
+                    <div className={langMode === "en-first" ? "order-2 mt-2 pt-2 border-t border-[#f0ede7]" : ""}>
+                      <textarea
+                        ref={(el) => {
+                          if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
+                          sectionRefs.current[sec.id].ar = el;
+                        }}
+                        value={secData.ar}
+                        onChange={(e) =>
+                          setSectionData((prev) => ({
+                            ...prev,
+                            [sec.id]: { ...prev[sec.id], ar: e.target.value },
+                          }))
+                        }
+                        onFocus={() => setActiveSection(sec.id)}
+                        placeholder={sec.id === "opening" ? "اكتب خطبتك هنا..." : `${sec.label}...`}
+                        className="w-full min-h-[80px] sm:min-h-[100px] font-[var(--font-arabic)] leading-[2] text-ink bg-transparent border-none resize-none outline-none text-right"
+                        style={{ fontSize: `${editorFontSize}px` }}
+                        dir="rtl"
+                      />
+                    </div>
+                  )}
 
-              {/* English text */}
-              {(langMode === "ar-first" || langMode === "en-only" || langMode === "en-first") && (
-                <div className={langMode === "ar-first" ? "mt-2 pt-2 border-t border-[#f0ede7]" : ""}>
-                  <textarea
-                    ref={outlineRef}
-                    value={outline}
-                    onChange={(e) => setOutline(e.target.value)}
-                    placeholder="Write the English translation or notes here..."
-                    className="w-full min-h-[120px] sm:min-h-[160px] leading-relaxed text-mute italic bg-transparent border-none resize-none outline-none"
-                    style={{ fontSize: `${editorFontSize - 2}px` }}
-                  />
+                  {/* English text */}
+                  {(langMode === "ar-first" || langMode === "en-only" || langMode === "en-first") && (
+                    <div className={langMode === "ar-first" ? "mt-2 pt-2 border-t border-[#f0ede7]" : ""}>
+                      <textarea
+                        ref={(el) => {
+                          if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
+                          sectionRefs.current[sec.id].en = el;
+                        }}
+                        value={secData.en}
+                        onChange={(e) =>
+                          setSectionData((prev) => ({
+                            ...prev,
+                            [sec.id]: { ...prev[sec.id], en: e.target.value },
+                          }))
+                        }
+                        onFocus={() => setActiveSection(sec.id)}
+                        placeholder={`${sec.label} in English...`}
+                        className="w-full min-h-[60px] sm:min-h-[80px] leading-relaxed text-mute italic bg-transparent border-none resize-none outline-none"
+                        style={{ fontSize: `${editorFontSize - 2}px` }}
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })}
           </div>
 
           {/* Status bar */}
