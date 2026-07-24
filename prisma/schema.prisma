@@ -8,32 +8,54 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  firebaseUid String @unique
-  email     String   @unique
-  name      String
-  role      String   @default("khatib") // khatib, admin, viewer
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  firebaseUid String   @unique
+  email       String   @unique
+  name        String
+  role        String   @default("khatib") // khatib, admin, viewer
+  accountType String   @default("individual") // individual, organization, institution
+  avatarUrl   String?
+  phone       String?
+  bio         String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  mosqueId  String?
-  mosque    Mosque?  @relation(fields: [mosqueId], references: [id])
-  sermons   Sermon[]
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  sermons        Sermon[]
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("organization") // organization, institution
+  address     String?
+  city        String?
+  country     String?
+  website     String?
+  phone       String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  mosques     Mosque[]
+  themes      Theme[]
 }
 
 model Mosque {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  city      String?
-  country   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  city        String?
+  country     String?
+  capacity    Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  users     User[]
-  themes    Theme[]
-  sermons   Sermon[]
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  sermons        Sermon[]
 }
 
 model Theme {
@@ -46,10 +68,11 @@ model Theme {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  mosqueId    String
-  mosque      Mosque   @relation(fields: [mosqueId], references: [id])
-  subTopics   SubTopic[]
-  sermons     Sermon[]
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  ownerId        String?
+  subTopics      SubTopic[]
+  sermons        Sermon[]
 }
 
 model SubTopic {
@@ -64,33 +87,33 @@ model SubTopic {
 }
 
 model Sermon {
-  id          String   @id @default(cuid())
-  title       String
-  content     String?  // rich text / markdown
-  outline     String?
-  status      String   @default("draft") // draft, ready, delivered
+  id            String    @id @default(cuid())
+  title         String
+  content       String?
+  outline       String?
+  status        String    @default("draft") // draft, ready, delivered
   scheduledDate DateTime?
   deliveredDate DateTime?
-  duration    Int?     // minutes
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  duration      Int?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  authorId    String
-  author      User     @relation(fields: [authorId], references: [id])
-  mosqueId    String
-  mosque      Mosque   @relation(fields: [mosqueId], references: [id])
-  themeId     String?
-  theme       Theme?   @relation(fields: [themeId], references: [id])
-  subTopicId  String?  @unique
-  subTopic    SubTopic? @relation(fields: [subTopicId], references: [id])
-  feedback    Feedback[]
-  references  Reference[]
+  authorId      String
+  author        User      @relation(fields: [authorId], references: [id])
+  mosqueId      String?
+  mosque        Mosque?   @relation(fields: [mosqueId], references: [id])
+  themeId       String?
+  theme         Theme?    @relation(fields: [themeId], references: [id])
+  subTopicId    String?   @unique
+  subTopic      SubTopic? @relation(fields: [subTopicId], references: [id])
+  feedback      Feedback[]
+  references    Reference[]
 }
 
 model Feedback {
   id         String   @id @default(cuid())
-  rating     Int?     // 1-5
+  rating     Int?
   comment    String?
   attendance Int?
   createdAt  DateTime @default(now())
