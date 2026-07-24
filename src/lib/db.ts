@@ -23,6 +23,7 @@ export function cuid() {
 }
 
 export function toJSON(row: unknown): unknown {
+  if (row === undefined || row === null) return row ?? null;
   return JSON.parse(JSON.stringify(row, (_k, v) => typeof v === "bigint" ? Number(v) : v));
 }
 
