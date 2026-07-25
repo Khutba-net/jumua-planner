@@ -611,76 +611,157 @@ export default function SermonEditorPage({
 
           {/* Writing area — continuous scroll with section dividers */}
           <div className="flex-1 overflow-y-auto">
-            <div className="bg-white mx-3 sm:mx-4 my-3 border border-line p-4 sm:p-6">
-              {sections.map((sec, secIdx) => {
-                const secData = sectionData[sec.id] ?? { ar: "", en: "" };
-                const isActive = activeSection === sec.id;
+            {(() => {
+              const showBoth = langMode === "ar-first" || langMode === "en-first";
+              const showAr = showBoth || langMode === "ar-only";
+              const showEn = showBoth || langMode === "en-only";
+
+              if (showBoth) {
                 return (
-                  <div
-                    key={sec.id}
-                    id={`section-${sec.id}`}
-                    onClick={() => setActiveSection(sec.id)}
-                  >
-                    {/* Section divider */}
-                    <div className={`flex items-center gap-3 ${secIdx === 0 ? "mb-3" : "mt-6 mb-3"}`}>
-                      {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
-                      <div className={`flex items-center gap-1.5 transition-colors ${isActive ? "text-primary" : "text-mute/40"}`}>
-                        <span className="material-symbols-outlined text-sm">{sec.icon}</span>
-                        <span className="text-[9px] tracking-[2px] font-bold uppercase">{sec.label}</span>
-                      </div>
-                      <div className="flex-1 h-px bg-[#e8e3d6]" />
+                  <div className="flex mx-3 sm:mx-4 my-3 gap-0 min-h-0">
+                    {/* English column (left) */}
+                    <div className="flex-1 bg-white border border-line border-r-0 p-4 sm:p-5">
+                      <p className="text-[9px] tracking-[2px] text-mute/40 font-bold mb-4">ENGLISH</p>
+                      {sections.map((sec, secIdx) => {
+                        const secData = sectionData[sec.id] ?? { ar: "", en: "" };
+                        const isActive = activeSection === sec.id;
+                        return (
+                          <div key={sec.id} id={`section-${sec.id}`} onClick={() => setActiveSection(sec.id)}>
+                            <div className={`flex items-center gap-2 ${secIdx === 0 ? "mb-2" : "mt-5 mb-2"}`}>
+                              {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
+                              <div className={`flex items-center gap-1 transition-colors ${isActive ? "text-primary" : "text-mute/30"}`}>
+                                <span className="material-symbols-outlined text-xs">{sec.icon}</span>
+                                <span className="text-[8px] tracking-[1.5px] font-bold uppercase">{sec.label}</span>
+                              </div>
+                              {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
+                            </div>
+                            <textarea
+                              ref={(el) => {
+                                if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
+                                sectionRefs.current[sec.id].en = el;
+                              }}
+                              value={secData.en}
+                              onChange={(e) =>
+                                setSectionData((prev) => ({
+                                  ...prev,
+                                  [sec.id]: { ...prev[sec.id], en: e.target.value },
+                                }))
+                              }
+                              onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("en"); }}
+                              placeholder={`${sec.label} in English...`}
+                              className="w-full min-h-[60px] leading-relaxed text-ink bg-transparent border-none resize-none outline-none"
+                              style={{ fontSize: `${editorFontSize - 1}px` }}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
 
-                    {/* Arabic text */}
-                    {(langMode === "ar-first" || langMode === "ar-only" || langMode === "en-first") && (
-                      <div className={langMode === "en-first" ? "order-2" : ""}>
-                        <textarea
-                          ref={(el) => {
-                            if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
-                            sectionRefs.current[sec.id].ar = el;
-                          }}
-                          value={secData.ar}
-                          onChange={(e) =>
-                            setSectionData((prev) => ({
-                              ...prev,
-                              [sec.id]: { ...prev[sec.id], ar: e.target.value },
-                            }))
-                          }
-                          onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("ar"); }}
-                          placeholder={sec.id === "opening" ? "اكتب خطبتك هنا..." : `${sec.label}...`}
-                          className="w-full min-h-[60px] font-[var(--font-arabic)] leading-[2] text-ink bg-transparent border-none resize-none outline-none text-right"
-                          style={{ fontSize: `${editorFontSize}px` }}
-                          dir="rtl"
-                        />
-                      </div>
-                    )}
+                    {/* Divider */}
+                    <div className="w-px bg-line shrink-0" />
 
-                    {/* English text */}
-                    {(langMode === "ar-first" || langMode === "en-only" || langMode === "en-first") && (
-                      <div className={langMode === "ar-first" ? "mt-1" : ""}>
-                        <textarea
-                          ref={(el) => {
-                            if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
-                            sectionRefs.current[sec.id].en = el;
-                          }}
-                          value={secData.en}
-                          onChange={(e) =>
-                            setSectionData((prev) => ({
-                              ...prev,
-                              [sec.id]: { ...prev[sec.id], en: e.target.value },
-                            }))
-                          }
-                          onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("en"); }}
-                          placeholder={`${sec.label} in English...`}
-                          className="w-full min-h-[40px] leading-relaxed text-mute italic bg-transparent border-none resize-none outline-none"
-                          style={{ fontSize: `${editorFontSize - 2}px` }}
-                        />
-                      </div>
-                    )}
+                    {/* Arabic column (right) */}
+                    <div className="flex-1 bg-white border border-line border-l-0 p-4 sm:p-5">
+                      <p className="text-[9px] tracking-[2px] text-mute/40 font-bold mb-4 text-right">العربية</p>
+                      {sections.map((sec, secIdx) => {
+                        const secData = sectionData[sec.id] ?? { ar: "", en: "" };
+                        const isActive = activeSection === sec.id;
+                        return (
+                          <div key={sec.id} onClick={() => setActiveSection(sec.id)}>
+                            <div className={`flex items-center gap-2 ${secIdx === 0 ? "mb-2" : "mt-5 mb-2"}`}>
+                              {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
+                              <div className={`flex items-center gap-1 transition-colors ${isActive ? "text-primary" : "text-mute/30"}`}>
+                                <span className="text-[8px] tracking-[1.5px] font-bold uppercase">{sec.label}</span>
+                                <span className="material-symbols-outlined text-xs">{sec.icon}</span>
+                              </div>
+                              {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
+                            </div>
+                            <textarea
+                              ref={(el) => {
+                                if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
+                                sectionRefs.current[sec.id].ar = el;
+                              }}
+                              value={secData.ar}
+                              onChange={(e) =>
+                                setSectionData((prev) => ({
+                                  ...prev,
+                                  [sec.id]: { ...prev[sec.id], ar: e.target.value },
+                                }))
+                              }
+                              onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("ar"); }}
+                              placeholder={sec.id === "opening" ? "...اكتب خطبتك هنا" : `...${sec.label}`}
+                              className="w-full min-h-[60px] font-[var(--font-arabic)] leading-[2] text-ink bg-transparent border-none resize-none outline-none text-right"
+                              style={{ fontSize: `${editorFontSize}px` }}
+                              dir="rtl"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
-              })}
-            </div>
+              }
+
+              return (
+                <div className="bg-white mx-3 sm:mx-4 my-3 border border-line p-4 sm:p-6">
+                  {sections.map((sec, secIdx) => {
+                    const secData = sectionData[sec.id] ?? { ar: "", en: "" };
+                    const isActive = activeSection === sec.id;
+                    return (
+                      <div key={sec.id} id={`section-${sec.id}`} onClick={() => setActiveSection(sec.id)}>
+                        <div className={`flex items-center gap-3 ${secIdx === 0 ? "mb-3" : "mt-6 mb-3"}`}>
+                          {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
+                          <div className={`flex items-center gap-1.5 transition-colors ${isActive ? "text-primary" : "text-mute/40"}`}>
+                            <span className="material-symbols-outlined text-sm">{sec.icon}</span>
+                            <span className="text-[9px] tracking-[2px] font-bold uppercase">{sec.label}</span>
+                          </div>
+                          <div className="flex-1 h-px bg-[#e8e3d6]" />
+                        </div>
+                        {showAr && (
+                          <textarea
+                            ref={(el) => {
+                              if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
+                              sectionRefs.current[sec.id].ar = el;
+                            }}
+                            value={secData.ar}
+                            onChange={(e) =>
+                              setSectionData((prev) => ({
+                                ...prev,
+                                [sec.id]: { ...prev[sec.id], ar: e.target.value },
+                              }))
+                            }
+                            onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("ar"); }}
+                            placeholder={sec.id === "opening" ? "...اكتب خطبتك هنا" : `...${sec.label}`}
+                            className="w-full min-h-[60px] font-[var(--font-arabic)] leading-[2] text-ink bg-transparent border-none resize-none outline-none text-right"
+                            style={{ fontSize: `${editorFontSize}px` }}
+                            dir="rtl"
+                          />
+                        )}
+                        {showEn && (
+                          <textarea
+                            ref={(el) => {
+                              if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
+                              sectionRefs.current[sec.id].en = el;
+                            }}
+                            value={secData.en}
+                            onChange={(e) =>
+                              setSectionData((prev) => ({
+                                ...prev,
+                                [sec.id]: { ...prev[sec.id], en: e.target.value },
+                              }))
+                            }
+                            onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("en"); }}
+                            placeholder={`${sec.label} in English...`}
+                            className="w-full min-h-[60px] leading-relaxed text-ink bg-transparent border-none resize-none outline-none"
+                            style={{ fontSize: `${editorFontSize - 1}px` }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Status bar */}
