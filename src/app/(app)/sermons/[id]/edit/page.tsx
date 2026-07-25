@@ -29,22 +29,6 @@ function wordCount(text: string | null) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-const SECTION_IDS = ["opening", "main", "second", "dua"] as const;
-const SECTION_DELIM = "\n\n---§---\n\n";
-
-function parseSections(text: string): Record<string, string> {
-  const parts = text.split(SECTION_DELIM);
-  const result: Record<string, string> = {};
-  SECTION_IDS.forEach((id, i) => {
-    result[id] = (parts[i] ?? "").trim();
-  });
-  return result;
-}
-
-function joinSections(data: Record<string, string>): string {
-  return SECTION_IDS.map((id) => data[id] ?? "").join(SECTION_DELIM);
-}
-
 const allStatuses = ["draft", "in_review", "ready", "delivered", "archived"];
 
 const statusLabel: Record<string, string> = {
@@ -81,7 +65,6 @@ interface CheckItem {
 interface CheckContext {
   title: string;
   content: string;
-  outline: string;
   scheduledDate: string;
   notes: string;
   words: number;
@@ -91,11 +74,17 @@ interface CheckContext {
 
 const checklist: CheckItem[] = [
   { key: "title", label: "Sermon title set", check: (c) => c.title.length > 0 && c.title !== "Untitled Sermon", required: true },
-  { key: "arabic", label: "Arabic content written", check: (c) => c.content.length >= 50, required: true },
-  { key: "english", label: "English translation added", check: (c) => c.outline.length >= 50, required: true },
+  { key: "content", label: "Sermon content written", check: (c) => c.content.length >= 50, required: true },
   { key: "date", label: "Scheduled date set", check: (c) => c.scheduledDate.length > 0, required: true },
   { key: "length", label: "Within target (15-25 min)", check: (c) => c.estMinutes >= 15 && c.estMinutes <= 25, required: false },
-  { key: "references", label: "References cited in notes", check: (c) => c.notes.toLowerCase().includes("surah") || c.notes.toLowerCase().includes("hadith") || c.notes.toLowerCase().includes("quran") || c.notes.toLowerCase().includes("reference") || c.hasReferences, required: false },
+  { key: "references", label: "References added", check: (c) => c.hasReferences, required: false },
+];
+
+const sectionChecks = [
+  { id: "opening", label: "Opening praise", icon: "wb_twilight" },
+  { id: "main", label: "Main theme", icon: "auto_stories" },
+  { id: "second", label: "Second khutbah", icon: "looks_two" },
+  { id: "dua", label: "Closing du'a", icon: "volunteer_activism" },
 ];
 
 export default function SermonEditorPage({
@@ -111,17 +100,10 @@ export default function SermonEditorPage({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
   const [status, setStatus] = useState("draft");
   const [scheduledDate, setScheduledDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [activeSection, setActiveSection] = useState("opening");
-  const [sectionData, setSectionData] = useState<Record<string, { ar: string; en: string }>>({
-    opening: { ar: "", en: "" },
-    main: { ar: "", en: "" },
-    second: { ar: "", en: "" },
-    dua: { ar: "", en: "" },
-  });
-  const [langMode, setLangMode] = useState("ar-first");
   const [mobilePanel, setMobilePanel] = useState<"editor" | "info" | "checklist">("editor");
   const [userWordTarget, setUserWordTarget] = useState(2500);
   const [editorFontSize, setEditorFontSize] = useState(16);
@@ -132,15 +114,14 @@ export default function SermonEditorPage({
   const [refSource, setRefSource] = useState("");
   const [refContent, setRefContent] = useState("");
   const [refSaving, setRefSaving] = useState(false);
-  const [lastFocusedLang, setLastFocusedLang] = useState<"ar" | "en">("ar");
-  const sectionRefs = useRef<Record<string, { ar: HTMLTextAreaElement | null; en: HTMLTextAreaElement | null }>>({});
+  const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
         if (data.settings) {
-          setLangMode(data.settings.default_language || "ar-first");
           setUserWordTarget(data.settings.word_target || 2500);
           setEditorFontSize(data.settings.editor_font_size || 16);
         }
@@ -157,13 +138,7 @@ export default function SermonEditorPage({
       .then((data: Sermon) => {
         setSermon(data);
         setTitle(data.title);
-        const arSections = parseSections(data.content ?? "");
-        const enSections = parseSections(data.outline ?? "");
-        const parsed: Record<string, { ar: string; en: string }> = {};
-        SECTION_IDS.forEach((id) => {
-          parsed[id] = { ar: arSections[id] ?? "", en: enSections[id] ?? "" };
-        });
-        setSectionData(parsed);
+        setContent(data.content ?? "");
         setStatus(data.status);
         setScheduledDate(
           data.scheduled_date
@@ -177,20 +152,15 @@ export default function SermonEditorPage({
       .catch(() => setLoading(false));
   }, [id]);
 
-  const content = joinSections(Object.fromEntries(SECTION_IDS.map((id) => [id, sectionData[id]?.ar ?? ""])));
-  const outline = joinSections(Object.fromEntries(SECTION_IDS.map((id) => [id, sectionData[id]?.en ?? ""])));
-
   const save = useCallback(async () => {
     setSaving(true);
-    const arJoined = joinSections(Object.fromEntries(SECTION_IDS.map((id) => [id, sectionData[id]?.ar ?? ""])));
-    const enJoined = joinSections(Object.fromEntries(SECTION_IDS.map((id) => [id, sectionData[id]?.en ?? ""])));
     await fetch(`/api/sermons/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title,
-        content: arJoined,
-        outline: enJoined,
+        content,
+        outline: "",
         status,
         scheduledDate: scheduledDate || null,
         notes,
@@ -198,7 +168,7 @@ export default function SermonEditorPage({
     });
     setLastSaved(new Date());
     setSaving(false);
-  }, [id, title, sectionData, status, scheduledDate, notes]);
+  }, [id, title, content, status, scheduledDate, notes]);
 
   useEffect(() => {
     if (!sermon) return;
@@ -206,27 +176,13 @@ export default function SermonEditorPage({
     return () => clearInterval(timer);
   }, [sermon, save]);
 
-  function buildReferenceMarker(type: "quran" | "hadith", title: string, source: string): string {
-    const label = type === "quran" ? "Quran" : "Hadith";
-    const detail = title || source || "";
-    return `\n[${label} — ${detail}]\n`;
-  }
-
   function insertAtCursor(block: string) {
-    const lang = lastFocusedLang;
-    const textarea = sectionRefs.current[activeSection]?.[lang];
-
+    const textarea = editorRef.current;
     if (textarea) {
       const start = textarea.selectionStart ?? textarea.value.length;
       const before = textarea.value.slice(0, start);
       const after = textarea.value.slice(start);
-      const newValue = before + block + after;
-
-      setSectionData((prev) => ({
-        ...prev,
-        [activeSection]: { ...prev[activeSection], [lang]: newValue },
-      }));
-
+      setContent(before + block + after);
       requestAnimationFrame(() => {
         const newPos = start + block.length;
         textarea.selectionStart = newPos;
@@ -253,14 +209,8 @@ export default function SermonEditorPage({
       if (res.ok) {
         const ref = await res.json();
         setReferences((prev) => [...prev, ref]);
-
-        const block = buildReferenceMarker(
-          refType,
-          refTitle.trim(),
-          refSource.trim()
-        );
-        insertAtCursor(block);
-
+        const label = refType === "quran" ? "Quran" : "Hadith";
+        insertAtCursor(`\n[${label} — ${refTitle.trim()}]\n`);
         setRefTitle("");
         setRefSource("");
         setRefContent("");
@@ -283,6 +233,15 @@ export default function SermonEditorPage({
     router.push("/sermons");
   }
 
+  function toggleSection(secId: string) {
+    setCompletedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(secId)) next.delete(secId);
+      else next.add(secId);
+      return next;
+    });
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full text-mute">
@@ -303,7 +262,7 @@ export default function SermonEditorPage({
   const estMinutes = Math.max(1, Math.round(words / 130));
 
   const checkCtx: CheckContext = {
-    title, content, outline, scheduledDate, notes, words, estMinutes,
+    title, content, scheduledDate, notes, words, estMinutes,
     hasReferences: references.length > 0,
   };
 
@@ -330,54 +289,6 @@ export default function SermonEditorPage({
     if ((status === "draft" || status === "in_review") && !allRequiredPassed) return;
     setStatus(next);
   }
-
-  const sections = [
-    {
-      id: "opening",
-      label: "Opening praise",
-      icon: "wb_twilight",
-      guide: [
-        "Hamd & Salawat (praise of Allah)",
-        "Shahada (testimony of faith)",
-        "Taqwa reminder verse",
-        "Introduce the topic",
-      ],
-    },
-    {
-      id: "main",
-      label: "Main theme",
-      icon: "auto_stories",
-      guide: [
-        "Core message & argument",
-        "Quran verses as evidence",
-        "Supporting hadith",
-        "Real-life examples",
-        "Practical lessons",
-      ],
-    },
-    {
-      id: "second",
-      label: "Second khutbah",
-      icon: "looks_two",
-      guide: [
-        "Brief hamd & salawat",
-        "Reinforce the message",
-        "Call to action",
-        "Salawat on the Prophet ﷺ",
-      ],
-    },
-    {
-      id: "dua",
-      label: "Closing du'a",
-      icon: "volunteer_activism",
-      guide: [
-        "Du'a for the ummah",
-        "Du'a for the sick & deceased",
-        "Du'a for guidance",
-        "Closing Quranic verse (16:90)",
-      ],
-    },
-  ];
 
   return (
     <div className="flex flex-col h-full">
@@ -411,15 +322,10 @@ export default function SermonEditorPage({
             Delete
           </button>
           <button
-            className="text-xs px-2 sm:px-2.5 py-1 border border-line bg-white text-ink hover:bg-surface transition-colors hidden sm:inline-flex"
-          >
-            Export
-          </button>
-          <button
             onClick={save}
             className="text-xs px-3 py-1 bg-primary text-white font-semibold hover:bg-secondary transition-colors"
           >
-            Save
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
@@ -487,24 +393,25 @@ export default function SermonEditorPage({
 
           <div className="h-px bg-line my-2.5" />
 
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">SECTIONS</p>
-          <div className="flex flex-col gap-0.5">
-            {sections.map((sec, i) => (
+          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">STRUCTURE</p>
+          <div className="flex flex-col gap-1">
+            {sectionChecks.map((sec) => (
               <button
                 key={sec.id}
-                onClick={() => {
-                  setActiveSection(sec.id);
-                  setMobilePanel("editor");
-                  document.getElementById(`section-${sec.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-                className={`flex items-center gap-1.5 text-[11px] px-1.5 py-1.5 text-left transition-colors ${
-                  activeSection === sec.id
-                    ? "bg-[#f3f0ea] text-ink font-medium"
-                    : "text-mute hover:bg-surface"
-                }`}
+                onClick={() => toggleSection(sec.id)}
+                className="flex items-center gap-2 text-[11px] px-1.5 py-1.5 text-left transition-colors hover:bg-surface group"
               >
-                <span className={`material-symbols-outlined text-[14px] shrink-0 ${activeSection === sec.id ? "text-primary" : "text-line"}`}>{sec.icon}</span>
-                <span className="truncate">{sec.label}</span>
+                <span className={`material-symbols-outlined text-[14px] shrink-0 transition-colors ${
+                  completedSections.has(sec.id) ? "text-green-600" : "text-line group-hover:text-mute"
+                }`}>
+                  {completedSections.has(sec.id) ? "check_circle" : "radio_button_unchecked"}
+                </span>
+                <span className={`material-symbols-outlined text-[13px] shrink-0 ${
+                  completedSections.has(sec.id) ? "text-primary/40" : "text-line"
+                }`}>{sec.icon}</span>
+                <span className={completedSections.has(sec.id) ? "text-mute line-through" : "text-mute"}>
+                  {sec.label}
+                </span>
               </button>
             ))}
           </div>
@@ -520,7 +427,6 @@ export default function SermonEditorPage({
             className="w-full text-[11px] text-ink bg-surface border border-line p-2 resize-none outline-none focus:border-primary transition-colors"
           />
 
-          {/* Delete/export on mobile */}
           <div className="flex gap-2 mt-4 md:hidden">
             <button
               onClick={handleDelete}
@@ -528,240 +434,66 @@ export default function SermonEditorPage({
             >
               Delete
             </button>
-            <button className="text-xs px-3 py-1.5 border border-line bg-white text-ink hover:bg-surface transition-colors flex-1">
-              Export
-            </button>
           </div>
         </div>
 
         {/* Center — Editor */}
         <div className={`${mobilePanel === "editor" ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0`}>
-          {/* Language toggle bar */}
-          <div className="flex items-center justify-between px-3 sm:px-3.5 py-2 border-b border-line bg-[#fdfcfa] flex-wrap gap-1.5">
-            <div className="flex bg-[#f3f0ea] p-0.5 gap-px overflow-x-auto">
-              {[
-                { key: "ar-first", label: "Arabic first", shortLabel: "AR 1st" },
-                { key: "en-first", label: "English first", shortLabel: "EN 1st" },
-                { key: "ar-only", label: "AR only", shortLabel: "AR" },
-                { key: "en-only", label: "EN only", shortLabel: "EN" },
-              ].map((m) => (
-                <button
-                  key={m.key}
-                  onClick={() => setLangMode(m.key)}
-                  className={`text-[11px] px-2 sm:px-2.5 py-1 transition-colors whitespace-nowrap ${
-                    langMode === m.key
-                      ? "bg-white text-ink border border-line"
-                      : "text-mute bg-transparent border border-transparent"
-                  }`}
-                >
-                  <span className="hidden sm:inline">{m.label}</span>
-                  <span className="sm:hidden">{m.shortLabel}</span>
-                </button>
-              ))}
+          {/* Toolbar */}
+          <div className="flex items-center justify-between px-3 sm:px-3.5 py-2 border-b border-line bg-[#fdfcfa]">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <button className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors font-bold shrink-0">B</button>
+              <button className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors italic shrink-0">I</button>
+              <button className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors underline shrink-0">U</button>
+              <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
+              <button className="px-1.5 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors shrink-0"><span className="material-symbols-outlined text-[14px]">format_quote</span></button>
+              <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
+              <button
+                onClick={() => { setRefType("quran"); setShowRefModal(true); }}
+                className="flex items-center gap-1 px-2 py-1 border border-line bg-white text-ink/70 hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-colors shrink-0 text-[11px] font-medium"
+              >
+                <span className="material-symbols-outlined text-[14px]">menu_book</span>
+                <span className="hidden sm:inline">Quran</span>
+              </button>
+              <button
+                onClick={() => { setRefType("hadith"); setShowRefModal(true); }}
+                className="flex items-center gap-1 px-2 py-1 border border-line bg-white text-ink/70 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors shrink-0 text-[11px] font-medium"
+              >
+                <span className="material-symbols-outlined text-[14px]">auto_stories</span>
+                <span className="hidden sm:inline">Hadith</span>
+              </button>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-mute">
-                {saving
-                  ? "Saving..."
-                  : lastSaved
-                  ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                  : ""}
-              </span>
-            </div>
-          </div>
-
-          {/* Formatting toolbar */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 mx-3 sm:mx-4 mt-3 bg-[#fcfaf6] border border-line overflow-x-auto">
-            <button className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors font-bold shrink-0">B</button>
-            <button className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors italic shrink-0">I</button>
-            <button className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors underline shrink-0">U</button>
-            <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
-            <button className="px-1.5 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors shrink-0"><span className="material-symbols-outlined text-[14px]">format_list_bulleted</span></button>
-            <button className="px-1.5 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors shrink-0"><span className="material-symbols-outlined text-[14px]">format_list_numbered</span></button>
-            <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
-            <button className="px-1.5 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors shrink-0"><span className="material-symbols-outlined text-[14px]">format_quote</span></button>
-            <button className="px-1.5 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors shrink-0"><span className="material-symbols-outlined text-[14px]">link</span></button>
-            <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
-            <button
-              onClick={() => { setRefType("quran"); setShowRefModal(true); }}
-              className="flex items-center gap-1 px-2 py-1 border border-line bg-white text-ink/70 hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-colors shrink-0 text-[11px] font-medium"
-            >
-              <span className="material-symbols-outlined text-[14px]">menu_book</span>
-              <span className="hidden sm:inline">Quran</span>
-            </button>
-            <button
-              onClick={() => { setRefType("hadith"); setShowRefModal(true); }}
-              className="flex items-center gap-1 px-2 py-1 border border-line bg-white text-ink/70 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors shrink-0 text-[11px] font-medium"
-            >
-              <span className="material-symbols-outlined text-[14px]">auto_stories</span>
-              <span className="hidden sm:inline">Hadith</span>
-            </button>
+            <span className="text-[10px] text-mute shrink-0 ml-2">
+              {saving
+                ? "Saving..."
+                : lastSaved
+                ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                : ""}
+            </span>
           </div>
 
           {/* Title */}
-          <div className="px-3 sm:px-4 pt-3 pb-2">
+          <div className="px-4 sm:px-6 pt-4 pb-1 bg-white">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Sermon title..."
-              className="w-full text-lg sm:text-xl font-bold text-ink placeholder:text-line bg-transparent border-none outline-none font-[var(--font-arabic)]"
+              className="w-full text-xl sm:text-2xl font-bold text-ink placeholder:text-line bg-transparent border-none outline-none"
             />
           </div>
 
-          {/* Writing area — continuous scroll with section dividers */}
-          <div className="flex-1 overflow-y-auto">
-            {(() => {
-              const showBoth = langMode === "ar-first" || langMode === "en-first";
-              const showAr = showBoth || langMode === "ar-only";
-              const showEn = showBoth || langMode === "en-only";
-
-              if (showBoth) {
-                return (
-                  <div className="flex mx-3 sm:mx-4 my-3 gap-0 min-h-0">
-                    {/* English column (left) */}
-                    <div className="flex-1 bg-white border border-line border-r-0 p-4 sm:p-5">
-                      <p className="text-[9px] tracking-[2px] text-mute/40 font-bold mb-4">ENGLISH</p>
-                      {sections.map((sec, secIdx) => {
-                        const secData = sectionData[sec.id] ?? { ar: "", en: "" };
-                        const isActive = activeSection === sec.id;
-                        return (
-                          <div key={sec.id} id={`section-${sec.id}`} onClick={() => setActiveSection(sec.id)}>
-                            <div className={`flex items-center gap-2 ${secIdx === 0 ? "mb-2" : "mt-5 mb-2"}`}>
-                              {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
-                              <div className={`flex items-center gap-1 transition-colors ${isActive ? "text-primary" : "text-mute/30"}`}>
-                                <span className="material-symbols-outlined text-xs">{sec.icon}</span>
-                                <span className="text-[8px] tracking-[1.5px] font-bold uppercase">{sec.label}</span>
-                              </div>
-                              {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
-                            </div>
-                            <textarea
-                              ref={(el) => {
-                                if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
-                                sectionRefs.current[sec.id].en = el;
-                              }}
-                              value={secData.en}
-                              onChange={(e) =>
-                                setSectionData((prev) => ({
-                                  ...prev,
-                                  [sec.id]: { ...prev[sec.id], en: e.target.value },
-                                }))
-                              }
-                              onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("en"); }}
-                              placeholder={`${sec.label} in English...`}
-                              className="w-full min-h-[60px] leading-relaxed text-ink bg-transparent border-none resize-none outline-none"
-                              style={{ fontSize: `${editorFontSize - 1}px` }}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Divider */}
-                    <div className="w-px bg-line shrink-0" />
-
-                    {/* Arabic column (right) */}
-                    <div className="flex-1 bg-white border border-line border-l-0 p-4 sm:p-5">
-                      <p className="text-[9px] tracking-[2px] text-mute/40 font-bold mb-4 text-right">العربية</p>
-                      {sections.map((sec, secIdx) => {
-                        const secData = sectionData[sec.id] ?? { ar: "", en: "" };
-                        const isActive = activeSection === sec.id;
-                        return (
-                          <div key={sec.id} onClick={() => setActiveSection(sec.id)}>
-                            <div className={`flex items-center gap-2 ${secIdx === 0 ? "mb-2" : "mt-5 mb-2"}`}>
-                              {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
-                              <div className={`flex items-center gap-1 transition-colors ${isActive ? "text-primary" : "text-mute/30"}`}>
-                                <span className="text-[8px] tracking-[1.5px] font-bold uppercase">{sec.label}</span>
-                                <span className="material-symbols-outlined text-xs">{sec.icon}</span>
-                              </div>
-                              {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
-                            </div>
-                            <textarea
-                              ref={(el) => {
-                                if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
-                                sectionRefs.current[sec.id].ar = el;
-                              }}
-                              value={secData.ar}
-                              onChange={(e) =>
-                                setSectionData((prev) => ({
-                                  ...prev,
-                                  [sec.id]: { ...prev[sec.id], ar: e.target.value },
-                                }))
-                              }
-                              onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("ar"); }}
-                              placeholder={sec.id === "opening" ? "...اكتب خطبتك هنا" : `...${sec.label}`}
-                              className="w-full min-h-[60px] font-[var(--font-arabic)] leading-[2] text-ink bg-transparent border-none resize-none outline-none text-right"
-                              style={{ fontSize: `${editorFontSize}px` }}
-                              dir="rtl"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div className="bg-white mx-3 sm:mx-4 my-3 border border-line p-4 sm:p-6">
-                  {sections.map((sec, secIdx) => {
-                    const secData = sectionData[sec.id] ?? { ar: "", en: "" };
-                    const isActive = activeSection === sec.id;
-                    return (
-                      <div key={sec.id} id={`section-${sec.id}`} onClick={() => setActiveSection(sec.id)}>
-                        <div className={`flex items-center gap-3 ${secIdx === 0 ? "mb-3" : "mt-6 mb-3"}`}>
-                          {secIdx > 0 && <div className="flex-1 h-px bg-[#e8e3d6]" />}
-                          <div className={`flex items-center gap-1.5 transition-colors ${isActive ? "text-primary" : "text-mute/40"}`}>
-                            <span className="material-symbols-outlined text-sm">{sec.icon}</span>
-                            <span className="text-[9px] tracking-[2px] font-bold uppercase">{sec.label}</span>
-                          </div>
-                          <div className="flex-1 h-px bg-[#e8e3d6]" />
-                        </div>
-                        {showAr && (
-                          <textarea
-                            ref={(el) => {
-                              if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
-                              sectionRefs.current[sec.id].ar = el;
-                            }}
-                            value={secData.ar}
-                            onChange={(e) =>
-                              setSectionData((prev) => ({
-                                ...prev,
-                                [sec.id]: { ...prev[sec.id], ar: e.target.value },
-                              }))
-                            }
-                            onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("ar"); }}
-                            placeholder={sec.id === "opening" ? "...اكتب خطبتك هنا" : `...${sec.label}`}
-                            className="w-full min-h-[60px] font-[var(--font-arabic)] leading-[2] text-ink bg-transparent border-none resize-none outline-none text-right"
-                            style={{ fontSize: `${editorFontSize}px` }}
-                            dir="rtl"
-                          />
-                        )}
-                        {showEn && (
-                          <textarea
-                            ref={(el) => {
-                              if (!sectionRefs.current[sec.id]) sectionRefs.current[sec.id] = { ar: null, en: null };
-                              sectionRefs.current[sec.id].en = el;
-                            }}
-                            value={secData.en}
-                            onChange={(e) =>
-                              setSectionData((prev) => ({
-                                ...prev,
-                                [sec.id]: { ...prev[sec.id], en: e.target.value },
-                              }))
-                            }
-                            onFocus={() => { setActiveSection(sec.id); setLastFocusedLang("en"); }}
-                            placeholder={`${sec.label} in English...`}
-                            className="w-full min-h-[60px] leading-relaxed text-ink bg-transparent border-none resize-none outline-none"
-                            style={{ fontSize: `${editorFontSize - 1}px` }}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+          {/* Single clean editor */}
+          <div className="flex-1 overflow-y-auto bg-white px-4 sm:px-6 pb-6">
+            <textarea
+              ref={editorRef}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="بسم الله الرحمن الرحيم — Begin writing your khutbah here. Mix Arabic and English freely..."
+              className="w-full h-full min-h-[400px] leading-[2.2] text-ink bg-transparent border-none resize-none outline-none"
+              style={{ fontSize: `${editorFontSize}px` }}
+              dir="auto"
+            />
           </div>
 
           {/* Status bar */}
@@ -773,18 +505,14 @@ export default function SermonEditorPage({
                 ? `Auto-saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                 : "Not saved yet"}
             </span>
-            <span>
-              {langMode === "ar-only" ? "AR" : langMode === "en-only" ? "EN" : "AR+EN"} · {words} words · ~{estMinutes} min
-            </span>
+            <span>{words} words · ~{estMinutes} min</span>
           </div>
         </div>
 
-        {/* Right panel — Context & Checklist */}
+        {/* Right panel — Checklist & References */}
         <div className={`${mobilePanel === "checklist" ? "flex" : "hidden"} md:flex w-full md:w-[200px] border-l border-line bg-white p-3.5 overflow-y-auto shrink-0 flex-col`}>
-          {/* Readiness checklist */}
           <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">READINESS</p>
           <div className="mb-3">
-            {/* Progress bar */}
             <div className="flex items-center gap-2 mb-2">
               <div className="flex-1 h-1.5 bg-surface overflow-hidden">
                 <div
@@ -795,7 +523,6 @@ export default function SermonEditorPage({
               <span className="text-[10px] font-bold text-mute">{passedChecks.length}/{checklist.length}</span>
             </div>
 
-            {/* Checklist items */}
             <div className="flex flex-col gap-1">
               {checklist.map((item) => {
                 const passed = item.check(checkCtx);
@@ -820,7 +547,6 @@ export default function SermonEditorPage({
               })}
             </div>
 
-            {/* Status advance button */}
             {nextAction[status] && (
               <button
                 onClick={handleStatusAdvance}
@@ -854,7 +580,6 @@ export default function SermonEditorPage({
 
           <div className="h-px bg-line my-2.5" />
 
-          {/* This Friday */}
           <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">THIS FRIDAY</p>
           <div className="bg-primary/5 p-2.5 mb-3">
             {scheduledDate ? (
@@ -871,7 +596,6 @@ export default function SermonEditorPage({
             )}
           </div>
 
-          {/* Word target */}
           <p className="text-[9px] tracking-[2px] text-mute/60 mb-2 mt-1">WORD TARGET</p>
           <div className="mb-3">
             <div className="flex items-baseline gap-1.5 mb-1">
@@ -884,10 +608,10 @@ export default function SermonEditorPage({
                 style={{ width: `${Math.min(100, (words / userWordTarget) * 100)}%` }}
               />
             </div>
-            <p className="text-[9px] text-mute/60 mt-1">~{Math.round(userWordTarget / 130)} min khutbah target</p>
           </div>
 
-          {/* References */}
+          <div className="h-px bg-line my-2.5" />
+
           <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">REFERENCES</p>
           {references.length > 0 ? (
             <div className="flex flex-col gap-1.5">
