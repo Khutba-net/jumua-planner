@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getUserId } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 import { writeFile } from "fs/promises";
 import path from "path";
 

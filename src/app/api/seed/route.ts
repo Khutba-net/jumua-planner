@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db, cuid } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function POST() {
   const userId = "demo-user";
   const year = 2026;

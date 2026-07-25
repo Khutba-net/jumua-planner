@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db, toJSON } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const body = await req.json();
   const { email } = body;

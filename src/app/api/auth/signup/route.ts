@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db, cuid, toJSON } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const body = await req.json();
   const { name, email, password, account_type, org_name, city, country } = body;
