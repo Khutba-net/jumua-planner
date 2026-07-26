@@ -6,18 +6,6 @@ export const dynamic = "force-dynamic";
 export async function POST() {
   const userId = "demo-user";
 
-  // Update demo user to look professional
-  db.prepare(`UPDATE users SET name = 'Sheikh Ahmed Al-Rashid', email = 'ahmed@alrahma-mosque.org', role = 'khatib', account_type = 'organization' WHERE id = ?`).run(userId);
-
-  // Create organization
-  const orgId = cuid();
-  db.prepare("DELETE FROM organizations WHERE name = 'Al-Rahma Islamic Centre'");
-  db.prepare(
-    "INSERT OR IGNORE INTO organizations (id, name, type, city, country, description) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(orgId, "Al-Rahma Islamic Centre", "mosque", "Calgary", "Canada", "A vibrant community mosque serving the Muslim community of Calgary with weekly Jumua prayers, educational programs, and community outreach.");
-
-  db.prepare("UPDATE users SET organization_id = ? WHERE id = ?").run(orgId, userId);
-
   // Clear existing sermons, references, themes
   db.prepare("DELETE FROM references_ WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = ?)").run(userId);
   db.prepare("DELETE FROM sermons WHERE author_id = ?").run(userId);
@@ -286,7 +274,7 @@ export async function POST() {
 
   return NextResponse.json({
     ok: true,
-    message: `Seeded 12 monthly themes, ${totalSermons} sermons, and ${totalRefs} references for Sheikh Ahmed Al-Rashid`,
+    message: `Seeded 12 monthly themes, ${totalSermons} sermons, and ${totalRefs} references`,
   });
 }
 
