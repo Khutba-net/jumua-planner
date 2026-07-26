@@ -6,11 +6,19 @@ export const dynamic = "force-dynamic";
 export async function POST() {
   const userId = "demo-user";
 
-  // Clear existing sermons, references, themes
+  // Clear existing content first (foreign keys)
   db.prepare("DELETE FROM references_ WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = ?)").run(userId);
+  db.prepare("DELETE FROM feedback WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = ?)").run(userId);
   db.prepare("DELETE FROM sermons WHERE author_id = ?").run(userId);
   db.prepare("DELETE FROM sub_topics WHERE theme_id IN (SELECT id FROM themes WHERE owner_id = ?)").run(userId);
   db.prepare("DELETE FROM themes WHERE owner_id = ?").run(userId);
+  db.prepare("DELETE FROM user_settings WHERE user_id = ?").run(userId);
+
+  // Recreate demo user with known credentials
+  db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+  db.prepare(
+    "INSERT INTO users (id, email, name, role, account_type) VALUES (?, ?, ?, ?, ?)"
+  ).run(userId, "demo@jumuaplanner.com", "Sheikh Ahmed", "khatib", "individual");
 
   // Settings
   db.prepare("INSERT OR REPLACE INTO user_settings (user_id, default_language, word_target, editor_font_size) VALUES (?, ?, ?, ?)").run(userId, "ar-first", 2500, 18);
