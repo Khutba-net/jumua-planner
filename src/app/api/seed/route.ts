@@ -3,7 +3,15 @@ import { db, cuid } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+export async function GET() {
+  return seed();
+}
+
 export async function POST() {
+  return seed();
+}
+
+async function seed() {
   const userId = "demo-user";
 
   // Clear existing content first (foreign keys)
