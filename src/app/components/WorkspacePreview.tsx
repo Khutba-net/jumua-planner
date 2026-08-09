@@ -96,9 +96,9 @@ function DashboardMockup() {
           <span className="text-[9px] text-[#00666d] font-semibold">View all →</span>
         </div>
         {[
-          { t: "The beauty of Tawheed", date: "FRI, JAN 2, 2026", theme: "AQEEDAH & FAITH" },
-          { t: "Patience in testing — a mark of faith", date: "FRI, JAN 9, 2026", theme: "AQEEDAH & FAITH" },
-          { t: "Certainty in God and daily life", date: "FRI, JAN 16, 2026", theme: "AQEEDAH & FAITH" },
+          { t: "The beauty of Tawheed", date: "FRI, JAN 2, 2026", theme: "FOUNDATIONS OF FAITH" },
+          { t: "Patience in testing — a mark of faith", date: "FRI, JAN 9, 2026", theme: "FOUNDATIONS OF FAITH" },
+          { t: "Certainty in God and daily life", date: "FRI, JAN 16, 2026", theme: "FOUNDATIONS OF FAITH" },
         ].map((s, i) => (
           <div key={i} className="bg-white border border-[#bcc9ca]/15 p-2.5 mb-1 flex items-center justify-between">
             <div>
@@ -154,11 +154,11 @@ function DashboardMockup() {
 
 function AnnualPlanMockup() {
   const themes = [
-    { name: "Aqeedah & Faith", color: "#5b7fa6", months: "Jan — Mar", subs: [
-      { name: "Tawheed & Sincerity", sermons: ["The beauty of Tawheed", "Patience in testing — a mark of faith"] },
+    { name: "Foundations of Faith", color: "#00666d", months: "Jan – Mar", subs: [
+      { name: "Tawheed & Sincerity", sermons: ["The beauty of Tawheed", "Patience in testing, a mark of faith"] },
       { name: "Trust in Allah", sermons: ["Certainty in God and daily life", "Living with trust in Allah"] },
     ], count: 9, status: "9 written" },
-    { name: "Morals & Purification", color: "#C4A35A", months: "Apr — Jun", subs: [
+    { name: "Family & Society", color: "#C4A35A", months: "Apr – Jun", subs: [
       { name: "Truthfulness & Integrity", sermons: ["Truthfulness in speech", "Integrity beyond appearance"] },
     ], count: 8, status: "6 written · 1 planned" },
   ];
@@ -170,14 +170,14 @@ function AnnualPlanMockup() {
             <p className="text-sm font-bold text-[#00666d] italic">Full year plan — 2026</p>
             <span className="text-[9px] text-[#6d797a]">‹ 2026 ›</span>
           </div>
-          <p className="text-[9px] text-[#6d797a]">4 themes · 9 sub-themes · 33 sermons</p>
+          <p className="text-[9px] text-[#6d797a]">4 seasons · 16 sub-bouquets · 52 Fridays</p>
         </div>
         <button className="bg-[#00666d] text-white text-[9px] px-2.5 py-1 font-bold">Export year plan</button>
       </div>
       {/* Stats strip */}
       <div className="flex border border-[#bcc9ca]/20 bg-white/60 mb-3">
         {[
-          { v: "48", l: "FRIDAYS" },
+          { v: "52", l: "FRIDAYS" },
           { v: "9", l: "SERIES 1" },
           { v: "8", l: "THEME 2" },
           { v: "8", l: "THEME 3" },
@@ -192,7 +192,7 @@ function AnnualPlanMockup() {
       </div>
       {/* Filters */}
       <div className="flex gap-1 mb-2 flex-wrap">
-        {["All themes", "Aqeedah & Faith", "Morals & Purification", "Unity & Brotherhood"].map((f, i) => (
+        {["All themes", "Foundations of Faith", "Family & Society", "Unity & Knowledge"].map((f, i) => (
           <span key={f} className={`text-[8px] font-bold px-2 py-1 ${i === 0 ? "bg-[#00666d] text-white" : "bg-white border border-[#bcc9ca]/30 text-[#6d797a]"}`}>{f}</span>
         ))}
       </div>
@@ -342,7 +342,7 @@ function EditorMockup() {
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-[9px] px-1.5 py-0.5 border border-[#bcc9ca]/30 bg-white text-[#1a1c1e]">← Sermons</span>
           <span className="text-[9px] text-[#1a1c1e] italic truncate hidden md:inline">Holding fast to Allah&apos;s rope together — Jul 10, 2026</span>
-          <span className="text-[7px] font-bold px-1.5 py-0.5 bg-[#C4A35A]/10 text-[#C4A35A] hidden md:inline">UNITY & BROTHERHOOD</span>
+          <span className="text-[7px] font-bold px-1.5 py-0.5 bg-[#C4A35A]/10 text-[#C4A35A] hidden md:inline">UNITY & KNOWLEDGE</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[8px] font-bold px-1.5 py-0.5 bg-orange-50 text-orange-600 flex items-center gap-0.5">
@@ -482,14 +482,15 @@ const mockups: Record<string, () => React.ReactNode> = {
 };
 
 export default function WorkspacePreview() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("annual");
   const sidebarActive = activeTab === "annual" ? "annual" : activeTab === "calendar" ? "calendar" : activeTab === "editor" ? "sermons" : "dashboard";
   const MockupComponent = mockups[activeTab];
 
   return (
-    <section className="py-24 px-5 md:px-[120px] bg-white">
-      <div className="text-center mb-16">
-        <h2 className="text-4xl font-bold text-primary mb-4">Intuitive Workspace</h2>
+    <section id="features" className="py-28 md:py-40 px-5 md:px-8 bg-white scroll-mt-20 overflow-hidden">
+      <div className="text-center mb-12 md:mb-16 max-w-4xl mx-auto">
+        <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold text-ink tracking-[-0.02em] leading-[1.08] mb-5">Everything you need to plan your year</h2>
+        <p className="text-lg md:text-xl text-ink/50 max-w-2xl mx-auto">Four connected surfaces, from the annual plan down to Friday&apos;s delivery.</p>
         <div className="flex justify-center gap-1 mt-8 bg-surface p-1 w-fit mx-auto flex-wrap">
           {tabs.map((tab) => (
             <button
