@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 interface UserData {
   id: string;
@@ -96,6 +97,7 @@ function SettingsSkeleton() {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [user, setUser] = useState<UserData | null>(null);
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [activeSection, setActiveSection] = useState("profile");
@@ -103,6 +105,7 @@ export default function SettingsPage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
@@ -206,6 +209,19 @@ export default function SettingsPage() {
     if (sidebarName) sidebarName.textContent = userName;
   }
 
+  async function handleDeleteAccount() {
+    if (!confirm("Are you sure you want to delete your account? All your sermons, themes, and data will be permanently deleted. This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/auth/delete-account", { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+      router.push("/");
+    } catch {
+      showToast("Failed to delete account", "error");
+      setDeleting(false);
+    }
+  }
+
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -280,6 +296,16 @@ export default function SettingsPage() {
 
   return (
     <div className="flex h-full">
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 text-white text-sm font-medium px-4 py-2.5 shadow-lg flex items-center gap-2 ${
+          toast.type === "error" ? "bg-red-500" : "bg-primary"
+        }`}>
+          <span className="material-symbols-outlined text-base">
+            {toast.type === "error" ? "error" : "check_circle"}
+          </span>
+          {toast.message}
+        </div>
+      )}
       {/* Section nav */}
       <div className="hidden md:block w-56 border-r border-line p-4 shrink-0">
         <button
@@ -336,18 +362,6 @@ export default function SettingsPage() {
               ))}
           </select>
         </div>
-
-        {/* Toast */}
-        {toast && (
-          <div className={`fixed top-4 right-4 z-50 text-white text-sm font-medium px-4 py-2.5 shadow-lg flex items-center gap-2 transition-all ${
-            toast.type === "error" ? "bg-red-500" : "bg-primary"
-          }`}>
-            <span className="material-symbols-outlined text-base">
-              {toast.type === "error" ? "error" : "check_circle"}
-            </span>
-            {toast.message}
-          </div>
-        )}
 
         {/* Profile */}
         {activeSection === "profile" && (
@@ -683,7 +697,7 @@ export default function SettingsPage() {
                   <div>
                     <p className="text-sm font-semibold text-ink">Upgrade to Organization</p>
                     <p className="text-xs text-mute mt-1">Get multi-khatib management, shared sermon bank, and moderator tools for your masjid.</p>
-                    <button className="mt-3 px-5 py-2 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">
+                    <button onClick={() => showToast("Coming soon", "error")} className="mt-3 px-5 py-2 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">
                       Upgrade — $49/mo
                     </button>
                   </div>
@@ -702,11 +716,11 @@ export default function SettingsPage() {
                       <p className="text-xs text-mute">Expires 12/2027</p>
                     </div>
                   </div>
-                  <button className="text-xs text-primary font-semibold hover:underline">Update</button>
+                  <button onClick={() => showToast("Coming soon", "error")} className="text-xs text-primary font-semibold hover:underline">Update</button>
                 </div>
                 <div className="flex items-center justify-between py-3 border-b border-line">
                   <p className="text-sm text-ink">View invoices</p>
-                  <button className="text-xs text-primary font-semibold hover:underline">View all</button>
+                  <button onClick={() => showToast("Coming soon", "error")} className="text-xs text-primary font-semibold hover:underline">View all</button>
                 </div>
               </div>
             </div>
@@ -733,7 +747,7 @@ export default function SettingsPage() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase">Team Members</p>
-                <button className="px-4 py-1.5 bg-primary text-white text-xs font-semibold hover:bg-secondary transition-colors">+ Invite Khatib</button>
+                <button onClick={() => showToast("Coming soon", "error")} className="px-4 py-1.5 bg-primary text-white text-xs font-semibold hover:bg-secondary transition-colors">+ Invite Khatib</button>
               </div>
               <div className="border border-line divide-y divide-line">
                 {[
@@ -756,12 +770,10 @@ export default function SettingsPage() {
             </div>
 
             <button
-              onClick={() => saveSection("profile", { name, email })}
-              disabled={saving}
-              className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2"
+              onClick={() => showToast("Coming soon", "error")}
+              className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors flex items-center gap-2"
             >
-              {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-              {saving ? "Saving..." : "Save Changes"}
+              Save Changes
             </button>
           </div>
         )}
@@ -780,13 +792,31 @@ export default function SettingsPage() {
                   <input type="password" placeholder="New password" className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
                   <input type="password" placeholder="Confirm new password" className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
                 </div>
-                <button className="mt-3 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">Update Password</button>
+                <button onClick={() => showToast("Coming soon", "error")} className="mt-3 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">Update Password</button>
               </div>
 
               <div className="border-t border-line pt-6">
                 <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-2">Export Your Data</p>
                 <p className="text-xs text-mute mb-3">Download all your sermons, themes, and settings as a JSON file.</p>
-                <button className="px-5 py-2 border border-line bg-white text-ink text-sm font-medium hover:bg-surface transition-colors flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/export");
+                      if (!res.ok) throw new Error("Export failed");
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `jumua-planner-export-${new Date().toISOString().slice(0, 10)}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      showToast("Data exported");
+                    } catch {
+                      showToast("Failed to export data", "error");
+                    }
+                  }}
+                  className="px-5 py-2 border border-line bg-white text-ink text-sm font-medium hover:bg-surface transition-colors flex items-center gap-2"
+                >
                   <span className="material-symbols-outlined text-base">download</span>
                   Export All Data
                 </button>
@@ -795,7 +825,7 @@ export default function SettingsPage() {
               <div className="border-t border-line pt-6">
                 <p className="text-[10px] font-bold text-red-600 tracking-[1.5px] uppercase mb-2">Danger Zone</p>
                 <p className="text-xs text-mute mb-3">Permanently delete your account and all associated data. This action cannot be undone.</p>
-                <button className="px-5 py-2 border border-red-300 bg-white text-red-600 text-sm font-medium hover:bg-red-50 transition-colors">Delete Account</button>
+                <button onClick={handleDeleteAccount} disabled={deleting} className="px-5 py-2 border border-red-300 bg-white text-red-600 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50">{deleting ? "Deleting..." : "Delete Account"}</button>
               </div>
             </div>
           </div>

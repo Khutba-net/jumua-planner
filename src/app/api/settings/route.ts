@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, toJSON } from "@/lib/db";
-import { getUserId } from "@/lib/auth";
+import { getUserId, AuthError } from "@/lib/auth";
+import { settingsUpdateSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
 
   const user = db.prepare("SELECT id, name, email, account_type, avatar_url, bio, phone FROM users WHERE id = ?").get(userId);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -20,9 +25,17 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const body = await req.json();
-  const { section } = body;
+  const parsed = parseBody(settingsUpdateSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+  const { section } = parsed.data;
 
   if (section === "profile") {
     const { name, email, bio, phone } = body;

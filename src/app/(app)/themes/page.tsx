@@ -28,6 +28,7 @@ interface Sermon {
   status: string;
   scheduled_date: string | null;
   theme_id: string | null;
+  sub_topic_id: string | null;
 }
 
 const MONTHS = [
@@ -57,7 +58,6 @@ const THEME_COLORS = [
 
 const STATUS_MAP: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   draft: { bg: "#f0eeeb", text: "#6d797a", dot: "#bcc9ca", label: "Not started" },
-  in_review: { bg: "#fdf3e7", text: "#a9822f", dot: "#C4A35A", label: "Planned" },
   ready: { bg: "#e8f5ee", text: "#1f7a4d", dot: "#2f9e5f", label: "Written" },
   delivered: { bg: "#e9f0f7", text: "#3c6194", dot: "#5b7fa6", label: "Delivered" },
   archived: { bg: "#f0eeeb", text: "#6d797a", dot: "#bcc9ca", label: "Archived" },
@@ -113,6 +113,7 @@ export default function AnnualPlanPage() {
   const [addTitleText, setAddTitleText] = useState("");
   const [addDate, setAddDate] = useState<string>("");
   const [addBusy, setAddBusy] = useState(false);
+  const [addSubTopicId, setAddSubTopicId] = useState<string | null>(null);
 
   // Inline title creation (52-Friday grid): keyed by ISO date
   const [gridAddIso, setGridAddIso] = useState<string | null>(null);
@@ -207,10 +208,12 @@ export default function AnnualPlanPage() {
   function openCreate(prefillMonth?: number) {
     setEditingTheme(null);
     setShowCreate(true);
-    const month = prefillMonth ?? SEASONS[Math.min(3, yearThemes.length)]?.startMonth ?? 1;
+    const filledSeasons = new Set(yearThemes.map((t) => Math.floor((t.month - 1) / 3)));
+    const firstEmpty = SEASONS.find((s) => !filledSeasons.has(s.n - 1));
+    const month = prefillMonth ?? firstEmpty?.startMonth ?? 1;
     setFormName("");
     setFormDesc("");
-    setFormColor(THEME_COLORS[yearThemes.length % THEME_COLORS.length].value);
+    setFormColor(THEME_COLORS[filledSeasons.size % THEME_COLORS.length].value);
     setFormMonth(month);
     setFormTopics(["", "", "", ""]);
   }
@@ -223,7 +226,8 @@ export default function AnnualPlanPage() {
     setFormColor(theme.color ?? "#00666d");
     setFormMonth(theme.month);
     const topics = theme.sub_topics.length > 0 ? theme.sub_topics.map((st) => st.name) : ["", "", "", ""];
-    setFormTopics(topics.length < 4 ? [...topics, ...Array(4 - topics.length).fill("")] : topics);
+    const padded = topics.length < 4 ? [...topics, ...Array(4 - topics.length).fill("")] : topics.slice(0, 4);
+    setFormTopics(padded);
   }
 
   function closeForm() {
@@ -262,19 +266,19 @@ export default function AnnualPlanPage() {
     fetchAll();
   }
 
-  function addSubField() { setFormTopics([...formTopics, ""]); }
   function setSubField(i: number, v: string) { setFormTopics(formTopics.map((t, idx) => (idx === i ? v : t))); }
-  function removeSubField(i: number) { setFormTopics(formTopics.filter((_, idx) => idx !== i)); }
 
   // ── Inline add title (season table) ──
-  function startAddTitle(theme: Theme, key: string) {
+  function startAddTitle(theme: Theme, key: string, subTopicId: string | null) {
     setAddingKey(key);
     setAddTitleText("");
     setAddDate(nextFridayForTheme(theme) ?? "");
+    setAddSubTopicId(subTopicId);
   }
   function cancelAddTitle() {
     setAddingKey(null);
     setAddTitleText("");
+    setAddSubTopicId(null);
   }
   async function submitAddTitle(theme: Theme) {
     const title = addTitleText.trim();
@@ -283,10 +287,11 @@ export default function AnnualPlanPage() {
     await fetch("/api/sermons", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, themeId: theme.id, status: "draft", scheduledDate: addDate || nextFridayForTheme(theme) }),
+      body: JSON.stringify({ title, themeId: theme.id, subTopicId: addSubTopicId, status: "draft", scheduledDate: addDate || nextFridayForTheme(theme) }),
     });
     setAddTitleText("");
     setAddingKey(null);
+    setAddSubTopicId(null);
     setAddBusy(false);
     fetchAll();
   }
@@ -331,14 +336,17 @@ export default function AnnualPlanPage() {
     seasonGroups.forEach((sg) => {
       sg.themes.forEach((theme) => {
         const ss = themeSermons(theme.id);
-        const subs = theme.sub_topics.length ? theme.sub_topics.map((s) => s.name) : ["General"];
-        const per = Math.max(1, Math.ceil(ss.length / subs.length));
-        subs.forEach((sub, si) => {
-          const slice = ss.slice(si * per, (si + 1) * per);
-          if (slice.length === 0) rows.push([sg.label, theme.name, sub, "", "", ""]);
+        const subEntries = theme.sub_topics.length
+          ? theme.sub_topics.map((s) => ({ name: s.name, id: s.id }))
+          : [{ name: "General", id: null as string | null }];
+        subEntries.forEach((sub) => {
+          const slice = sub.id
+            ? ss.filter((s) => s.sub_topic_id === sub.id)
+            : ss.filter((s) => !s.sub_topic_id);
+          if (slice.length === 0) rows.push([sg.label, theme.name, sub.name, "", "", ""]);
           slice.forEach((sr) =>
             rows.push([
-              sg.label, theme.name, sub,
+              sg.label, theme.name, sub.name,
               sr.scheduled_date ? sr.scheduled_date.slice(0, 10) : "",
               sr.title,
               (STATUS_MAP[sr.status] ?? STATUS_MAP.draft).label,
@@ -363,33 +371,36 @@ export default function AnnualPlanPage() {
     <div className="flex min-h-screen bg-cream-bg">
       <div className="flex-1 min-w-0">
         {/* ── Header ── */}
-        <header className="px-4 sm:px-6 lg:px-10 pt-6 pb-5 border-b border-line">
+        <header className="px-4 sm:px-6 lg:px-10 pt-7 pb-6 border-b border-line/60">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div>
-              <p className="text-[10px] font-bold tracking-[2.5px] text-accent-gold uppercase mb-1">Plan phase</p>
-              <h1 className="text-2xl sm:text-[28px] font-extrabold text-primary tracking-tight leading-none">
-                Annual Plan · {year}
+              <h1 className="text-[22px] sm:text-[26px] font-bold text-ink tracking-tight leading-none">
+                Annual Plan <span className="text-mute font-normal">·</span> <span className="text-primary">{year}</span>
               </h1>
-              <p className="mt-1.5 text-[13px] text-mute font-[var(--font-arabic)]" dir="rtl">
+              <p className="mt-2 text-[13px] text-mute/70 font-[var(--font-arabic)]" dir="rtl">
                 الخطة السنوية لخطبة الجمعة — {TARGET_FRIDAYS} جمعة
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               {/* Year stepper */}
-              <div className="flex items-center bg-white border border-line rounded-full overflow-hidden">
+              <div className="flex items-center bg-white border border-line/60 rounded-xl overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 <button onClick={() => setYear(year - 1)} aria-label="Previous year"
-                  className="w-8 h-8 grid place-items-center text-mute hover:text-primary hover:bg-primary/5 transition-colors">‹</button>
-                <span className="text-sm font-bold text-primary px-2 min-w-[46px] text-center tabular-nums">{year}</span>
+                  className="w-9 h-9 grid place-items-center text-mute hover:text-primary hover:bg-primary/5 transition-all duration-200">
+                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                </button>
+                <span className="text-[13px] font-semibold text-ink px-1 min-w-[44px] text-center tabular-nums select-none">{year}</span>
                 <button onClick={() => setYear(year + 1)} aria-label="Next year"
-                  className="w-8 h-8 grid place-items-center text-mute hover:text-primary hover:bg-primary/5 transition-colors">›</button>
+                  className="w-9 h-9 grid place-items-center text-mute hover:text-primary hover:bg-primary/5 transition-all duration-200">
+                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                </button>
               </div>
               {/* View toggle */}
-              <div className="flex items-center bg-white border border-line rounded-full p-0.5">
+              <div className="flex items-center bg-white border border-line/60 rounded-xl p-[3px] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 {(["seasons", "grid"] as const).map((v) => (
                   <button key={v} onClick={() => setView(v)}
-                    className={`text-[12px] font-semibold px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
-                      view === v ? "bg-primary text-white shadow-sm" : "text-mute hover:text-ink"
+                    className={`text-[12px] font-medium px-3 py-[7px] rounded-[9px] transition-all duration-200 flex items-center gap-1.5 ${
+                      view === v ? "bg-primary text-white shadow-[0_1px_3px_rgba(0,102,109,0.3)]" : "text-mute hover:text-ink"
                     }`}>
                     <span className="material-symbols-outlined text-[15px]">{v === "seasons" ? "table_rows" : "grid_view"}</span>
                     {v === "seasons" ? "Seasons" : "52 Fridays"}
@@ -397,7 +408,7 @@ export default function AnnualPlanPage() {
                 ))}
               </div>
               <button onClick={exportPlan}
-                className="h-9 px-3.5 text-[12px] font-semibold text-ink bg-white border border-line rounded-full hover:bg-surface transition-colors flex items-center gap-1.5">
+                className="h-9 px-3 text-[12px] font-medium text-mute bg-white border border-line/60 rounded-xl hover:text-ink hover:border-line shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px]">download</span>
                 <span className="hidden sm:inline">Export</span>
               </button>
@@ -405,35 +416,37 @@ export default function AnnualPlanPage() {
           </div>
 
           {/* Progress meter */}
-          <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
             <div className="flex-1 min-w-0">
-              <div className="flex items-baseline justify-between mb-1.5">
-                <p className="text-[12px] font-semibold text-ink">
-                  <span className="text-primary text-[15px] font-extrabold tabular-nums">{titled}</span>
-                  <span className="text-mute"> / {TARGET_FRIDAYS} Fridays titled</span>
+              <div className="flex items-baseline justify-between mb-2">
+                <p className="text-[13px] text-ink">
+                  <span className="text-primary text-[17px] font-bold tabular-nums">{titled}</span>
+                  <span className="text-mute/80 font-normal"> / {TARGET_FRIDAYS} Fridays titled</span>
                 </p>
-                <p className="text-[11px] text-mute tabular-nums">{pct}%</p>
+                <p className="text-[12px] text-mute/60 font-medium tabular-nums">{pct}%</p>
               </div>
-              <div className="h-2 rounded-full bg-line/70 overflow-hidden flex">
-                <div className="h-full bg-primary transition-[width] duration-500 ease-out"
+              <div className="h-[6px] rounded-full bg-ink/[0.06] overflow-hidden flex">
+                <div className="h-full bg-primary rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
                   style={{ width: `${Math.min(100, (delivered / TARGET_FRIDAYS) * 100)}%` }} title={`${delivered} delivered`} />
-                <div className="h-full bg-primary/40 transition-[width] duration-500 ease-out"
+                <div className="h-full bg-primary/35 transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
                   style={{ width: `${Math.min(100, ((written - delivered) / TARGET_FRIDAYS) * 100)}%` }} title="written" />
-                <div className="h-full bg-accent-gold/50 transition-[width] duration-500 ease-out"
+                <div className="h-full bg-accent-gold/45 transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
                   style={{ width: `${Math.min(100, ((titled - written) / TARGET_FRIDAYS) * 100)}%` }} title="planned" />
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+              <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2.5">
                 <Legend color="#00666d" label={`${delivered} delivered`} />
-                <Legend color="rgba(0,102,109,0.4)" label={`${written - delivered} written`} />
-                <Legend color="rgba(196,163,90,0.6)" label={`${titled - written} planned`} />
-                <Legend color="#e8e5df" label={`${Math.max(0, TARGET_FRIDAYS - titled)} open`} />
+                <Legend color="rgba(0,102,109,0.35)" label={`${written - delivered} written`} />
+                <Legend color="rgba(196,163,90,0.55)" label={`${titled - written} planned`} />
+                <Legend color="rgba(28,28,26,0.08)" label={`${Math.max(0, TARGET_FRIDAYS - titled)} open`} />
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
-              <button onClick={() => openCreate()}
-                className="h-9 px-4 text-[12px] font-bold text-white bg-primary rounded-full hover:bg-secondary transition-colors active:scale-95 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">add</span> Main theme
-              </button>
+              {seasonGroups.some((sg) => sg.themes.length === 0) && (
+                <button onClick={() => openCreate()}
+                  className="h-9 px-4 text-[12px] font-semibold text-white bg-primary rounded-xl hover:bg-secondary shadow-[0_1px_3px_rgba(0,102,109,0.25)] transition-all duration-200 active:scale-[0.97] flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px]">add</span> Main theme
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -449,9 +462,9 @@ export default function AnnualPlanPage() {
           ) : yearThemes.length === 0 ? (
             <EmptyWizard year={year} onStart={() => openCreate(1)} />
           ) : (
-            <div className="flex flex-col gap-5 max-w-6xl">
+            <div className="flex flex-col gap-4 max-w-6xl">
               {seasonGroups.map((sg, i) => (
-                <section key={sg.n} className="annual-rise" style={{ animationDelay: `${i * 70}ms` }}>
+                <section key={sg.n} className="annual-rise" style={{ animationDelay: `${i * 60}ms` }}>
                   <SeasonBlock
                     season={sg}
                     themeSermons={themeSermons}
@@ -471,8 +484,8 @@ export default function AnnualPlanPage() {
                 </section>
               ))}
               <button onClick={handleNewSermonBlank}
-                className="self-start text-[12px] text-mute hover:text-primary transition-colors flex items-center gap-1.5 mt-1">
-                <span className="material-symbols-outlined text-[16px]">bolt</span>
+                className="self-start text-[11px] text-mute/45 hover:text-primary transition-all duration-200 flex items-center gap-1.5 mt-2 py-1">
+                <span className="material-symbols-outlined text-[15px]">add</span>
                 Add a standalone Friday (Eid, special occasion)
               </button>
             </div>
@@ -483,18 +496,18 @@ export default function AnnualPlanPage() {
       {/* ── Create / Edit panel ── */}
       {isFormOpen && (
         <>
-          <div className="fixed inset-0 bg-black/25 backdrop-blur-sm z-40 lg:hidden" onClick={closeForm} />
-          <aside className="fixed right-0 top-0 h-full w-full sm:w-[400px] z-50 lg:z-auto lg:relative lg:w-[380px] border-l border-line bg-white overflow-y-auto shrink-0 shadow-xl lg:shadow-none">
-            <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-line px-6 py-4 flex items-center justify-between z-10">
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40 lg:hidden" onClick={closeForm} />
+          <aside className="fixed right-0 top-0 h-full w-full sm:w-[400px] z-50 lg:z-auto lg:relative lg:w-[380px] border-l border-line/40 bg-white overflow-y-auto shrink-0 shadow-[-4px_0_24px_rgba(0,0,0,0.06)] lg:shadow-none">
+            <div className="sticky top-0 bg-white/90 backdrop-blur-md border-b border-line/40 px-6 py-4 flex items-center justify-between z-10">
               <div>
-                <p className="text-[10px] font-bold tracking-[2px] uppercase text-accent-gold">
+                <p className="text-[11px] font-medium text-mute/60">
                   {formSeason.label} · {formSeason.range}
                 </p>
-                <p className="text-lg font-bold text-primary">{editingTheme ? "Edit theme" : "New main theme"}</p>
+                <p className="text-[17px] font-semibold text-ink mt-0.5">{editingTheme ? "Edit theme" : "New theme"}</p>
               </div>
               <button onClick={closeForm} aria-label="Close"
-                className="w-8 h-8 rounded-full bg-surface border border-line grid place-items-center text-mute hover:text-primary transition-colors">
-                <span className="material-symbols-outlined text-lg">close</span>
+                className="w-8 h-8 rounded-lg bg-ink/[0.04] grid place-items-center text-mute/60 hover:text-ink hover:bg-ink/[0.08] transition-all duration-200">
+                <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
@@ -502,26 +515,28 @@ export default function AnnualPlanPage() {
               <Field label="Theme name">
                 <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Foundations of Faith" autoFocus
-                  className="w-full text-[14px] font-semibold text-ink border border-line rounded-lg px-3.5 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-mute/50" />
+                  className="w-full text-[14px] font-medium text-ink border border-line/60 rounded-xl px-3.5 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
               </Field>
 
-              <Field label="Season (start month)">
+              <Field label="Season">
                 <select value={formMonth} onChange={(e) => setFormMonth(Number(e.target.value))}
-                  className="w-full text-[13px] font-semibold text-ink border border-line rounded-lg px-3 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all">
-                  {SEASONS.map((s) => (
-                    <option key={s.n} value={s.startMonth}>{s.label} · {s.range}</option>
-                  ))}
-                  {MONTHS.map((m, i) => (
-                    <option key={m} value={i + 1}>Starts {m}</option>
-                  ))}
+                  className="w-full text-[13px] font-medium text-ink border border-line/60 rounded-xl px-3 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200">
+                  {SEASONS.map((s) => {
+                    const taken = !editingTheme && yearThemes.some((t) => Math.floor((t.month - 1) / 3) === s.n - 1);
+                    return (
+                      <option key={s.n} value={s.startMonth} disabled={taken}>
+                        {s.label} · {s.range}{taken ? " (filled)" : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </Field>
 
               <Field label="Accent color">
-                <div className="flex gap-2.5">
+                <div className="flex gap-2">
                   {THEME_COLORS.map((c) => (
                     <button key={c.value} onClick={() => setFormColor(c.value)} title={c.label}
-                      className={`w-8 h-8 rounded-full transition-all ${formColor === c.value ? "ring-2 ring-offset-2 ring-primary scale-110" : "hover:scale-110"}`}
+                      className={`w-7 h-7 rounded-lg transition-all duration-200 ${formColor === c.value ? "ring-2 ring-offset-2 ring-primary scale-105" : "hover:scale-105"}`}
                       style={{ backgroundColor: c.value }} />
                   ))}
                 </div>
@@ -530,43 +545,33 @@ export default function AnnualPlanPage() {
               <Field label="Description">
                 <textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} rows={2}
                   placeholder="What this season's theme is about..."
-                  className="w-full text-[13px] text-ink border border-line rounded-lg px-3.5 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all resize-none placeholder:text-mute/50" />
+                  className="w-full text-[13px] text-ink border border-line/60 rounded-xl px-3.5 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 resize-none placeholder:text-mute/40" />
               </Field>
 
-              <Field label="Sub-bouquets · الباقات الفرعية">
+              <Field label="Sub-bouquets">
                 <div className="flex flex-col gap-2">
                   {formTopics.map((t, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full text-[10px] font-bold grid place-items-center shrink-0 text-white"
+                      <span className="w-[18px] h-[18px] text-[9px] font-bold grid place-items-center shrink-0 text-white"
                         style={{ backgroundColor: formColor }}>{i + 1}</span>
                       <input type="text" value={t} onChange={(e) => setSubField(i, e.target.value)}
                         placeholder={`Sub-bouquet ${i + 1}`}
-                        className="flex-1 text-[13px] text-ink border border-line rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-mute/50" />
-                      {formTopics.length > 1 && (
-                        <button onClick={() => removeSubField(i)} className="text-mute hover:text-red-500 transition-colors" aria-label="Remove">
-                          <span className="material-symbols-outlined text-base">close</span>
-                        </button>
-                      )}
+                        className="flex-1 text-[13px] text-ink border border-line/60 rounded-xl px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
                     </div>
                   ))}
                 </div>
-                {formTopics.length < 6 && (
-                  <button onClick={addSubField} className="text-[11px] font-bold text-primary hover:text-secondary mt-2.5 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">add</span> Add sub-bouquet
-                  </button>
-                )}
               </Field>
 
-              <div className="flex flex-col gap-2.5 pt-1">
+              <div className="flex flex-col gap-2.5 pt-2">
                 <button onClick={handleSave} disabled={!formName.trim() || saving}
-                  className={`w-full py-2.5 text-[13px] font-bold rounded-lg transition-all ${
-                    formName.trim() && !saving ? "bg-primary text-white hover:bg-secondary active:scale-[0.98]" : "bg-line text-mute cursor-not-allowed"
+                  className={`w-full py-2.5 text-[13px] font-semibold rounded-xl transition-all duration-200 ${
+                    formName.trim() && !saving ? "bg-primary text-white hover:bg-secondary shadow-[0_1px_3px_rgba(0,102,109,0.25)] active:scale-[0.98]" : "bg-ink/[0.06] text-mute cursor-not-allowed"
                   }`}>
                   {saving ? "Saving…" : editingTheme ? "Update theme" : "Create theme"}
                 </button>
                 {editingTheme && (
                   <button onClick={() => handleDelete(editingTheme.id)}
-                    className="w-full py-2 text-[12px] font-semibold text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-all">
+                    className="w-full py-2 text-[12px] font-medium text-red-500/80 border border-red-200/60 rounded-xl hover:bg-red-50/50 transition-all duration-200">
                     Delete theme
                   </button>
                 )}
@@ -583,8 +588,8 @@ export default function AnnualPlanPage() {
 
 function Legend({ color, label }: { color: string; label: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-[10.5px] text-mute">
-      <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+    <span className="flex items-center gap-1.5 text-[11px] text-mute/60">
+      <span className="w-2 h-2 rounded-[3px]" style={{ backgroundColor: color }} />
       {label}
     </span>
   );
@@ -593,13 +598,13 @@ function Legend({ color, label }: { color: string; label: string }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="text-[10px] font-bold tracking-[1.5px] uppercase text-mute block mb-1.5">{label}</label>
+      <label className="text-[11px] font-medium text-mute/70 block mb-2">{label}</label>
       {children}
     </div>
   );
 }
 
-/* ── Season block: the Main theme │ Sub-bouquets │ Sermon titles table ── */
+/* ── Season block: 1 Main theme │ 4 Sub-bouquets │ 4 Sermon titles each ── */
 function SeasonBlock({
   season, themeSermons, onEditTheme, onAddThemeToSeason,
   addingKey, onStartAdd, onCancelAdd, addTitleText, setAddTitleText,
@@ -610,7 +615,7 @@ function SeasonBlock({
   onEditTheme: (t: Theme) => void;
   onAddThemeToSeason: () => void;
   addingKey: string | null;
-  onStartAdd: (t: Theme, key: string) => void;
+  onStartAdd: (t: Theme, key: string, subTopicId: string | null) => void;
   onCancelAdd: () => void;
   addTitleText: string;
   setAddTitleText: (v: string) => void;
@@ -620,145 +625,154 @@ function SeasonBlock({
   submitAddTitle: (t: Theme) => void;
   addBusy: boolean;
 }) {
-  const seasonSermons = season.themes.reduce((n, t) => n + themeSermons(t.id).length, 0);
-
+  const theme = season.themes[0] ?? null;
+  const color = theme?.color || "#00666d";
+  const ss = season.themes.flatMap((t) => themeSermons(t.id));
+  const allSubTopics = season.themes.flatMap((t) => t.sub_topics);
+  const subSlots = Array.from({ length: 4 }, (_, i) => allSubTopics[i] ?? null);
   return (
-    <div className="bg-white border border-line rounded-xl overflow-hidden">
+    <div className="bg-white border border-line/50 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.02)]">
       {/* Season header */}
-      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-line bg-surface/60">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-line/40">
         <div className="flex items-center gap-3">
-          <span className="w-9 h-9 rounded-lg bg-primary/10 text-primary grid place-items-center text-[15px] font-extrabold tabular-nums">
+          <span className="w-8 h-8 bg-primary/10 text-primary grid place-items-center text-[13px] font-bold tabular-nums">
             {season.n}
           </span>
           <div>
             <p className="text-[14px] font-bold text-ink leading-tight">
-              {season.label} <span className="text-mute font-medium">· {season.range}</span>
+              {season.label} <span className="text-mute/70 font-medium">· {season.range}</span>
             </p>
-            <p className="text-[11px] text-mute font-[var(--font-arabic)]" dir="rtl">{season.ar}</p>
+            <p className="text-[10.5px] text-mute/50 font-[var(--font-arabic)] mt-0.5" dir="rtl">{season.ar}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-mute tabular-nums hidden sm:inline">{seasonSermons} Fridays</span>
-          <button onClick={onAddThemeToSeason}
-            className="text-[11px] font-semibold text-primary border border-primary/20 bg-primary/5 rounded-full px-3 py-1 hover:bg-primary/10 transition-colors flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px]">add</span> Theme
-          </button>
-        </div>
+        {theme && (
+          <span className="text-[11px] text-mute/70 font-medium tabular-nums hidden sm:inline">
+            {ss.length} titles
+          </span>
+        )}
       </div>
 
-      {season.themes.length === 0 ? (
+      {!theme ? (
         <button onClick={onAddThemeToSeason}
-          className="w-full py-8 text-center text-[12px] text-mute hover:text-primary hover:bg-primary/[0.02] transition-colors flex flex-col items-center gap-1.5">
-          <span className="material-symbols-outlined text-2xl text-line">add_circle</span>
+          className="w-full py-10 text-center text-[12px] text-mute/50 hover:text-primary transition-all duration-200 flex flex-col items-center gap-2 group">
+          <span className="material-symbols-outlined text-2xl text-mute/25 group-hover:text-primary/50 transition-colors duration-200">add_circle</span>
           Set the main theme for {season.range}
         </button>
       ) : (
         <div>
-          {/* Column labels */}
-          <div className="hidden sm:grid grid-cols-[190px_minmax(0,1fr)] px-5 pt-3 pb-1.5 text-[9px] font-bold tracking-[1.5px] uppercase text-mute/70">
-            <span>Main theme</span>
-            <span className="grid grid-cols-[170px_minmax(0,1fr)]"><span>Sub-bouquet</span><span>Sermon titles · Fridays</span></span>
+          {/* Theme name bar */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-line/40 bg-ink/[0.015]">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+              <button onClick={() => onEditTheme(theme)}
+                className="text-left text-[14px] font-bold text-ink hover:text-primary transition-all duration-200 leading-snug">
+                {theme.name}
+              </button>
+            </div>
+            <span className="text-[10px] text-mute/70 font-medium">
+              {theme.sub_topics.length}/4 bouquets · {ss.length} titles
+            </span>
           </div>
 
-          {season.themes.map((theme) => {
-            const color = theme.color || "#00666d";
-            const ss = themeSermons(theme.id);
-            const subs = theme.sub_topics.length ? theme.sub_topics.map((s) => s.name) : ["Untitled sub-bouquet"];
-            const per = Math.max(1, Math.ceil(ss.length / subs.length));
+          {/* Column labels */}
+          <div className="hidden sm:grid grid-cols-[170px_minmax(0,1fr)] px-5 pt-3 pb-1.5 text-[10px] font-semibold text-mute/60 uppercase tracking-wide">
+            <span>Sub-bouquet</span><span>Sermon titles</span>
+          </div>
 
-            return (
-              <div key={theme.id} className="grid grid-cols-1 sm:grid-cols-[190px_minmax(0,1fr)] border-t border-line">
-                {/* Main theme cell */}
-                <div className="px-5 py-3.5 sm:border-r border-line flex sm:flex-col items-center sm:items-start gap-2 sm:gap-1.5 bg-surface/30">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  <button onClick={() => onEditTheme(theme)}
-                    className="text-left text-[14px] font-bold text-ink hover:text-primary transition-colors leading-snug">
-                    {theme.name}
-                  </button>
-                  <span className="text-[10px] text-mute sm:mt-0.5">
-                    {theme.sub_topics.length} bouquets · {ss.length} Fridays
-                  </span>
-                </div>
+          {/* 4 sub-bouquet slots */}
+          <div className="divide-y divide-line/30">
+            {subSlots.map((sub, si) => {
+              const slice = sub
+                ? ss.filter((s) => s.sub_topic_id === sub.id).slice(0, 4)
+                : [];
+              const key = `${theme.id}:${si}`;
+              const isAdding = addingKey === key;
+              const dateOpts = isAdding ? dateOptionsFor(theme) : [];
+              const hasSubTopic = sub !== null;
+              const emptySlots = 4 - slice.length;
 
-                {/* Sub-bouquets + titles */}
-                <div className="divide-y divide-line/70">
-                  {subs.map((sub, si) => {
-                    const slice = ss.slice(si * per, (si + 1) * per);
-                    const key = `${theme.id}:${si}`;
-                    const isAdding = addingKey === key;
-                    const dateOpts = isAdding ? dateOptionsFor(theme) : [];
-                    return (
-                      <div key={si} className="grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)]">
-                        {/* sub-bouquet name */}
-                        <div className="px-5 sm:px-4 pt-2.5 sm:py-3 sm:border-r border-line/70 flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full text-[10px] font-bold grid place-items-center shrink-0 text-white" style={{ backgroundColor: color }}>
-                            {si + 1}
-                          </span>
-                          <span className="text-[12.5px] font-semibold text-ink">{sub}</span>
-                        </div>
-                        {/* titles */}
-                        <div className="px-5 sm:px-4 pb-2.5 sm:py-2 flex flex-col">
-                          {slice.length === 0 && !isAdding && (
-                            <span className="text-[11px] text-mute/60 italic py-1">No titles yet</span>
-                          )}
-                          {slice.map((sr) => {
-                            const st = STATUS_MAP[sr.status] ?? STATUS_MAP.draft;
-                            return (
-                              <Link key={sr.id} href={`/sermons/${sr.id}/edit`}
-                                className="group flex items-center gap-2.5 py-1.5 -mx-1.5 px-1.5 rounded-md hover:bg-primary/[0.04] transition-colors">
-                                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: st.dot }} />
-                                <span className="text-[10px] text-mute tabular-nums w-[42px] shrink-0">
-                                  {sr.scheduled_date ? formatFriday(sr.scheduled_date.slice(0, 10)) : "—"}
-                                </span>
-                                <span className="text-[12.5px] text-ink font-medium truncate min-w-0 flex-1 group-hover:text-primary transition-colors">
-                                  {sr.title}
-                                </span>
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
-                                  style={{ backgroundColor: st.bg, color: st.text }}>{st.label}</span>
-                              </Link>
-                            );
-                          })}
+              return (
+                <div key={si} className="grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)]">
+                  {/* sub-bouquet name */}
+                  <div className="px-5 sm:px-4 pt-2.5 sm:py-3 sm:border-r border-line/30 flex items-center gap-2">
+                    <span className="w-[18px] h-[18px] text-[9px] font-bold grid place-items-center shrink-0 text-white"
+                      style={{ backgroundColor: hasSubTopic ? color : "#ccc" }}>
+                      {si + 1}
+                    </span>
+                    <span className={`text-[12.5px] font-semibold ${hasSubTopic ? "text-ink" : "text-mute/35 italic"}`}>
+                      {sub?.name ?? "Empty slot"}
+                    </span>
+                  </div>
 
-                          {isAdding ? (
-                            <div className="mt-1.5 flex flex-col gap-2 bg-primary/[0.03] border border-primary/20 rounded-lg p-2">
-                              <input autoFocus value={addTitleText} disabled={addBusy}
-                                onChange={(e) => setAddTitleText(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") submitAddTitle(theme);
-                                  if (e.key === "Escape") onCancelAdd();
-                                }}
-                                placeholder="Sermon title…"
-                                className="text-[12.5px] text-ink bg-white border border-line rounded-md px-2.5 py-1.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 placeholder:text-mute/50" />
-                              <div className="flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-[15px] text-mute shrink-0">event</span>
-                                <select value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
-                                  className="flex-1 min-w-0 text-[11.5px] font-semibold text-ink bg-white border border-line rounded-md px-2 py-1.5 outline-none focus:border-primary">
-                                  {dateOpts.length === 0 && <option value="">No open Fridays in season</option>}
-                                  {dateOpts.map((iso) => (
-                                    <option key={iso} value={iso}>Fri {formatFriday(iso)}</option>
-                                  ))}
-                                </select>
-                                <button onClick={() => submitAddTitle(theme)} disabled={!addTitleText.trim() || addBusy}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-md transition-colors ${
-                                    addTitleText.trim() && !addBusy ? "bg-primary text-white hover:bg-secondary" : "bg-line text-mute cursor-not-allowed"
-                                  }`}>{addBusy ? "…" : "Add"}</button>
-                                <button onClick={onCancelAdd} className="text-[11px] font-semibold text-mute hover:text-ink px-1.5 py-1.5">Cancel</button>
-                              </div>
+                  {/* titles */}
+                  <div className="px-5 sm:px-4 pb-2.5 sm:py-2 flex flex-col">
+                    {!hasSubTopic ? (
+                      <button onClick={() => onEditTheme(theme)}
+                        className="text-[11px] text-mute/40 hover:text-primary py-2 flex items-center gap-1 transition-colors duration-200">
+                        <span className="material-symbols-outlined text-[13px]">edit</span>
+                        Edit theme to name this sub-bouquet
+                      </button>
+                    ) : (
+                      <>
+                        {slice.map((sr) => {
+                          const st = STATUS_MAP[sr.status] ?? STATUS_MAP.draft;
+                          return (
+                            <Link key={sr.id} href={`/sermons/${sr.id}/edit`}
+                              className="group flex items-center gap-2.5 py-[7px] -mx-2 px-2 hover:bg-ink/[0.03] transition-all duration-200">
+                              <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: st.dot }} />
+                              <span className="text-[11px] text-mute/70 font-medium tabular-nums w-[42px] shrink-0">
+                                {sr.scheduled_date ? formatFriday(sr.scheduled_date.slice(0, 10)) : "—"}
+                              </span>
+                              <span className="text-[13px] text-ink font-medium truncate min-w-0 flex-1 group-hover:text-primary transition-colors duration-200">
+                                {sr.title}
+                              </span>
+                              <span className="text-[9.5px] font-semibold px-1.5 py-[3px] whitespace-nowrap"
+                                style={{ backgroundColor: st.bg, color: st.text }}>{st.label}</span>
+                            </Link>
+                          );
+                        })}
+
+                        {isAdding ? (
+                          <div className="mt-1.5 flex flex-col gap-2 bg-primary/[0.02] border border-primary/15 p-2.5">
+                            <input autoFocus value={addTitleText} disabled={addBusy}
+                              onChange={(e) => setAddTitleText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") submitAddTitle(theme);
+                                if (e.key === "Escape") onCancelAdd();
+                              }}
+                              placeholder="Sermon title…"
+                              className="text-[12.5px] text-ink font-medium bg-white border border-line/60 px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
+                            <div className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[14px] text-mute/50 shrink-0">event</span>
+                              <select value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
+                                className="flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none focus:border-primary transition-all duration-200">
+                                {dateOpts.length === 0 && <option value="">No open Fridays</option>}
+                                {dateOpts.map((iso) => (
+                                  <option key={iso} value={iso}>Fri {formatFriday(iso)}</option>
+                                ))}
+                              </select>
+                              <button onClick={() => submitAddTitle(theme)} disabled={!addTitleText.trim() || addBusy}
+                                className={`text-[11px] font-bold px-3 py-1.5 transition-all duration-200 ${
+                                  addTitleText.trim() && !addBusy ? "bg-primary text-white hover:bg-secondary" : "bg-ink/[0.06] text-mute cursor-not-allowed"
+                                }`}>{addBusy ? "…" : "Add"}</button>
+                              <button onClick={onCancelAdd} className="text-[11px] font-medium text-mute/60 hover:text-ink px-1.5 py-1.5 transition-colors duration-200">Cancel</button>
                             </div>
-                          ) : (
-                            <button onClick={() => onStartAdd(theme, key)}
-                              className="mt-0.5 self-start text-[11px] font-semibold text-mute hover:text-primary transition-colors flex items-center gap-1 py-1">
-                              <span className="material-symbols-outlined text-[14px]">add</span> Add title
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                          </div>
+                        ) : emptySlots > 0 ? (
+                          <button onClick={() => onStartAdd(theme, key, sub.id)}
+                            className="mt-0.5 self-start text-[11px] font-medium text-mute/50 hover:text-primary transition-all duration-200 flex items-center gap-0.5 py-1">
+                            <span className="material-symbols-outlined text-[13px]">add</span> Add title
+                            <span className="text-mute/30 ml-1">({emptySlots} remaining)</span>
+                          </button>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+
+          </div>
         </div>
       )}
     </div>

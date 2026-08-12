@@ -27,6 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     fetch("/api/dashboard")
       .then((r) => {
         if (r.status === 401) { router.push("/auth/login"); return null; }
+        if (r.status === 403) return r.json().then((d: { onboarding?: boolean }) => { if (d.onboarding === false) router.push("/setup"); return null; });
         return r.json();
       })
       .then((d) => { if (d) setUser(d.user); })
@@ -40,7 +41,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-cream-bg flex">
       {/* Mobile top bar */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-line flex items-center justify-between px-4 py-3 lg:hidden">
+      <div data-app-topbar className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-line flex items-center justify-between px-4 py-3 lg:hidden">
         <button onClick={() => setSidebarOpen(true)} className="text-primary">
           <span className="material-symbols-outlined text-2xl">menu</span>
         </button>
@@ -64,7 +65,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Sidebar */}
-      <aside className={`
+      <aside data-app-sidebar className={`
         fixed top-0 left-0 h-full z-50 w-64 bg-white border-r border-line flex flex-col shrink-0
         transition-transform duration-200 ease-in-out
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
@@ -140,7 +141,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 min-w-0 min-h-screen pt-14 lg:pt-0">
+      <main data-app-main className="flex-1 min-w-0 min-h-screen pt-14 lg:pt-0">
         {children}
       </main>
     </div>

@@ -54,11 +54,12 @@ html.dark select {
 }
 
 @keyframes annualRise {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
-.annual-rise { animation: annualRise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.annual-rise { animation: annualRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
   .annual-rise { animation: none; }
 }
+

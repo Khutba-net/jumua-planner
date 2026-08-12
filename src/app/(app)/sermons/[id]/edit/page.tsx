@@ -29,11 +29,10 @@ function wordCount(text: string | null) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-const allStatuses = ["draft", "in_review", "ready", "delivered", "archived"];
+const allStatuses = ["draft", "ready", "delivered", "archived"];
 
 const statusLabel: Record<string, string> = {
   draft: "DRAFT",
-  in_review: "IN REVIEW",
   ready: "READY",
   delivered: "DELIVERED",
   archived: "ARCHIVED",
@@ -41,7 +40,6 @@ const statusLabel: Record<string, string> = {
 
 const statusStyle: Record<string, string> = {
   draft: "bg-[#f3f0ea] text-[#8a7968]",
-  in_review: "bg-orange-50 text-orange-600",
   ready: "bg-green-50 text-green-700",
   delivered: "bg-[#f0eef8] text-[#6b5fa0]",
   archived: "bg-surface text-mute",
@@ -49,7 +47,6 @@ const statusStyle: Record<string, string> = {
 
 const statusIcon: Record<string, string> = {
   draft: "edit_note",
-  in_review: "rate_review",
   ready: "check_circle",
   delivered: "event_available",
   archived: "inventory_2",
@@ -115,6 +112,8 @@ export default function SermonEditorPage({
   const [refContent, setRefContent] = useState("");
   const [refSaving, setRefSaving] = useState(false);
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -152,7 +151,7 @@ export default function SermonEditorPage({
       .catch(() => setLoading(false));
   }, [id]);
 
-  const save = useCallback(async () => {
+  const save = useCallback(async (overrides?: { status?: string }) => {
     setSaving(true);
     await fetch(`/api/sermons/${id}`, {
       method: "PUT",
@@ -161,7 +160,7 @@ export default function SermonEditorPage({
         title,
         content,
         outline: "",
-        status,
+        status: overrides?.status ?? status,
         scheduledDate: scheduledDate || null,
         notes,
       }),
@@ -170,11 +169,18 @@ export default function SermonEditorPage({
     setSaving(false);
   }, [id, title, content, status, scheduledDate, notes]);
 
+  const changeStatus = useCallback((newStatus: string) => {
+    setStatus(newStatus);
+    save({ status: newStatus });
+  }, [save]);
+
   useEffect(() => {
     if (!sermon) return;
     const timer = setInterval(() => save(), 30000);
     return () => clearInterval(timer);
   }, [sermon, save]);
+
+  const bothClosed = !leftOpen && !rightOpen;
 
   function insertAtCursor(block: string) {
     const textarea = editorRef.current;
@@ -190,6 +196,28 @@ export default function SermonEditorPage({
         textarea.focus();
       });
     }
+  }
+
+  function wrapSelection(prefix: string, suffix: string) {
+    const textarea = editorRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = textarea.value.slice(start, end);
+    const before = textarea.value.slice(0, start);
+    const after = textarea.value.slice(end);
+    const wrapped = prefix + (selected || "text") + suffix;
+    setContent(before + wrapped + after);
+    requestAnimationFrame(() => {
+      if (selected) {
+        textarea.selectionStart = start + prefix.length;
+        textarea.selectionEnd = start + prefix.length + selected.length;
+      } else {
+        textarea.selectionStart = start + prefix.length;
+        textarea.selectionEnd = start + prefix.length + 4;
+      }
+      textarea.focus();
+    });
   }
 
   async function handleAddReference() {
@@ -272,22 +300,20 @@ export default function SermonEditorPage({
   const allRequiredPassed = requiredPassed === requiredTotal;
 
   const nextStatus: Record<string, string> = {
-    draft: "in_review",
-    in_review: "ready",
+    draft: "ready",
     ready: "delivered",
   };
 
   const nextAction: Record<string, string> = {
-    draft: "Submit for Review",
-    in_review: "Mark Ready",
+    draft: "Mark Ready",
     ready: "Mark Delivered",
   };
 
   function handleStatusAdvance() {
     const next = nextStatus[status];
     if (!next) return;
-    if ((status === "draft" || status === "in_review") && !allRequiredPassed) return;
-    setStatus(next);
+    if (status === "draft" && !allRequiredPassed) return;
+    changeStatus(next);
   }
 
   return (
@@ -322,7 +348,7 @@ export default function SermonEditorPage({
             Delete
           </button>
           <button
-            onClick={save}
+            onClick={() => save()}
             className="text-xs px-3 py-1 bg-primary text-white font-semibold hover:bg-secondary transition-colors"
           >
             {saving ? "Saving..." : "Save"}
@@ -355,8 +381,14 @@ export default function SermonEditorPage({
       {/* 3-column layout */}
       <div className="flex-1 flex min-h-0">
         {/* Left panel — Speech info */}
-        <div className={`${mobilePanel === "info" ? "flex" : "hidden"} md:flex w-full md:w-[175px] border-r border-line bg-white p-3.5 overflow-y-auto shrink-0 flex-col`}>
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">SPEECH INFO</p>
+        <div className={`${mobilePanel === "info" ? "flex" : "hidden"} md:flex border-r border-line bg-white overflow-hidden shrink-0 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${leftOpen ? "w-full md:w-[175px] p-3.5" : "md:w-0 md:p-0 md:border-none"}`}>
+          <div className={`${leftOpen ? "opacity-100" : "opacity-0 pointer-events-none"} transition-opacity duration-200 flex flex-col min-w-[160px]`}>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[9px] tracking-[2px] text-mute/60">SPEECH INFO</p>
+            <button onClick={() => setLeftOpen(false)} className="hidden md:flex items-center justify-center w-5 h-5 rounded-md text-mute/40 hover:text-mute hover:bg-surface transition-colors" title="Collapse panel">
+              <span className="material-symbols-outlined text-[14px]">chevron_left</span>
+            </button>
+          </div>
 
           <div className="mb-2.5">
             <p className="text-[10px] text-mute/60">Date</p>
@@ -372,7 +404,7 @@ export default function SermonEditorPage({
             <p className="text-[10px] text-mute/60">Status</p>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => changeStatus(e.target.value)}
               className="text-xs font-medium text-ink bg-transparent border-none outline-none w-full"
             >
               {allStatuses.map((s) => (
@@ -435,18 +467,41 @@ export default function SermonEditorPage({
               Delete
             </button>
           </div>
+          </div>
         </div>
 
         {/* Center — Editor */}
-        <div className={`${mobilePanel === "editor" ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0`}>
+        <div className={`${mobilePanel === "editor" ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0 relative`}>
+          {/* Left re-open tab */}
+          {!leftOpen && (
+            <button
+              onClick={() => setLeftOpen(true)}
+              className="hidden md:flex absolute left-0 top-3 z-10 items-center justify-center w-5 h-10 bg-white border border-l-0 border-line rounded-r-lg text-mute/50 hover:text-primary hover:bg-primary/5 transition-colors shadow-sm"
+              title="Show speech info"
+            >
+              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+            </button>
+          )}
+
+          {/* Right re-open tab */}
+          {!rightOpen && (
+            <button
+              onClick={() => setRightOpen(true)}
+              className="hidden md:flex absolute right-0 top-3 z-10 items-center justify-center w-5 h-10 bg-white border border-r-0 border-line rounded-l-lg text-mute/50 hover:text-primary hover:bg-primary/5 transition-colors shadow-sm"
+              title="Show checklist"
+            >
+              <span className="material-symbols-outlined text-[14px]">chevron_left</span>
+            </button>
+          )}
+
           {/* Toolbar */}
           <div className="flex items-center justify-between px-3 sm:px-3.5 py-2 border-b border-line bg-[#fdfcfa]">
             <div className="flex items-center gap-1.5 overflow-x-auto">
-              <button className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors font-bold shrink-0">B</button>
-              <button className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors italic shrink-0">I</button>
-              <button className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors underline shrink-0">U</button>
+              <button onClick={() => wrapSelection("**", "**")} className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors font-bold shrink-0">B</button>
+              <button onClick={() => wrapSelection("*", "*")} className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors italic shrink-0">I</button>
+              <button onClick={() => wrapSelection("__", "__")} className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors underline shrink-0">U</button>
               <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
-              <button className="px-1.5 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors shrink-0"><span className="material-symbols-outlined text-[14px]">format_quote</span></button>
+              <button onClick={() => wrapSelection("\n> ", "\n")} className="px-1.5 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors shrink-0"><span className="material-symbols-outlined text-[14px]">format_quote</span></button>
               <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
               <button
                 onClick={() => { setRefType("quran"); setShowRefModal(true); }}
@@ -472,28 +527,31 @@ export default function SermonEditorPage({
             </span>
           </div>
 
-          {/* Title */}
-          <div className="px-4 sm:px-6 pt-4 pb-1 bg-white">
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Sermon title..."
-              className="w-full text-xl sm:text-2xl font-bold text-ink placeholder:text-line bg-transparent border-none outline-none"
-            />
-          </div>
+          {/* Title + Editor wrapper */}
+          <div className="flex-1 flex flex-col min-h-0 bg-white">
+            {/* Title */}
+            <div className="px-5 sm:px-8 pt-5 pb-1">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Sermon title..."
+                className="w-full text-xl sm:text-2xl font-bold text-ink placeholder:text-line bg-transparent border-none outline-none"
+              />
+            </div>
 
-          {/* Single clean editor */}
-          <div className="flex-1 overflow-y-auto bg-white px-4 sm:px-6 pb-6">
-            <textarea
-              ref={editorRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="بسم الله الرحمن الرحيم — Begin writing your khutbah here. Mix Arabic and English freely..."
-              className="w-full h-full min-h-[400px] leading-[2.2] text-ink bg-transparent border-none resize-none outline-none"
-              style={{ fontSize: `${editorFontSize}px` }}
-              dir="auto"
-            />
+            {/* Content */}
+            <div className="flex-1 min-h-0 px-5 sm:px-8 pb-6">
+              <textarea
+                ref={editorRef}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="بسم الله الرحمن الرحيم — Begin writing your khutbah here. Mix Arabic and English freely..."
+                className="w-full h-full min-h-0 leading-[2.2] text-ink bg-transparent border-none resize-none outline-none"
+                style={{ fontSize: `${editorFontSize}px` }}
+                dir="auto"
+              />
+            </div>
           </div>
 
           {/* Status bar */}
@@ -510,8 +568,14 @@ export default function SermonEditorPage({
         </div>
 
         {/* Right panel — Checklist & References */}
-        <div className={`${mobilePanel === "checklist" ? "flex" : "hidden"} md:flex w-full md:w-[200px] border-l border-line bg-white p-3.5 overflow-y-auto shrink-0 flex-col`}>
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">READINESS</p>
+        <div className={`${mobilePanel === "checklist" ? "flex" : "hidden"} md:flex border-l border-line bg-white overflow-hidden shrink-0 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${rightOpen ? "w-full md:w-[200px] p-3.5" : "md:w-0 md:p-0 md:border-none"}`}>
+          <div className={`${rightOpen ? "opacity-100" : "opacity-0 pointer-events-none"} transition-opacity duration-200 flex flex-col min-w-[185px]`}>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[9px] tracking-[2px] text-mute/60">READINESS</p>
+            <button onClick={() => setRightOpen(false)} className="hidden md:flex items-center justify-center w-5 h-5 rounded-md text-mute/40 hover:text-mute hover:bg-surface transition-colors" title="Collapse panel">
+              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+            </button>
+          </div>
           <div className="mb-3">
             <div className="flex items-center gap-2 mb-2">
               <div className="flex-1 h-1.5 bg-surface overflow-hidden">
@@ -550,7 +614,7 @@ export default function SermonEditorPage({
             {nextAction[status] && (
               <button
                 onClick={handleStatusAdvance}
-                disabled={!allRequiredPassed && (status === "draft" || status === "in_review")}
+                disabled={!allRequiredPassed && status === "draft"}
                 className={`w-full mt-2.5 text-[11px] font-bold py-2 px-3 transition-all flex items-center justify-center gap-1.5 ${
                   allRequiredPassed || status === "ready"
                     ? status === "ready"
@@ -560,13 +624,13 @@ export default function SermonEditorPage({
                 }`}
               >
                 <span className="material-symbols-outlined text-[14px]">
-                  {status === "draft" ? "send" : status === "in_review" ? "check_circle" : "event_available"}
+                  {status === "draft" ? "check_circle" : "event_available"}
                 </span>
                 {nextAction[status]}
               </button>
             )}
 
-            {!allRequiredPassed && (status === "draft" || status === "in_review") && (
+            {!allRequiredPassed && status === "draft" && (
               <p className="text-[9px] text-red-400 mt-1">Complete required items (*) first</p>
             )}
 
@@ -667,6 +731,7 @@ export default function SermonEditorPage({
               <span className="material-symbols-outlined text-[12px]">add</span>
               Hadith
             </button>
+          </div>
           </div>
         </div>
       </div>

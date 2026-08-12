@@ -28,7 +28,6 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const STATUS_MAP: Record<string, { bg: string; text: string; label: string }> = {
   draft: { bg: "#f0eeeb", text: "#6d797a", label: "Not started" },
-  in_review: { bg: "#fdf3e7", text: "#C4A35A", label: "Planned" },
   ready: { bg: "#e8f5ee", text: "#00666d", label: "Written" },
   delivered: { bg: "#eef2f7", text: "#5b7fa6", label: "Delivered" },
   archived: { bg: "#f0eeeb", text: "#6d797a", label: "Archived" },
@@ -119,7 +118,6 @@ export default function CalendarPage() {
   });
 
   const writtenCount = monthSermons.filter((s) => s.status === "ready" || s.status === "delivered").length;
-  const plannedCount = monthSermons.filter((s) => s.status === "in_review").length;
   const draftCount = monthSermons.filter((s) => s.status === "draft").length;
 
   // Year view — mini months
@@ -246,10 +244,6 @@ export default function CalendarPage() {
             <div className="flex-1 min-w-[72px] px-3 py-2.5 text-center border-r border-[#bcc9ca]/20">
               <div className="text-xl font-bold text-[#00666d]">{writtenCount}</div>
               <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">Written</div>
-            </div>
-            <div className="flex-1 min-w-[72px] px-3 py-2.5 text-center border-r border-[#bcc9ca]/20">
-              <div className="text-xl font-bold text-[#C4A35A]">{plannedCount}</div>
-              <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">Planned</div>
             </div>
             <div className="flex-1 min-w-[72px] px-3 py-2.5 text-center">
               <div className="text-xl font-bold text-[#6d797a]">{draftCount}</div>

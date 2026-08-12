@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
-import { db, cuid, toJSON } from "@/lib/db";
+import { db, cuid, toJSON, hashPassword } from "@/lib/db";
+import { rateLimitByIp } from "@/lib/rate-limit";
+import { signupSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const { name, email, password, account_type, org_name, city, country } = body;
-
-  if (!name || !email || !password) {
-    return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const { allowed } = rateLimitByIp(ip, "signup", 3, 60_000);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many signup attempts. Try again in a minute." }, { status: 429 });
   }
+
+  const body = await req.json();
+  const parsed = parseBody(signupSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+  const { name, email, password } = parsed.data;
 
   const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
   if (existing) {
@@ -17,22 +25,21 @@ export async function POST(req: Request) {
   }
 
   const userId = cuid();
-  let organizationId: string | null = null;
-
-  if (account_type !== "individual" && org_name) {
-    organizationId = cuid();
-    db.prepare(
-      "INSERT INTO organizations (id, name, type, city, country) VALUES (?, ?, ?, ?, ?)"
-    ).run(organizationId, org_name, account_type || "organization", city || null, country || null);
-  }
+  const passwordHash = hashPassword(password);
 
   db.prepare(
-    "INSERT INTO users (id, email, name, role, account_type, organization_id) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(userId, email, name, "khatib", account_type || "individual", organizationId);
+    "INSERT INTO users (id, email, name, password_hash, role, onboarding_complete) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(userId, email, name, passwordHash, "khatib", 0);
 
-  const user = db.prepare("SELECT id, email, name, account_type FROM users WHERE id = ?").get(userId);
+  const user = db.prepare("SELECT id, email, name, onboarding_complete FROM users WHERE id = ?").get(userId);
 
   const res = NextResponse.json({ user: toJSON(user) });
-  res.cookies.set("user_id", userId, { path: "/", httpOnly: true, maxAge: 60 * 60 * 24 * 30 });
+  res.cookies.set("user_id", userId, {
+    path: "/",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 30,
+  });
   return res;
 }

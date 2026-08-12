@@ -1,33 +1,49 @@
 import { NextResponse } from "next/server";
 import { db, cuid, toJSON } from "@/lib/db";
-import { getUserId } from "@/lib/auth";
+import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
 
   const themes = db.prepare(`
     SELECT t.*,
       (SELECT COUNT(*) FROM sub_topics WHERE theme_id = t.id) as sub_topic_count,
       (SELECT COUNT(*) FROM sermons WHERE theme_id = t.id) as sermon_count
     FROM themes t
-    WHERE t.owner_id = ? OR t.organization_id IS NOT NULL
+    WHERE t.owner_id = ?
     ORDER BY t.year DESC, t.month ASC
   `).all(userId);
 
-  const themesWithTopics = (themes as Record<string, unknown>[]).map((theme) => {
-    const subTopics = db.prepare(
-      "SELECT * FROM sub_topics WHERE theme_id = ? ORDER BY week_number ASC"
-    ).all(theme.id as string);
-    return { ...theme, sub_topics: subTopics };
-  });
+  const themeIds = (themes as { id: string }[]).map(t => t.id);
+  let allSubTopics: Record<string, unknown>[] = [];
+  if (themeIds.length > 0) {
+    const placeholders = themeIds.map(() => "?").join(",");
+    allSubTopics = db.prepare(
+      `SELECT * FROM sub_topics WHERE theme_id IN (${placeholders}) ORDER BY week_number ASC`
+    ).all(...themeIds) as Record<string, unknown>[];
+  }
+
+  const themesWithTopics = (themes as Record<string, unknown>[]).map((theme) => ({
+    ...theme,
+    sub_topics: allSubTopics.filter(st => st.theme_id === theme.id),
+  }));
 
   return NextResponse.json(toJSON(themesWithTopics));
 }
 
 export async function POST(req: Request) {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
+
   const body = await req.json();
   const { name, description, month, year, color } = body;
 

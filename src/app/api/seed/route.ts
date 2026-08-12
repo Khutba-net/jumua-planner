@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, cuid } from "@/lib/db";
+import { db, cuid, hashPassword } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -24,47 +24,32 @@ async function seed() {
 
   // Recreate demo user with known credentials
   db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+  const demoHash = hashPassword("demo1234");
   db.prepare(
-    "INSERT INTO users (id, email, name, role, account_type) VALUES (?, ?, ?, ?, ?)"
-  ).run(userId, "demo@jumuaplanner.com", "Sheikh Ahmed", "khatib", "individual");
+    "INSERT INTO users (id, email, name, password_hash, role, account_type, onboarding_complete) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).run(userId, "ahmed@example.com", "Sheikh Ahmed", demoHash, "khatib", "individual", 1);
 
   // Settings
   db.prepare("INSERT OR REPLACE INTO user_settings (user_id, default_language, word_target, editor_font_size) VALUES (?, ?, ?, ?)").run(userId, "ar-first", 2500, 18);
 
   const year = 2026;
 
-  // ── 12-month annual plan ──
+  // ── 4-season annual plan: 1 theme × 4 sub-bouquets × ~4 titles ──
   const themes = [
     {
       name: "Foundations of Faith",
-      description: "Strengthening Aqeedah — Tawheed, trust in Allah, and the pillars of Iman.",
+      description: "Strengthening Aqeedah, the Prophetic example, and purification of the heart.",
       month: 1, color: "#2563eb",
-      subs: ["Tawheed & Sincerity", "Trust & Reliance on Allah"],
+      subs: ["Tawheed & Sincerity", "The Prophetic Example", "Trust & Reliance", "Purification of the Heart"],
       sermons: [
         { title: "The Beauty of Tawheed in Daily Life", date: "2026-01-02", status: "delivered", content: genContent("tawheed") },
         { title: "Patience in Testing — A Mark of True Faith", date: "2026-01-09", status: "delivered", content: genContent("patience") },
         { title: "Certainty in Allah Amid Uncertainty", date: "2026-01-16", status: "delivered", content: genContent("certainty") },
         { title: "Living with Tawakkul", date: "2026-01-23", status: "delivered", content: genContent("tawakkul") },
-      ],
-    },
-    {
-      name: "The Prophetic Example",
-      description: "Living the Sunnah — the Prophet's character, mercy, and guidance for modern life.",
-      month: 2, color: "#059669",
-      subs: ["Prophetic Character", "Mercy & Compassion"],
-      sermons: [
         { title: "The Prophet's Gentleness with All People", date: "2026-02-06", status: "delivered", content: genContent("gentleness") },
         { title: "Mercy as a Way of Life", date: "2026-02-13", status: "delivered", content: genContent("mercy") },
         { title: "The Sunnah in Our Modern Routines", date: "2026-02-20", status: "delivered", content: genContent("sunnah") },
         { title: "Forgiveness: The Prophet's Greatest Strength", date: "2026-02-27", status: "delivered", content: genContent("forgiveness") },
-      ],
-    },
-    {
-      name: "Purification of the Heart",
-      description: "Tazkiyah — cleansing the soul from envy, arrogance, and heedlessness.",
-      month: 3, color: "#7c3aed",
-      subs: ["Diseases of the Heart", "Spiritual Remedies"],
-      sermons: [
         { title: "Recognizing the Diseases of the Heart", date: "2026-03-06", status: "delivered", content: genContent("diseases") },
         { title: "Overcoming Envy with Gratitude", date: "2026-03-13", status: "delivered", content: genContent("envy") },
         { title: "Humility Before Allah and His Creation", date: "2026-03-20", status: "delivered", content: genContent("humility") },
@@ -72,35 +57,19 @@ async function seed() {
       ],
     },
     {
-      name: "Family & Relationships",
-      description: "Building strong Muslim families — marriage, parenting, and kinship ties.",
+      name: "Family, Justice & Quran",
+      description: "Building strong families, standing for justice, and living by the Book of Allah.",
       month: 4, color: "#C4A35A",
-      subs: ["Marriage & Partnership", "Rights of Parents & Children"],
+      subs: ["Marriage & Family", "Rights & Responsibilities", "Justice & Generosity", "Living by the Quran"],
       sermons: [
         { title: "The Sacred Bond of Marriage in Islam", date: "2026-04-03", status: "delivered", content: genContent("marriage") },
         { title: "Raising Children with Purpose and Love", date: "2026-04-10", status: "delivered", content: genContent("parenting") },
         { title: "Honouring Parents in Word and Deed", date: "2026-04-17", status: "delivered", content: genContent("parents") },
         { title: "Maintaining Family Ties in a Busy World", date: "2026-04-24", status: "delivered", content: genContent("kinship") },
-      ],
-    },
-    {
-      name: "Social Justice in Islam",
-      description: "Standing for justice — equity, charity, and defending the oppressed.",
-      month: 5, color: "#dc2626",
-      subs: ["Justice & Equity", "Charity & Generosity"],
-      sermons: [
         { title: "Justice as a Pillar of the Muslim Community", date: "2026-05-01", status: "delivered", content: genContent("justice") },
         { title: "The Spirit of Sadaqah Beyond Ramadan", date: "2026-05-08", status: "delivered", content: genContent("sadaqah") },
         { title: "Standing with the Oppressed", date: "2026-05-15", status: "delivered", content: genContent("oppressed") },
         { title: "Wealth as a Trust from Allah", date: "2026-05-22", status: "delivered", content: genContent("wealth") },
-      ],
-    },
-    {
-      name: "Quran: A Living Guide",
-      description: "Deepening our relationship with the Book of Allah — recitation, reflection, and application.",
-      month: 6, color: "#0891b2",
-      subs: ["Tadabbur & Reflection", "Living by the Quran"],
-      sermons: [
         { title: "The Quran as a Companion in Solitude", date: "2026-06-05", status: "delivered", content: genContent("quran_companion") },
         { title: "Reflecting on the Quran with the Heart", date: "2026-06-12", status: "delivered", content: genContent("tadabbur") },
         { title: "Stories of the Prophets — Lessons for Today", date: "2026-06-19", status: "delivered", content: genContent("prophets") },
@@ -108,36 +77,20 @@ async function seed() {
       ],
     },
     {
-      name: "Unity & Brotherhood",
-      description: "Strengthening the bonds of the Ummah — community, cooperation, and reconciliation.",
+      name: "Unity, Knowledge & Worship",
+      description: "Strengthening community bonds, pursuing knowledge, and deepening worship.",
       month: 7, color: "#4a7c59",
-      subs: ["Community Building", "Reconciliation & Forgiveness"],
+      subs: ["Community Building", "Reconciliation & Forgiveness", "Seeking Knowledge", "Du'a & Worship"],
       sermons: [
         { title: "Brotherhood as a Shield Against Division", date: "2026-07-03", status: "ready", content: genContent("brotherhood") },
         { title: "Holding Fast to Allah's Rope Together", date: "2026-07-10", status: "ready", content: genContent("unity") },
         { title: "Repairing Broken Ties with Mercy", date: "2026-07-17", status: "ready", content: genContent("broken_ties") },
         { title: "The Importance of Taqwa (God-Consciousness)", date: "2026-07-24", status: "ready", content: genContent("taqwa") },
-        { title: "Respecting Difference Without Division", date: "2026-07-31", status: "in_review", content: genContent("difference") },
-      ],
-    },
-    {
-      name: "Knowledge & Education",
-      description: "The pursuit of knowledge — its virtue, etiquette, and impact on the Ummah.",
-      month: 8, color: "#ea580c",
-      subs: ["Seeking Knowledge", "Teaching & Mentorship"],
-      sermons: [
-        { title: "The Virtue of Seeking Knowledge", date: "2026-08-07", status: "in_review", content: genContent("knowledge") },
+        { title: "Respecting Difference Without Division", date: "2026-07-31", status: "ready", content: genContent("difference") },
+        { title: "The Virtue of Seeking Knowledge", date: "2026-08-07", status: "ready", content: genContent("knowledge") },
         { title: "The Etiquette of the Student and Scholar", date: "2026-08-14", status: "draft", content: genContent("etiquette") },
         { title: "Raising a Generation of Thinkers", date: "2026-08-21", status: "draft", content: "" },
         { title: "Knowledge Without Action", date: "2026-08-28", status: "draft", content: "" },
-      ],
-    },
-    {
-      name: "Du'a & Worship",
-      description: "The power of supplication and deepening our acts of worship.",
-      month: 9, color: "#be185d",
-      subs: ["The Art of Du'a", "Perfecting Salah"],
-      sermons: [
         { title: "The Etiquette and Power of Du'a", date: "2026-09-04", status: "draft", content: "" },
         { title: "Khushu in Salah — Praying with Presence", date: "2026-09-11", status: "draft", content: "" },
         { title: "The Night Prayer — A Private Audience", date: "2026-09-18", status: "draft", content: "" },
@@ -145,35 +98,19 @@ async function seed() {
       ],
     },
     {
-      name: "The Hereafter",
-      description: "Reflecting on death, the grave, and the eternal life to come.",
+      name: "The Hereafter & Modern Life",
+      description: "Reflecting on the eternal life, navigating contemporary challenges, and year-end renewal.",
       month: 10, color: "#8a5c6e",
-      subs: ["Death & Preparation", "Paradise & Accountability"],
+      subs: ["Death & Preparation", "Paradise & Accountability", "Contemporary Challenges", "Reflection & Renewal"],
       sermons: [
         { title: "Remembering Death to Live Fully", date: "2026-10-02", status: "draft", content: "" },
         { title: "Preparing for the Journey No One Escapes", date: "2026-10-09", status: "draft", content: "" },
         { title: "The Scales of Justice on the Day of Judgement", date: "2026-10-16", status: "draft", content: "" },
         { title: "The Promise of Paradise", date: "2026-10-23", status: "draft", content: "" },
-      ],
-    },
-    {
-      name: "Contemporary Challenges",
-      description: "Navigating modern life — technology, mental health, identity, and faith in the West.",
-      month: 11, color: "#475569",
-      subs: ["Faith in the Modern World", "Mental Health & Wellbeing"],
-      sermons: [
         { title: "Social Media and the Muslim Soul", date: "2026-11-06", status: "draft", content: "" },
         { title: "Mental Health — Breaking the Stigma with Islam", date: "2026-11-13", status: "draft", content: "" },
         { title: "Muslim Identity in the West", date: "2026-11-20", status: "draft", content: "" },
         { title: "Raising Youth in a Digital Age", date: "2026-11-27", status: "draft", content: "" },
-      ],
-    },
-    {
-      name: "Year-End Reflection",
-      description: "Accounting for the year — gratitude, repentance, and setting spiritual goals.",
-      month: 12, color: "#1e3a5f",
-      subs: ["Self-Accounting", "Renewal & Hope"],
-      sermons: [
         { title: "A Year in Review — What Did We Plant?", date: "2026-12-04", status: "draft", content: "" },
         { title: "Repentance — The Door That Never Closes", date: "2026-12-11", status: "draft", content: "" },
         { title: "Setting Spiritual Goals for the Coming Year", date: "2026-12-18", status: "draft", content: "" },
@@ -249,7 +186,7 @@ async function seed() {
     "INSERT INTO sub_topics (id, name, week_number, theme_id) VALUES (?, ?, ?, ?)"
   );
   const insertSermon = db.prepare(
-    "INSERT INTO sermons (id, title, content, status, scheduled_date, author_id, theme_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO sermons (id, title, content, status, scheduled_date, author_id, theme_id, sub_topic_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
   const insertRef = db.prepare(
     "INSERT INTO references_ (id, type, title, source, content, sermon_id) VALUES (?, ?, ?, ?, ?, ?)"
@@ -263,15 +200,21 @@ async function seed() {
       const themeId = cuid();
       insertTheme.run(themeId, theme.name, theme.description, theme.month, year, theme.color, userId);
 
+      const subIds: string[] = [];
       theme.subs.forEach((sub, idx) => {
         const subId = cuid();
+        subIds.push(subId);
         insertSub.run(subId, sub, idx + 1, themeId);
       });
 
-      for (const s of theme.sermons) {
+      const perSub = subIds.length > 0 ? Math.ceil(theme.sermons.length / subIds.length) : 0;
+      for (let si = 0; si < theme.sermons.length; si++) {
+        const s = theme.sermons[si];
         const sermonId = cuid();
         const updatedAt = s.date + "T12:00:00.000Z";
-        insertSermon.run(sermonId, s.title, s.content, s.status, s.date, userId, themeId, updatedAt);
+        const subIdx = Math.min(Math.floor(si / perSub), subIds.length - 1);
+        const subTopicId = subIds[subIdx] ?? null;
+        insertSermon.run(sermonId, s.title, s.content, s.status, s.date, userId, themeId, subTopicId, updatedAt);
         totalSermons++;
 
         for (const [key, refs] of Object.entries(refMap)) {
@@ -290,7 +233,7 @@ async function seed() {
 
   return NextResponse.json({
     ok: true,
-    message: `Seeded 12 monthly themes, ${totalSermons} sermons, and ${totalRefs} references`,
+    message: `Seeded 4 seasonal themes, ${totalSermons} sermons, and ${totalRefs} references`,
   });
 }
 

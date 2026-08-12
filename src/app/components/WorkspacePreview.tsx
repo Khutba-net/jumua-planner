@@ -251,13 +251,13 @@ function CalendarMockup() {
     [27, 28, 29, 30, 31, null, null],
   ];
   const sermonDays: Record<number, { title: string; status: string }> = {
-    3: { title: "Brotherhood as a shield", status: "in_review" },
-    10: { title: "Holding fast to Allah's rope", status: "in_review" },
+    3: { title: "Brotherhood as a shield", status: "ready" },
+    10: { title: "Holding fast to Allah's rope", status: "ready" },
     17: { title: "Repairing broken ties", status: "draft" },
     24: { title: "Respecting difference", status: "draft" },
   };
   const statusColors: Record<string, { bg: string; text: string; label: string }> = {
-    in_review: { bg: "#fdf3e7", text: "#C4A35A", label: "Planned" },
+    ready: { bg: "#e8f5ee", text: "#1f7a4d", label: "Ready" },
     draft: { bg: "#f0eeeb", text: "#6d797a", label: "Not started" },
   };
   return (
