@@ -214,6 +214,6 @@ function initTables(db: Database.Database) {
       "INSERT INTO users (id, firebase_uid, email, name, password_hash, role, account_type, onboarding_complete) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     ).run("demo-user", "demo-firebase-uid", "ahmed@example.com", "Ahmed", demoPasswordHash, "khatib", "individual", 1);
   } else {
-    db.prepare("UPDATE users SET onboarding_complete = 1, password_hash = COALESCE(password_hash, ?) WHERE id = ?").run(demoPasswordHash, "demo-user");
+    db.prepare("UPDATE users SET email = 'ahmed@example.com', name = 'Ahmed', onboarding_complete = 1, password_hash = ? WHERE id = ?").run(demoPasswordHash, "demo-user");
   }
 }

@@ -12,6 +12,7 @@ export async function POST() {
 }
 
 async function seed() {
+  try {
   const userId = "demo-user";
 
   // Clear existing content first (foreign keys)
@@ -235,6 +236,10 @@ async function seed() {
     ok: true,
     message: `Seeded 4 seasonal themes, ${totalSermons} sermons, and ${totalRefs} references`,
   });
+  } catch (e) {
+    console.error("[Seed Error]", e);
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Unknown error" }, { status: 500 });
+  }
 }
 
 function genContent(topic: string): string {
