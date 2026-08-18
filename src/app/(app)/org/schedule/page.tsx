@@ -60,6 +60,8 @@ export default function SchedulePage() {
   const [swapMember, setSwapMember] = useState("");
   const [swapGuest, setSwapGuest] = useState("");
   const [swapIsGuest, setSwapIsGuest] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [myMemberId, setMyMemberId] = useState<string | null>(null);
 
   const thisFriday = getThisFriday();
   const fridays = getFridays(new Date(), 16);
@@ -70,6 +72,8 @@ export default function SchedulePage() {
       .then((d) => {
         if (d.assignments) setAssignments(d.assignments);
         if (d.members) setMembers(d.members);
+        if (d.isAdmin !== undefined) setIsAdmin(d.isAdmin);
+        if (d.myMemberId !== undefined) setMyMemberId(d.myMemberId);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -146,7 +150,7 @@ export default function SchedulePage() {
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-ink">{t("org.schedule")}</h1>
-        <p className="text-sm text-mute mt-0.5">{t("org.scheduleSub")}</p>
+        <p className="text-sm text-mute mt-0.5">{isAdmin ? t("org.scheduleSub") : t("org.scheduleView")}</p>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -181,6 +185,7 @@ export default function SchedulePage() {
                   {assignment ? (
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                        assignment.member_id === myMemberId ? "bg-primary/20 text-primary ring-2 ring-primary/30" :
                         assignment.guest_name ? "bg-accent-gold/15 text-accent-gold" : "bg-primary/10 text-primary"
                       }`}>
                         {(assignment.khatib_name || assignment.guest_name || "?")[0]}
@@ -188,6 +193,9 @@ export default function SchedulePage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-ink text-sm truncate">
                           {assignment.khatib_name || assignment.guest_name}
+                          {assignment.member_id === myMemberId && (
+                            <span className="text-[10px] text-primary font-bold ms-1.5">({t("org.you")})</span>
+                          )}
                           {assignment.guest_name && (
                             <span className="text-[10px] text-accent-gold font-bold ms-1.5">({t("org.guest")})</span>
                           )}
@@ -202,7 +210,8 @@ export default function SchedulePage() {
                   )}
                 </div>
 
-                {/* Actions */}
+                {/* Actions (admin only) */}
+                {isAdmin && (
                 <div className="flex items-center gap-1 shrink-0">
                   {assignment && !past ? (
                     <>
@@ -241,6 +250,7 @@ export default function SchedulePage() {
                     </button>
                   ) : null}
                 </div>
+                )}
               </div>
 
               {/* Assign form */}

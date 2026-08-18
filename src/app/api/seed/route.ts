@@ -232,9 +232,95 @@ async function seed() {
 
   txn();
 
+  // ── Seed a khatib user linked to an existing org ──
+  const khatibUserId = "demo-khatib";
+  db.prepare("DELETE FROM references_ WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = ?)").run(khatibUserId);
+  db.prepare("DELETE FROM feedback WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = ?)").run(khatibUserId);
+  db.prepare("DELETE FROM sermons WHERE author_id = ?").run(khatibUserId);
+  db.prepare("DELETE FROM sub_topics WHERE theme_id IN (SELECT id FROM themes WHERE owner_id = ?)").run(khatibUserId);
+  db.prepare("DELETE FROM themes WHERE owner_id = ?").run(khatibUserId);
+  db.prepare("DELETE FROM user_settings WHERE user_id = ?").run(khatibUserId);
+  db.prepare("DELETE FROM friday_assignments WHERE organization_id IN (SELECT organization_id FROM org_members WHERE user_id = ?)").run(khatibUserId);
+  db.prepare("DELETE FROM org_members WHERE user_id = ?").run(khatibUserId);
+  db.prepare("DELETE FROM users WHERE id = ?").run(khatibUserId);
+
+  const existingOrg = db.prepare("SELECT id, name FROM organizations LIMIT 1").get() as { id: string; name: string } | undefined;
+
+  if (existingOrg) {
+    const khatibHash = hashPassword("khatib123");
+    db.prepare(
+      "INSERT INTO users (id, email, name, password_hash, role, account_type, organization_id, onboarding_complete, planning_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(khatibUserId, "bilal@example.com", "Sheikh Bilal", khatibHash, "khatib", "organization", existingOrg.id, 1, 2026);
+
+    const khatibMemberId = cuid();
+    db.prepare(
+      "INSERT INTO org_members (id, organization_id, user_id, name, email, role, status) VALUES (?, ?, ?, ?, ?, 'khatib', 'active')"
+    ).run(khatibMemberId, existingOrg.id, khatibUserId, "Sheikh Bilal", "bilal@example.com");
+
+    const khatibThemeId = cuid();
+    db.prepare(
+      "INSERT INTO themes (id, name, description, month, year, color, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(khatibThemeId, "Community & Compassion", "Building bridges and nurturing mercy in our community", 7, 2026, "#2563eb", khatibUserId);
+
+    const khatibSubs = ["Neighborly Love", "Supporting the Vulnerable", "Forgiveness & Reconciliation", "Collective Worship"];
+    const kSubIds: string[] = [];
+    khatibSubs.forEach((sub, idx) => {
+      const subId = cuid();
+      kSubIds.push(subId);
+      db.prepare("INSERT INTO sub_topics (id, name, week_number, theme_id) VALUES (?, ?, ?, ?)").run(subId, sub, idx + 1, khatibThemeId);
+    });
+
+    const kSermons = [
+      { title: "The Right of the Neighbor in Islam", date: "2026-07-03", status: "delivered" },
+      { title: "Opening Our Doors, Opening Our Hearts", date: "2026-07-10", status: "delivered" },
+      { title: "Caring for the Elderly in Our Community", date: "2026-07-17", status: "delivered" },
+      { title: "The Power of a Sincere Apology", date: "2026-07-24", status: "ready" },
+      { title: "Praying Together: The Strength of Jama'ah", date: "2026-07-31", status: "ready" },
+      { title: "When Your Brother Is Hurting", date: "2026-08-07", status: "draft" },
+      { title: "Youth and the Masjid — A Home They Choose", date: "2026-08-14", status: "draft" },
+      { title: "The Sunnah of Smiling", date: "2026-08-21", status: "draft" },
+    ];
+
+    kSermons.forEach((s, i) => {
+      const sermonId = cuid();
+      const subIdx = Math.min(Math.floor(i / 2), kSubIds.length - 1);
+      db.prepare(
+        "INSERT INTO sermons (id, title, content, status, scheduled_date, author_id, theme_id, sub_topic_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run(sermonId, s.title, s.status === "delivered" ? genContent("brotherhood") : "", s.status, s.date, khatibUserId, khatibThemeId, kSubIds[subIdx], s.date + "T12:00:00.000Z");
+    });
+
+    const now = new Date();
+    const day = now.getDay();
+    const diff = (5 - day + 7) % 7;
+    const thisFri = new Date(now);
+    thisFri.setDate(now.getDate() + (diff === 0 ? 0 : diff));
+
+    const fridaysToAssign = [];
+    const f = new Date(thisFri);
+    for (let i = 0; i < 4; i++) {
+      fridaysToAssign.push(f.toISOString().split("T")[0]);
+      f.setDate(f.getDate() + 7);
+    }
+
+    db.prepare("DELETE FROM friday_assignments WHERE organization_id = ?").run(existingOrg.id);
+
+    const guests = ["Sheikh Abdullah", "Imam Hassan"];
+    fridaysToAssign.forEach((fd, i) => {
+      if (i % 2 === 0) {
+        db.prepare(
+          "INSERT INTO friday_assignments (id, organization_id, member_id, friday_date) VALUES (?, ?, ?, ?)"
+        ).run(cuid(), existingOrg.id, khatibMemberId, fd);
+      } else {
+        db.prepare(
+          "INSERT INTO friday_assignments (id, organization_id, member_id, friday_date, guest_name) VALUES (?, ?, ?, ?, ?)"
+        ).run(cuid(), existingOrg.id, null, fd, guests[Math.floor(i / 2)] || "Guest Khatib");
+      }
+    });
+  }
+
   return NextResponse.json({
     ok: true,
-    message: `Seeded 4 seasonal themes, ${totalSermons} sermons, and ${totalRefs} references`,
+    message: `Seeded 4 seasonal themes, ${totalSermons} sermons, and ${totalRefs} references. ${existingOrg ? "Also seeded khatib user (bilal@example.com / khatib123) with assignments." : "No org found for khatib seeding."}`,
   });
   } catch (e) {
     console.error("[Seed Error]", e);

@@ -8,8 +8,8 @@ export async function GET(req: Request) {
   const userId = await getUserId();
   const user = db.prepare("SELECT id, organization_id, role FROM users WHERE id = ?").get(userId) as { id: string; organization_id: string | null; role: string } | undefined;
 
-  if (!user?.organization_id || user.role !== "admin") {
-    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  if (!user?.organization_id) {
+    return NextResponse.json({ error: "Not part of an organization" }, { status: 403 });
   }
 
   const url = new URL(req.url);
@@ -30,7 +30,11 @@ export async function GET(req: Request) {
     "SELECT id, name, status FROM org_members WHERE organization_id = ? AND role = 'khatib' AND status = 'active' ORDER BY name"
   ).all(user.organization_id);
 
-  return NextResponse.json(toJSON({ assignments, members }));
+  const myMember = db.prepare(
+    "SELECT id FROM org_members WHERE user_id = ? AND organization_id = ?"
+  ).get(userId, user.organization_id) as { id: string } | undefined;
+
+  return NextResponse.json(toJSON({ assignments, members, isAdmin: user.role === "admin", myMemberId: myMember?.id || null }));
 }
 
 export async function POST(req: Request) {

@@ -132,6 +132,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "org.noAssignments": "No upcoming assignments",
     "org.assignedTo": "Assigned to you",
     "org.thisWeekSchedule": "This Friday",
+    "org.you": "You",
+    "org.scheduleView": "View your organization's Friday schedule",
 
     // Dashboard
     "dash.greeting": "Asalamu alaykom,",
@@ -567,6 +569,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "org.noAssignments": "لا توجد تعيينات قادمة",
     "org.assignedTo": "معيّن لك",
     "org.thisWeekSchedule": "جمعة هذا الأسبوع",
+    "org.you": "أنت",
+    "org.scheduleView": "عرض جدول الجمعة لمنظمتك",
 
     // Dashboard
     "dash.greeting": "السلام عليكم ورحمة الله وبركاته،",
