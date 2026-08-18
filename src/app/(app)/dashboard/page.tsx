@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getUpcomingHijriEvents, getHijriDateString, type ResolvedHijriEvent } from "@/lib/hijri-events";
+import { useI18n } from "@/lib/i18n";
 
 interface DashboardData {
   user: { name: string; account_type: string; email: string };
@@ -72,13 +74,6 @@ interface DashboardData {
   planningYear: number;
 }
 
-const statusLabel: Record<string, string> = {
-  draft: "Draft",
-  ready: "Ready",
-  delivered: "Delivered",
-  archived: "Archived",
-};
-
 const statusDot: Record<string, string> = {
   draft: "bg-mute/40",
   ready: "bg-green-500",
@@ -91,35 +86,6 @@ function wordCount(text: string | null) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
-
-function getFridayLabel(dateStr: string): string {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const friday = new Date(dateStr + "T00:00:00");
-  const diffDays = Math.round((friday.getTime() - today.getTime()) / 86400000);
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Tomorrow";
-  return "This Friday";
-}
-
-function formatDate(iso: string) {
-  return new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 const seasonIcon: Record<string, string> = {
   "Season 1": "looks_one",
   "Season 2": "looks_two",
@@ -129,6 +95,7 @@ const seasonIcon: Record<string, string> = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t, isAr, lang } = useI18n();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [backlogOpen, setBacklogOpen] = useState(false);
@@ -137,6 +104,14 @@ export default function DashboardPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState<"friday" | "eid" | "talk" | "other">("friday");
   const [creating, setCreating] = useState(false);
+  const hijriEvents = useMemo(() => getUpcomingHijriEvents(5), []);
+
+  const statusLabel: Record<string, string> = {
+    draft: t("status.draft"),
+    ready: t("status.ready"),
+    delivered: t("status.delivered"),
+    archived: t("status.archived"),
+  };
 
   useEffect(() => {
     fetch("/api/dashboard")
@@ -144,6 +119,42 @@ export default function DashboardPage() {
       .then((d) => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
+
+  function timeAgo(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return t("dash.justNow");
+    if (mins < 60) return isAr ? `منذ ${mins} د` : `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return isAr ? `منذ ${hrs} س` : `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return isAr ? `منذ ${days} ي` : `${days}d ago`;
+  }
+
+  function getFridayLabel(dateStr: string): string {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const friday = new Date(dateStr + "T00:00:00");
+    const diffDays = Math.round((friday.getTime() - today.getTime()) / 86400000);
+    if (diffDays === 0) return t("dash.today");
+    if (diffDays === 1) return t("dash.tomorrow");
+    return t("dash.thisFriday");
+  }
+
+  function formatDate(iso: string) {
+    return new Date(iso + "T00:00:00").toLocaleDateString(isAr ? "ar-SA" : "en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+  }
+
+  function formatShortDate(iso: string) {
+    return new Date(iso + "T00:00:00").toLocaleDateString(isAr ? "ar-SA" : "en-US", {
+      day: "numeric",
+      month: "short",
+    });
+  }
 
   async function handleCreateSermon() {
     if (!newTitle.trim()) return;
@@ -194,21 +205,28 @@ export default function DashboardPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-full text-mute">Loading...</div>;
+    return <div className="flex items-center justify-center h-full text-mute">{t("dash.loading")}</div>;
   }
 
   if (!data) {
-    return <div className="flex items-center justify-center h-full text-mute">Failed to load dashboard</div>;
+    return <div className="flex items-center justify-center h-full text-mute">{t("dash.failedToLoad")}</div>;
   }
 
   const { user, stats, recentSermons, upcomingSermons, thisFriday, lastFriday, backlogCount, backlogSermons, seasons, checklist } = data;
 
+  const seasonLabelMap: Record<string, string> = {
+    "Season 1": t("season.1"),
+    "Season 2": t("season.2"),
+    "Season 3": t("season.3"),
+    "Season 4": t("season.4"),
+  };
+
   const checklistSteps = [
-    { key: "themes", label: "Main themes", ...checklist.themes, href: "/themes" },
-    { key: "subTopics", label: "Sub-bouquets", ...checklist.subTopics, href: "/themes" },
-    { key: "titles", label: "Sermon titles", ...checklist.titles, href: "/sermons" },
-    { key: "delivered", label: "Delivered", ...checklist.delivered, href: null },
-    { key: "reviewed", label: "Feedback logged", ...checklist.reviewed, href: null },
+    { key: "themes", label: t("dash.mainThemes"), ...checklist.themes, href: "/themes" },
+    { key: "subTopics", label: t("dash.subBouquets"), ...checklist.subTopics, href: "/themes" },
+    { key: "titles", label: t("dash.sermonTitles"), ...checklist.titles, href: "/sermons" },
+    { key: "delivered", label: t("status.delivered"), ...checklist.delivered, href: null },
+    { key: "reviewed", label: t("dash.feedbackLogged"), ...checklist.reviewed, href: null },
   ];
   const totalDone = checklistSteps.reduce((s, c) => s + c.done, 0);
   const totalTarget = checklistSteps.reduce((s, c) => s + c.total, 0);
@@ -222,11 +240,11 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
             <p className="text-lg text-ink">
-              Asalamu alaykom,{" "}
+              {t("dash.greeting")}{" "}
               <span className="text-primary font-semibold">{user.name}</span>
             </p>
             <p className="text-sm text-mute mt-0.5">
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              {new Date().toLocaleDateString(isAr ? "ar-SA" : "en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
             </p>
           </div>
           <div className="flex gap-2">
@@ -235,13 +253,13 @@ export default function DashboardPage() {
               className="px-4 py-2 border border-line bg-white text-ink text-sm font-medium hover:bg-surface transition-colors flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-base">calendar_month</span>
-              Year plan
+              {t("dash.yearPlan")}
             </Link>
             <button
               onClick={openNewForm}
               className="px-4 py-2 bg-primary text-white text-sm font-medium hover:bg-secondary transition-colors"
             >
-              + New sermon
+              {t("dash.newSermon")}
             </button>
           </div>
         </div>
@@ -250,27 +268,27 @@ export default function DashboardPage() {
         {showNewForm && (
           <div className="bg-white border border-line p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-semibold text-ink">New sermon</p>
+              <p className="text-sm font-semibold text-ink">{t("dash.newSermonTitle")}</p>
               <button onClick={() => setShowNewForm(false)} className="text-mute hover:text-ink transition-colors">
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
             <input
               type="text"
-              placeholder="Sermon title"
+              placeholder={t("dash.sermonTitle")}
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleCreateSermon(); }}
               autoFocus
               className="w-full px-3 py-2 border border-line text-sm text-ink bg-white mb-4 focus:outline-none focus:border-primary"
             />
-            <p className="text-xs text-mute mb-2">Type</p>
+            <p className="text-xs text-mute mb-2">{t("dash.type")}</p>
             <div className="grid grid-cols-4 gap-2 mb-4">
               {([
-                { value: "friday" as const, label: "Friday", icon: "mosque" },
-                { value: "eid" as const, label: "Eid", icon: "auto_awesome" },
-                { value: "talk" as const, label: "Talk", icon: "mic" },
-                { value: "other" as const, label: "Other", icon: "note" },
+                { value: "friday" as const, label: t("dash.friday"), icon: "mosque" },
+                { value: "eid" as const, label: t("dash.eid"), icon: "auto_awesome" },
+                { value: "talk" as const, label: t("dash.talk"), icon: "mic" },
+                { value: "other" as const, label: t("dash.other"), icon: "note" },
               ]).map((opt) => (
                 <button
                   key={opt.value}
@@ -287,23 +305,21 @@ export default function DashboardPage() {
               ))}
             </div>
             <p className="text-[11px] text-mute mb-4">
-              {newType === "friday"
-                ? "Tracked weekly with backlog prompts and season progress."
-                : "Standalone — not part of the weekly Friday cycle."}
+              {newType === "friday" ? t("dash.fridayDesc") : t("dash.standaloneDesc")}
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowNewForm(false)}
                 className="px-4 py-2 border border-line text-sm text-mute hover:bg-surface transition-colors"
               >
-                Cancel
+                {t("dash.cancel")}
               </button>
               <button
                 onClick={handleCreateSermon}
                 disabled={!newTitle.trim() || creating}
                 className="px-4 py-2 bg-primary text-white text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50"
               >
-                {creating ? "Creating..." : "Create sermon"}
+                {creating ? t("dash.creating") : t("dash.createSermon")}
               </button>
             </div>
           </div>
@@ -331,7 +347,7 @@ export default function DashboardPage() {
                   {thisFriday.sermon.theme_name && (
                     <span className="text-xs text-accent-gold font-medium">{thisFriday.sermon.theme_name}</span>
                   )}
-                  <span className="text-xs text-mute">{wordCount(thisFriday.sermon.content)} words</span>
+                  <span className="text-xs text-mute">{wordCount(thisFriday.sermon.content)} {t("dash.words")}</span>
                 </div>
               </div>
               <span className="material-symbols-outlined text-primary/40 group-hover:text-primary/60 transition-colors text-xl mt-1">arrow_forward</span>
@@ -344,12 +360,12 @@ export default function DashboardPage() {
               <span className="text-xs font-semibold text-mute">{getFridayLabel(thisFriday.date)}</span>
               <span className="text-xs text-mute">{formatDate(thisFriday.date)}</span>
             </div>
-            <p className="text-sm text-mute mb-3">No sermon planned for this Friday yet.</p>
+            <p className="text-sm text-mute mb-3">{t("dash.noSermonPlanned")}</p>
             <button
               onClick={openNewForm}
               className="text-xs font-semibold text-primary hover:underline"
             >
-              Plan a sermon
+              {t("dash.planSermon")}
             </button>
           </div>
         )}
@@ -361,30 +377,30 @@ export default function DashboardPage() {
               <span className="material-symbols-outlined text-accent-gold text-xl">pending_actions</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-ink">
-                  How did <span className="font-semibold">"{lastFriday.sermon.title}"</span> go last Friday?
+                  {t("dash.howDidItGo")} <span className="font-semibold">&quot;{lastFriday.sermon.title}&quot;</span> {t("dash.goLastFriday")}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 mt-3 pl-9">
+            <div className={`flex items-center gap-2 mt-3 ${isAr ? "pr-9" : "pl-9"}`}>
               <button
                 onClick={() => handleQuickLog(lastFriday.sermon.id, "delivered")}
                 disabled={loggingId === lastFriday.sermon.id}
                 className="px-3 py-1.5 bg-primary text-white text-xs font-medium hover:bg-secondary transition-colors disabled:opacity-50"
               >
-                Delivered
+                {t("dash.delivered")}
               </button>
               <button
                 onClick={() => handleQuickLog(lastFriday.sermon.id, "archived")}
                 disabled={loggingId === lastFriday.sermon.id}
                 className="px-3 py-1.5 border border-line text-mute text-xs font-medium hover:bg-surface transition-colors disabled:opacity-50"
               >
-                Skipped
+                {t("dash.skipped")}
               </button>
               <Link
                 href={`/sermons/${lastFriday.sermon.id}/edit`}
-                className="px-3 py-1.5 text-xs text-primary font-medium hover:underline ml-auto"
+                className={`px-3 py-1.5 text-xs text-primary font-medium hover:underline ${isAr ? "mr-auto" : "ml-auto"}`}
               >
-                Open sermon
+                {t("dash.openSermon")}
               </Link>
             </div>
           </div>
@@ -395,12 +411,12 @@ export default function DashboardPage() {
           <div className="bg-red-50 border border-red-200 mb-4">
             <button
               onClick={() => setBacklogOpen(!backlogOpen)}
-              className="flex items-center gap-3 p-4 w-full text-left hover:bg-red-100/40 transition-colors"
+              className="flex items-center gap-3 p-4 w-full text-start hover:bg-red-100/40 transition-colors"
             >
               <span className="material-symbols-outlined text-red-500 text-xl">warning</span>
               <div className="flex-1">
                 <p className="text-sm font-medium text-ink">
-                  {backlogCount} past {backlogCount === 1 ? "sermon" : "sermons"} not yet logged
+                  {backlogCount} {backlogCount === 1 ? t("dash.pastNotLoggedSingle") : t("dash.pastNotLogged")}
                 </p>
               </div>
               <span className={`material-symbols-outlined text-red-300 text-lg transition-transform duration-200 ${backlogOpen ? "rotate-180" : ""}`}>
@@ -415,11 +431,11 @@ export default function DashboardPage() {
                       <p className="text-sm text-ink truncate">{sermon.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[11px] text-mute">
-                          {new Date(sermon.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                          {formatShortDate(sermon.scheduled_date)}
                         </span>
                         {sermon.theme_name && (
                           <>
-                            <span className="text-mute/30">·</span>
+                            <span className="text-mute/30">&middot;</span>
                             <span className="text-[11px] text-accent-gold">{sermon.theme_name}</span>
                           </>
                         )}
@@ -431,14 +447,14 @@ export default function DashboardPage() {
                         disabled={loggingId === sermon.id}
                         className="px-2.5 py-1 bg-primary text-white text-[11px] font-medium hover:bg-secondary transition-colors disabled:opacity-50"
                       >
-                        Delivered
+                        {t("dash.delivered")}
                       </button>
                       <button
                         onClick={() => handleQuickLog(sermon.id, "archived")}
                         disabled={loggingId === sermon.id}
                         className="px-2.5 py-1 border border-line bg-white text-mute text-[11px] font-medium hover:bg-surface transition-colors disabled:opacity-50"
                       >
-                        Skipped
+                        {t("dash.skipped")}
                       </button>
                     </div>
                   </div>
@@ -451,10 +467,10 @@ export default function DashboardPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
           {[
-            { label: "Total sermons", value: stats.total, icon: "description" },
-            { label: "Drafts", value: stats.drafts, icon: "edit_note" },
-            { label: "Ready to deliver", value: stats.ready, icon: "check_circle" },
-            { label: "Delivered", value: stats.delivered, icon: "event_available" },
+            { label: t("dash.totalSermons"), value: stats.total, icon: "description" },
+            { label: t("dash.drafts"), value: stats.drafts, icon: "edit_note" },
+            { label: t("dash.readyToDeliver"), value: stats.ready, icon: "check_circle" },
+            { label: t("status.delivered"), value: stats.delivered, icon: "event_available" },
           ].map((stat) => (
             <div
               key={stat.label}
@@ -468,28 +484,28 @@ export default function DashboardPage() {
                 </div>
                 <p className="text-xs text-mute">{stat.label}</p>
               </div>
-              <p className="text-2xl font-bold text-ink pl-9">{stat.value}</p>
+              <p className={`text-2xl font-bold text-ink ${isAr ? "pr-9" : "pl-9"}`}>{stat.value}</p>
             </div>
           ))}
         </div>
 
         {/* Recent sermons */}
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-semibold text-ink">Recent sermons</p>
+          <p className="text-sm font-semibold text-ink">{t("dash.recentSermons")}</p>
           <Link href="/sermons" className="text-xs text-primary font-semibold hover:underline">
-            View all
+            {t("dash.viewAll")}
           </Link>
         </div>
 
         {recentSermons.length === 0 ? (
           <div className="bg-white border border-line p-10 text-center">
             <span className="material-symbols-outlined text-4xl text-line mb-3 block">description</span>
-            <p className="text-mute mb-4">No sermons yet. Start writing your first khutbah.</p>
+            <p className="text-mute mb-4">{t("dash.noSermons")}</p>
             <button
               onClick={openNewForm}
               className="px-5 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors"
             >
-              + New Sermon
+              {t("dash.newSermon")}
             </button>
           </div>
         ) : (
@@ -509,15 +525,15 @@ export default function DashboardPage() {
                         <span className="text-xs text-mute">{statusLabel[sermon.status] ?? sermon.status}</span>
                         {sermon.theme_name && (
                           <>
-                            <span className="text-mute/30">·</span>
+                            <span className="text-mute/30">&middot;</span>
                             <span className="text-xs text-accent-gold">{sermon.theme_name}</span>
                           </>
                         )}
                         {sermon.scheduled_date && (
                           <>
-                            <span className="text-mute/30">·</span>
+                            <span className="text-mute/30">&middot;</span>
                             <span className="text-xs text-mute">
-                              {new Date(sermon.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                              {formatShortDate(sermon.scheduled_date)}
                             </span>
                           </>
                         )}
@@ -533,11 +549,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Right sidebar */}
-      <div className="lg:w-[280px] border-t lg:border-t-0 lg:border-l border-line p-4 sm:p-5 shrink-0 overflow-y-auto">
+      <div className={`lg:w-[280px] border-t lg:border-t-0 ${isAr ? "lg:border-r" : "lg:border-l"} border-line p-4 sm:p-5 shrink-0 overflow-y-auto`}>
         {/* Annual Progress */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-ink">{data.planningYear} progress</p>
+            <p className="text-sm font-semibold text-ink">{data.planningYear} {t("dash.progress")}</p>
             <span className="text-xs text-mute">{overallPercent}%</span>
           </div>
           <div className="w-full h-1.5 bg-line rounded-full mb-4 overflow-hidden">
@@ -565,7 +581,7 @@ export default function DashboardPage() {
                     </div>
                     <span className="text-xs text-mute">{step.done}/{step.total}</span>
                   </div>
-                  <div className="w-full h-1 bg-line rounded-full overflow-hidden ml-6" style={{ width: "calc(100% - 1.5rem)" }}>
+                  <div className={`w-full h-1 bg-line rounded-full overflow-hidden ${isAr ? "mr-6" : "ml-6"}`} style={{ width: "calc(100% - 1.5rem)" }}>
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${complete ? "bg-primary" : "bg-primary/40"}`}
                       style={{ width: `${pct}%` }}
@@ -584,7 +600,7 @@ export default function DashboardPage() {
 
         {/* Season Progress */}
         <div className="mb-6">
-          <p className="text-sm font-semibold text-ink mb-3">Season progress</p>
+          <p className="text-sm font-semibold text-ink mb-3">{t("dash.seasonProgress")}</p>
           <div className="flex flex-col gap-3">
             {seasons.map((season) => (
               <div
@@ -600,9 +616,9 @@ export default function DashboardPage() {
                     <span className="material-symbols-outlined text-base text-mute">
                       {seasonIcon[season.label]}
                     </span>
-                    <span className="text-sm font-medium text-ink">{season.label}</span>
+                    <span className="text-sm font-medium text-ink">{seasonLabelMap[season.label] ?? season.label}</span>
                     {season.isCurrent && (
-                      <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Now</span>
+                      <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">{t("dash.now")}</span>
                     )}
                   </div>
                   <span className="text-xs text-mute">{season.progress}%</span>
@@ -625,11 +641,53 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Hijri Events */}
+        {hijriEvents.length > 0 && (
+          <div className="mb-6">
+            <p className="text-sm font-semibold text-ink mb-3">{t("dash.hijriEvents")}</p>
+            <div className="flex flex-col gap-1">
+              {hijriEvents.map((event, i) => {
+                const daysUntil = Math.ceil((event.gregorianDate.getTime() - Date.now()) / 86400000);
+                return (
+                  <div
+                    key={`${event.name}-${i}`}
+                    className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-surface transition-colors"
+                  >
+                    <div
+                      className="w-7 h-7 flex items-center justify-center rounded-lg shrink-0"
+                      style={{ backgroundColor: event.color + "18" }}
+                    >
+                      <span
+                        className="material-symbols-outlined text-base"
+                        style={{ color: event.color }}
+                      >
+                        {event.icon}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-ink truncate">{isAr ? event.nameAr : event.name}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[11px] text-mute">
+                          {event.gregorianDate.toLocaleDateString(isAr ? "ar-SA" : "en-US", { day: "numeric", month: "short" })}
+                        </span>
+                        <span className="text-mute/30">&middot;</span>
+                        <span className="text-[11px] text-primary font-medium">
+                          {daysUntil === 0 ? t("dash.today") : daysUntil === 1 ? t("dash.tomorrow") : isAr ? `${daysUntil} ي` : `${daysUntil}d`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Upcoming */}
         <div className="mb-6">
-          <p className="text-sm font-semibold text-ink mb-3">Upcoming</p>
+          <p className="text-sm font-semibold text-ink mb-3">{t("dash.upcoming")}</p>
           {upcomingSermons.length === 0 ? (
-            <p className="text-xs text-mute/50">No upcoming sermons scheduled</p>
+            <p className="text-xs text-mute/50">{t("dash.noUpcoming")}</p>
           ) : (
             <div className="flex flex-col gap-1">
               {upcomingSermons.map((sermon) => (
@@ -640,7 +698,7 @@ export default function DashboardPage() {
                 >
                   <span className="text-[11px] font-semibold text-primary whitespace-nowrap min-w-[42px]">
                     {sermon.scheduled_date
-                      ? new Date(sermon.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short" }).toUpperCase()
+                      ? new Date(sermon.scheduled_date + "T00:00:00").toLocaleDateString(isAr ? "ar-SA" : "en-US", { day: "numeric", month: "short" }).toUpperCase()
                       : "TBD"}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -658,28 +716,28 @@ export default function DashboardPage() {
 
         {/* Quick actions */}
         <div>
-          <p className="text-sm font-semibold text-ink mb-3">Quick actions</p>
+          <p className="text-sm font-semibold text-ink mb-3">{t("dash.quickActions")}</p>
           <div className="flex flex-col gap-1.5">
             <button
               onClick={openNewForm}
-              className="flex items-center gap-2 text-sm text-ink px-3 py-2 bg-white border border-line hover:bg-surface transition-colors w-full text-left rounded-lg"
+              className="flex items-center gap-2 text-sm text-ink px-3 py-2 bg-white border border-line hover:bg-surface transition-colors w-full text-start rounded-lg"
             >
               <span className="material-symbols-outlined text-primary text-lg">add</span>
-              New sermon
+              {t("dash.newSermonAction")}
             </button>
             <Link
               href="/sermons"
               className="flex items-center gap-2 text-sm text-ink px-3 py-2 bg-white border border-line hover:bg-surface transition-colors rounded-lg"
             >
               <span className="material-symbols-outlined text-primary text-lg">list</span>
-              All sermons
+              {t("dash.allSermons")}
             </Link>
             <Link
               href="/themes"
               className="flex items-center gap-2 text-sm text-ink px-3 py-2 bg-white border border-line hover:bg-surface transition-colors rounded-lg"
             >
               <span className="material-symbols-outlined text-primary text-lg">calendar_month</span>
-              Annual plan
+              {t("dash.annualPlan")}
             </Link>
           </div>
         </div>

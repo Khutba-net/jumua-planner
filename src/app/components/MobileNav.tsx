@@ -2,14 +2,20 @@
 
 import { useState } from "react";
 
-const links = [
-  { href: "#annual-plan", label: "Annual Plan" },
-  { href: "#features", label: "Features" },
-  { href: "#how", label: "How It Works" },
-  { href: "#pricing", label: "Pricing" },
-];
+const links = {
+  en: [
+    { href: "#framework", label: "Plan" },
+    { href: "#objectives", label: "Prepare" },
+    { href: "#pricing", label: "Pricing" },
+  ],
+  ar: [
+    { href: "#framework", label: "الخطة" },
+    { href: "#objectives", label: "الإعداد" },
+    { href: "#pricing", label: "الأسعار" },
+  ],
+};
 
-export default function MobileNav() {
+export default function MobileNav({ lang = "en" }: { lang?: "en" | "ar" }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -27,7 +33,7 @@ export default function MobileNav() {
       {open && (
         <div className="fixed top-[52px] left-0 right-0 z-[100] border-b border-line shadow-lg" style={{ background: "#FAF7F2" }}>
           <nav className="flex flex-col px-6 py-4 gap-1">
-            {links.map((l) => (
+            {(links[lang] || links.en).map((l) => (
               <a
                 key={l.href}
                 href={l.href}

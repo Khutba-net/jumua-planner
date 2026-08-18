@@ -1,54 +1,65 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 
 const tr = {
   en: {
-    title: "Create your account",
-    subtitle: "Get started with JumuaPlanner in seconds",
-    google: "Continue with Google",
-    or: "or",
+    loading: "Loading invite...",
+    invalidTitle: "Invalid Invite",
+    invalidDesc: "This invite link is invalid or has expired.",
+    backHome: "Go to homepage",
+    joinOrg: (org: string) => `Join ${org}`,
+    youreInvited: (name: string, org: string) => `${name}, you've been invited to join ${org} on JumuaPlanner.`,
+    createAccount: "Create your account to get started.",
     name: "Full name",
     namePlaceholder: "Enter your full name",
     email: "Email",
     emailPlaceholder: "you@example.com",
     password: "Password",
     passPlaceholder: "At least 8 characters",
-    creating: "Creating account...",
-    create: "Create Account",
+    joining: "Joining...",
+    join: "Join Organization",
     hasAccount: "Already have an account?",
     signIn: "Sign in",
     fallbackError: "Something went wrong. Please try again.",
   },
   ar: {
-    title: "أنشئ حسابك",
-    subtitle: "ابدأ مع جمعة بلانر في ثوانٍ",
-    google: "المتابعة مع جوجل",
-    or: "أو",
+    loading: "جاري تحميل الدعوة...",
+    invalidTitle: "دعوة غير صالحة",
+    invalidDesc: "رابط الدعوة هذا غير صالح أو انتهت صلاحيته.",
+    backHome: "العودة للرئيسية",
+    joinOrg: (org: string) => `انضم إلى ${org}`,
+    youreInvited: (name: string, org: string) => `${name}، لقد تمت دعوتك للانضمام إلى ${org} على جمعة بلانر.`,
+    createAccount: "أنشئ حسابك للبدء.",
     name: "الاسم الكامل",
     namePlaceholder: "أدخل اسمك الكامل",
     email: "البريد الإلكتروني",
     emailPlaceholder: "you@example.com",
     password: "كلمة المرور",
     passPlaceholder: "٨ أحرف على الأقل",
-    creating: "جاري إنشاء الحساب...",
-    create: "إنشاء حساب",
+    joining: "جاري الانضمام...",
+    join: "انضم للمنظمة",
     hasAccount: "لديك حساب بالفعل؟",
     signIn: "تسجيل الدخول",
     fallbackError: "حدث خطأ. يرجى المحاولة مرة أخرى.",
   },
 };
 
-export default function SignupPage() {
+export default function InvitePage({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = use(params);
   const [lang, setLang] = useState<"en" | "ar">("en");
   const c = tr[lang];
   const isAr = lang === "ar";
 
+  const [inviteData, setInviteData] = useState<{ khatib_name: string; org_name: string } | null>(null);
+  const [inviteError, setInviteError] = useState("");
+  const [loadingInvite, setLoadingInvite] = useState(true);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -56,35 +67,72 @@ export default function SignupPage() {
     if (saved === "ar") setLang("ar");
   }, []);
 
-  const handleSignup = async (e: React.FormEvent) => {
+  useEffect(() => {
+    fetch(`/api/invite/${code}`)
+      .then(async (r) => {
+        if (!r.ok) {
+          const d = await r.json();
+          setInviteError(d.error || "Invalid invite");
+          return;
+        }
+        const d = await r.json();
+        setInviteData(d);
+        setName(d.khatib_name);
+      })
+      .finally(() => setLoadingInvite(false));
+  }, [code]);
+
+  const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
     setError("");
 
     try {
-      const res = await fetch("/api/auth/signup", {
+      const res = await fetch(`/api/invite/${code}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Signup failed");
-        setLoading(false);
+        setError(data.error || "Failed to join");
+        setSaving(false);
         return;
       }
       window.location.href = "/setup";
     } catch {
       setError(c.fallbackError);
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  if (loadingInvite) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <p className="text-mute text-sm">{c.loading}</p>
+      </div>
+    );
+  }
+
+  if (inviteError || !inviteData) {
+    return (
+      <div dir={isAr ? "rtl" : "ltr"} className={`min-h-screen bg-surface flex flex-col items-center justify-center px-5 ${isAr ? "font-arabic" : ""}`}>
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+            <span className="material-symbols-outlined text-red-500 text-3xl">error</span>
+          </div>
+          <h1 className="text-xl font-bold text-ink mb-2">{c.invalidTitle}</h1>
+          <p className="text-ink/40 text-sm mb-6">{inviteError || c.invalidDesc}</p>
+          <Link href="/" className="text-primary font-semibold text-sm hover:underline">{c.backHome}</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div dir={isAr ? "rtl" : "ltr"} className={`min-h-screen bg-surface flex flex-col items-center justify-center px-5 py-10 md:py-16 ${isAr ? "font-arabic" : ""}`}>
+    <div dir={isAr ? "rtl" : "ltr"} className={`min-h-screen bg-surface flex flex-col items-center justify-center px-5 py-10 ${isAr ? "font-arabic" : ""}`}>
       <div className="w-full max-w-[460px]">
-        {/* Logo + lang toggle */}
-        <div className="text-center mb-8 md:mb-10">
+        <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-4 mb-4">
             <Link href="/" className="inline-flex items-center gap-2">
               <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -104,31 +152,15 @@ export default function SignupPage() {
           </button>
         </div>
 
-        <h1 className="text-2xl md:text-3xl font-bold text-ink text-center mb-1.5 tracking-tight">
-          {c.title}
-        </h1>
-        <p className="text-ink/40 text-center mb-8 text-sm">
-          {c.subtitle}
-        </p>
-
-        <button
-          type="button"
-          className="w-full py-3.5 rounded-full border border-line bg-white text-ink font-semibold text-sm hover:bg-surface transition-all flex items-center justify-center gap-3"
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18">
-            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-            <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
-            <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-          </svg>
-          {c.google}
-        </button>
-
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-line" />
-          <span className="text-[10px] text-ink/30 font-semibold uppercase tracking-wider">{c.or}</span>
-          <div className="flex-1 h-px bg-line" />
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 mb-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+            <span className="material-symbols-outlined text-primary text-2xl">group_add</span>
+          </div>
+          <h1 className="text-xl font-bold text-ink mb-1">{c.joinOrg(inviteData.org_name)}</h1>
+          <p className="text-ink/40 text-sm">{c.youreInvited(inviteData.khatib_name, inviteData.org_name)}</p>
         </div>
+
+        <p className="text-ink/40 text-sm text-center mb-6">{c.createAccount}</p>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-lg mb-4">
@@ -136,7 +168,7 @@ export default function SignupPage() {
           </div>
         )}
 
-        <form onSubmit={handleSignup} className="flex flex-col gap-5">
+        <form onSubmit={handleJoin} className="flex flex-col gap-5">
           <div>
             <label className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
             <input
@@ -176,16 +208,16 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={saving}
             className="w-full py-3.5 rounded-full bg-primary text-white font-bold text-sm hover:bg-secondary shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 mt-1"
           >
-            {loading ? c.creating : c.create}
+            {saving ? c.joining : c.join}
           </button>
         </form>
 
         <p className="text-center text-sm text-ink/40 mt-8">
           {c.hasAccount}{" "}
-          <Link href="/auth/login" className="text-primary font-semibold hover:underline">
+          <Link href={`/auth/login?invite=${code}`} className="text-primary font-semibold hover:underline">
             {c.signIn}
           </Link>
         </p>

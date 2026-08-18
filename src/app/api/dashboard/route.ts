@@ -36,7 +36,7 @@ export async function GET() {
     throw e;
   }
 
-  const user = db.prepare("SELECT id, name, email, account_type, avatar_url, bio, phone, onboarding_complete, planning_year, created_at FROM users WHERE id = ?").get(userId) as Record<string, unknown> | undefined;
+  const user = db.prepare("SELECT id, name, email, account_type, role, avatar_url, bio, phone, onboarding_complete, planning_year, created_at FROM users WHERE id = ?").get(userId) as Record<string, unknown> | undefined;
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   if (!user.onboarding_complete) {

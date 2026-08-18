@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n";
 
 interface SubTopic {
   id: string;
@@ -56,12 +57,15 @@ const THEME_COLORS = [
   { label: "Amber", value: "#B8860B" },
 ];
 
-const STATUS_MAP: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  draft: { bg: "#f0eeeb", text: "#6d797a", dot: "#bcc9ca", label: "Not started" },
-  ready: { bg: "#e8f5ee", text: "#1f7a4d", dot: "#2f9e5f", label: "Written" },
-  delivered: { bg: "#e9f0f7", text: "#3c6194", dot: "#5b7fa6", label: "Delivered" },
-  archived: { bg: "#f0eeeb", text: "#6d797a", dot: "#bcc9ca", label: "Archived" },
-};
+function useStatusMap() {
+  const { t } = useI18n();
+  return {
+    draft: { bg: "#f0eeeb", text: "#6d797a", dot: "#bcc9ca", label: t("status.notStarted") },
+    ready: { bg: "#e8f5ee", text: "#1f7a4d", dot: "#2f9e5f", label: t("status.written") },
+    delivered: { bg: "#e9f0f7", text: "#3c6194", dot: "#5b7fa6", label: t("status.delivered") },
+    archived: { bg: "#f0eeeb", text: "#6d797a", dot: "#bcc9ca", label: t("status.archived") },
+  } as Record<string, { bg: string; text: string; dot: string; label: string }>;
+}
 
 const TARGET_FRIDAYS = 52;
 
@@ -72,7 +76,6 @@ function seasonIndexOf(month: number) {
 function fridaysInYear(year: number): Date[] {
   const out: Date[] = [];
   const d = new Date(year, 0, 1);
-  // advance to first Friday (getDay() === 5)
   while (d.getDay() !== 5) d.setDate(d.getDate() + 1);
   while (d.getFullYear() === year) {
     out.push(new Date(d));
@@ -85,20 +88,24 @@ function toISODate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function formatFriday(iso: string) {
+function formatFriday(iso: string, isAr: boolean) {
   const d = new Date(iso + "T00:00:00");
+  if (isAr) {
+    return d.toLocaleDateString("ar-SA", { day: "numeric", month: "short" });
+  }
   return `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
 }
 
 export default function AnnualPlanPage() {
   const router = useRouter();
+  const { t, isAr } = useI18n();
+  const STATUS_MAP = useStatusMap();
   const [themes, setThemes] = useState<Theme[]>([]);
   const [sermons, setSermons] = useState<Sermon[]>([]);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(new Date().getFullYear());
   const [view, setView] = useState<"seasons" | "grid">("seasons");
 
-  // Create / edit theme panel
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -108,14 +115,12 @@ export default function AnnualPlanPage() {
   const [formMonth, setFormMonth] = useState(1);
   const [formTopics, setFormTopics] = useState<string[]>(["", "", "", ""]);
 
-  // Inline title creation (season table): keyed by `${themeId}:${subIdx}`
   const [addingKey, setAddingKey] = useState<string | null>(null);
   const [addTitleText, setAddTitleText] = useState("");
   const [addDate, setAddDate] = useState<string>("");
   const [addBusy, setAddBusy] = useState(false);
   const [addSubTopicId, setAddSubTopicId] = useState<string | null>(null);
 
-  // Inline title creation (52-Friday grid): keyed by ISO date
   const [gridAddIso, setGridAddIso] = useState<string | null>(null);
   const [gridAddText, setGridAddText] = useState("");
   const [gridBusy, setGridBusy] = useState(false);
@@ -158,13 +163,11 @@ export default function AnnualPlanPage() {
   const delivered = yearSermons.filter((s) => s.status === "delivered").length;
   const pct = Math.min(100, Math.round((titled / TARGET_FRIDAYS) * 100));
 
-  // group themes into 4 seasons
   const seasonGroups = SEASONS.map((s) => ({
     ...s,
     themes: yearThemes.filter((t) => seasonIndexOf(t.month) === s.n - 1),
   }));
 
-  // ── Friday helpers ──
   const fridays = useMemo(() => fridaysInYear(year), [year]);
   const takenDates = useMemo(() => {
     const m = new Map<string, Sermon>();
@@ -172,15 +175,13 @@ export default function AnnualPlanPage() {
     return m;
   }, [yearSermons]);
 
-  // ISO dates of every Friday inside a theme's season (its 3-month quarter)
   function seasonFridayISOs(theme: Theme): string[] {
-    const startMonth = SEASONS[seasonIndexOf(theme.month)].startMonth; // 1,4,7,10
+    const startMonth = SEASONS[seasonIndexOf(theme.month)].startMonth;
     return fridays
       .filter((d) => { const m = d.getMonth() + 1; return m >= startMonth && m <= startMonth + 2; })
       .map(toISODate);
   }
 
-  // Open (unassigned) Fridays in the season, optionally keeping the currently-picked one
   function openSeasonFridays(theme: Theme, keep?: string | null): string[] {
     return seasonFridayISOs(theme).filter((iso) => !takenDates.has(iso) || iso === keep);
   }
@@ -191,9 +192,6 @@ export default function AnnualPlanPage() {
     return free ?? seasonISOs[seasonISOs.length - 1] ?? null;
   }
 
-  // Which theme "owns" a given Friday date — the theme with the greatest start month
-  // at or before that month. On a tie (several themes share a start month), keep the
-  // first one, i.e. the season's primary theme.
   function themeIdForDate(iso: string): string | null {
     const month = Number(iso.slice(5, 7));
     let chosen: Theme | null = null;
@@ -204,7 +202,6 @@ export default function AnnualPlanPage() {
     return chosen?.id ?? yearThemes[0]?.id ?? null;
   }
 
-  // ── Theme panel ──
   function openCreate(prefillMonth?: number) {
     setEditingTheme(null);
     setShowCreate(true);
@@ -260,7 +257,7 @@ export default function AnnualPlanPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this theme? Its Friday sermons stay but become unlinked from the plan.")) return;
+    if (!confirm(t("themes.deleteConfirm"))) return;
     await fetch(`/api/themes/${id}`, { method: "DELETE" });
     closeForm();
     fetchAll();
@@ -268,7 +265,6 @@ export default function AnnualPlanPage() {
 
   function setSubField(i: number, v: string) { setFormTopics(formTopics.map((t, idx) => (idx === i ? v : t))); }
 
-  // ── Inline add title (season table) ──
   function startAddTitle(theme: Theme, key: string, subTopicId: string | null) {
     setAddingKey(key);
     setAddTitleText("");
@@ -296,7 +292,6 @@ export default function AnnualPlanPage() {
     fetchAll();
   }
 
-  // ── Inline add title (52-Friday grid) ──
   function startGridAdd(iso: string) {
     setGridAddIso(iso);
     setGridAddText("");
@@ -330,23 +325,22 @@ export default function AnnualPlanPage() {
     router.push(`/sermons/${s.id}/edit`);
   }
 
-  // ── Export CSV ──
   function exportPlan() {
-    const rows: string[][] = [["Season", "Main theme", "Sub-bouquet", "Friday", "Sermon title", "Status"]];
+    const rows: string[][] = [[t("themes.season"), t("themes.mainTheme"), t("themes.subBouquet"), t("type.friday"), t("themes.sermonTitles"), t("status.draft")]];
     seasonGroups.forEach((sg) => {
       sg.themes.forEach((theme) => {
         const ss = themeSermons(theme.id);
         const subEntries = theme.sub_topics.length
           ? theme.sub_topics.map((s) => ({ name: s.name, id: s.id }))
-          : [{ name: "General", id: null as string | null }];
+          : [{ name: isAr ? "عام" : "General", id: null as string | null }];
         subEntries.forEach((sub) => {
           const slice = sub.id
             ? ss.filter((s) => s.sub_topic_id === sub.id)
             : ss.filter((s) => !s.sub_topic_id);
-          if (slice.length === 0) rows.push([sg.label, theme.name, sub.name, "", "", ""]);
+          if (slice.length === 0) rows.push([isAr ? t(`season.${sg.n}`) : sg.label, theme.name, sub.name, "", "", ""]);
           slice.forEach((sr) =>
             rows.push([
-              sg.label, theme.name, sub.name,
+              isAr ? t(`season.${sg.n}`) : sg.label, theme.name, sub.name,
               sr.scheduled_date ? sr.scheduled_date.slice(0, 10) : "",
               sr.title,
               (STATUS_MAP[sr.status] ?? STATUS_MAP.draft).label,
@@ -375,15 +369,14 @@ export default function AnnualPlanPage() {
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div>
               <h1 className="text-[22px] sm:text-[26px] font-bold text-ink tracking-tight leading-none">
-                Annual Plan <span className="text-mute font-normal">·</span> <span className="text-primary">{year}</span>
+                {t("themes.annualPlan")} <span className="text-mute font-normal">·</span> <span className="text-primary">{year}</span>
               </h1>
               <p className="mt-2 text-[13px] text-mute/70 font-[var(--font-arabic)]" dir="rtl">
-                الخطة السنوية لخطبة الجمعة — {TARGET_FRIDAYS} جمعة
+                {t("themes.annualPlanAr")} — {TARGET_FRIDAYS} {t("themes.fridays")}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Year stepper */}
               <div className="flex items-center bg-white border border-line/60 rounded-xl overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 <button onClick={() => setYear(year - 1)} aria-label="Previous year"
                   className="w-9 h-9 grid place-items-center text-mute hover:text-primary hover:bg-primary/5 transition-all duration-200">
@@ -395,7 +388,6 @@ export default function AnnualPlanPage() {
                   <span className="material-symbols-outlined text-[18px]">chevron_right</span>
                 </button>
               </div>
-              {/* View toggle */}
               <div className="flex items-center bg-white border border-line/60 rounded-xl p-[3px] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 {(["seasons", "grid"] as const).map((v) => (
                   <button key={v} onClick={() => setView(v)}
@@ -403,14 +395,14 @@ export default function AnnualPlanPage() {
                       view === v ? "bg-primary text-white shadow-[0_1px_3px_rgba(0,102,109,0.3)]" : "text-mute hover:text-ink"
                     }`}>
                     <span className="material-symbols-outlined text-[15px]">{v === "seasons" ? "table_rows" : "grid_view"}</span>
-                    {v === "seasons" ? "Seasons" : "52 Fridays"}
+                    {v === "seasons" ? t("themes.seasons") : t("themes.52fridays")}
                   </button>
                 ))}
               </div>
               <button onClick={exportPlan}
                 className="h-9 px-3 text-[12px] font-medium text-mute bg-white border border-line/60 rounded-xl hover:text-ink hover:border-line shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px]">download</span>
-                <span className="hidden sm:inline">Export</span>
+                <span className="hidden sm:inline">{t("themes.export")}</span>
               </button>
             </div>
           </div>
@@ -421,30 +413,30 @@ export default function AnnualPlanPage() {
               <div className="flex items-baseline justify-between mb-2">
                 <p className="text-[13px] text-ink">
                   <span className="text-primary text-[17px] font-bold tabular-nums">{titled}</span>
-                  <span className="text-mute/80 font-normal"> / {TARGET_FRIDAYS} Fridays titled</span>
+                  <span className="text-mute/80 font-normal"> / {TARGET_FRIDAYS} {t("themes.fridaysTitled")}</span>
                 </p>
                 <p className="text-[12px] text-mute/60 font-medium tabular-nums">{pct}%</p>
               </div>
               <div className="h-[6px] rounded-full bg-ink/[0.06] overflow-hidden flex">
                 <div className="h-full bg-primary rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                  style={{ width: `${Math.min(100, (delivered / TARGET_FRIDAYS) * 100)}%` }} title={`${delivered} delivered`} />
+                  style={{ width: `${Math.min(100, (delivered / TARGET_FRIDAYS) * 100)}%` }} title={`${delivered} ${t("themes.delivered")}`} />
                 <div className="h-full bg-primary/35 transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                  style={{ width: `${Math.min(100, ((written - delivered) / TARGET_FRIDAYS) * 100)}%` }} title="written" />
+                  style={{ width: `${Math.min(100, ((written - delivered) / TARGET_FRIDAYS) * 100)}%` }} title={t("themes.written")} />
                 <div className="h-full bg-accent-gold/45 transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                  style={{ width: `${Math.min(100, ((titled - written) / TARGET_FRIDAYS) * 100)}%` }} title="planned" />
+                  style={{ width: `${Math.min(100, ((titled - written) / TARGET_FRIDAYS) * 100)}%` }} title={t("themes.planned")} />
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2.5">
-                <Legend color="#00666d" label={`${delivered} delivered`} />
-                <Legend color="rgba(0,102,109,0.35)" label={`${written - delivered} written`} />
-                <Legend color="rgba(196,163,90,0.55)" label={`${titled - written} planned`} />
-                <Legend color="rgba(28,28,26,0.08)" label={`${Math.max(0, TARGET_FRIDAYS - titled)} open`} />
+                <Legend color="#00666d" label={`${delivered} ${t("themes.delivered")}`} />
+                <Legend color="rgba(0,102,109,0.35)" label={`${written - delivered} ${t("themes.written")}`} />
+                <Legend color="rgba(196,163,90,0.55)" label={`${titled - written} ${t("themes.planned")}`} />
+                <Legend color="rgba(28,28,26,0.08)" label={`${Math.max(0, TARGET_FRIDAYS - titled)} ${t("themes.open")}`} />
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
               {seasonGroups.some((sg) => sg.themes.length === 0) && (
                 <button onClick={() => openCreate()}
                   className="h-9 px-4 text-[12px] font-semibold text-white bg-primary rounded-xl hover:bg-secondary shadow-[0_1px_3px_rgba(0,102,109,0.25)] transition-all duration-200 active:scale-[0.97] flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px]">add</span> Main theme
+                  <span className="material-symbols-outlined text-[16px]">add</span> {t("themes.mainTheme")}
                 </button>
               )}
             </div>
@@ -486,7 +478,7 @@ export default function AnnualPlanPage() {
               <button onClick={handleNewSermonBlank}
                 className="self-start text-[11px] text-mute/45 hover:text-primary transition-all duration-200 flex items-center gap-1.5 mt-2 py-1">
                 <span className="material-symbols-outlined text-[15px]">add</span>
-                Add a standalone Friday (Eid, special occasion)
+                {t("themes.addStandalone")}
               </button>
             </div>
           )}
@@ -497,13 +489,13 @@ export default function AnnualPlanPage() {
       {isFormOpen && (
         <>
           <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40 lg:hidden" onClick={closeForm} />
-          <aside className="fixed right-0 top-0 h-full w-full sm:w-[400px] z-50 lg:z-auto lg:relative lg:w-[380px] border-l border-line/40 bg-white overflow-y-auto shrink-0 shadow-[-4px_0_24px_rgba(0,0,0,0.06)] lg:shadow-none">
+          <aside className={`fixed ${isAr ? "left-0" : "right-0"} top-0 h-full w-full sm:w-[400px] z-50 lg:z-auto lg:relative lg:w-[380px] ${isAr ? "border-r" : "border-l"} border-line/40 bg-white overflow-y-auto shrink-0 shadow-[-4px_0_24px_rgba(0,0,0,0.06)] lg:shadow-none`}>
             <div className="sticky top-0 bg-white/90 backdrop-blur-md border-b border-line/40 px-6 py-4 flex items-center justify-between z-10">
               <div>
                 <p className="text-[11px] font-medium text-mute/60">
-                  {formSeason.label} · {formSeason.range}
+                  {isAr ? t(`season.${formSeason.n}`) : formSeason.label} · {isAr ? t(`season.${formSeason.n}.range`) : formSeason.range}
                 </p>
-                <p className="text-[17px] font-semibold text-ink mt-0.5">{editingTheme ? "Edit theme" : "New theme"}</p>
+                <p className="text-[17px] font-semibold text-ink mt-0.5">{editingTheme ? t("themes.editThemeTitle") : t("themes.newTheme")}</p>
               </div>
               <button onClick={closeForm} aria-label="Close"
                 className="w-8 h-8 rounded-lg bg-ink/[0.04] grid place-items-center text-mute/60 hover:text-ink hover:bg-ink/[0.08] transition-all duration-200">
@@ -512,27 +504,27 @@ export default function AnnualPlanPage() {
             </div>
 
             <div className="p-6 flex flex-col gap-5">
-              <Field label="Theme name">
+              <Field label={t("themes.themeName")}>
                 <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. Foundations of Faith" autoFocus
+                  placeholder={t("themes.themeNamePlaceholder")} autoFocus
                   className="w-full text-[14px] font-medium text-ink border border-line/60 rounded-xl px-3.5 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
               </Field>
 
-              <Field label="Season">
+              <Field label={t("themes.season")}>
                 <select value={formMonth} onChange={(e) => setFormMonth(Number(e.target.value))}
                   className="w-full text-[13px] font-medium text-ink border border-line/60 rounded-xl px-3 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200">
                   {SEASONS.map((s) => {
                     const taken = !editingTheme && yearThemes.some((t) => Math.floor((t.month - 1) / 3) === s.n - 1);
                     return (
                       <option key={s.n} value={s.startMonth} disabled={taken}>
-                        {s.label} · {s.range}{taken ? " (filled)" : ""}
+                        {isAr ? t(`season.${s.n}`) : s.label} · {isAr ? t(`season.${s.n}.range`) : s.range}{taken ? ` (${t("themes.filled")})` : ""}
                       </option>
                     );
                   })}
                 </select>
               </Field>
 
-              <Field label="Accent color">
+              <Field label={t("themes.accentColor")}>
                 <div className="flex gap-2">
                   {THEME_COLORS.map((c) => (
                     <button key={c.value} onClick={() => setFormColor(c.value)} title={c.label}
@@ -542,20 +534,20 @@ export default function AnnualPlanPage() {
                 </div>
               </Field>
 
-              <Field label="Description">
+              <Field label={t("themes.description")}>
                 <textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} rows={2}
-                  placeholder="What this season's theme is about..."
+                  placeholder={t("themes.descPlaceholder")}
                   className="w-full text-[13px] text-ink border border-line/60 rounded-xl px-3.5 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 resize-none placeholder:text-mute/40" />
               </Field>
 
-              <Field label="Sub-bouquets">
+              <Field label={t("themes.subBouquets")}>
                 <div className="flex flex-col gap-2">
-                  {formTopics.map((t, i) => (
+                  {formTopics.map((tp, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <span className="w-[18px] h-[18px] text-[9px] font-bold grid place-items-center shrink-0 text-white"
                         style={{ backgroundColor: formColor }}>{i + 1}</span>
-                      <input type="text" value={t} onChange={(e) => setSubField(i, e.target.value)}
-                        placeholder={`Sub-bouquet ${i + 1}`}
+                      <input type="text" value={tp} onChange={(e) => setSubField(i, e.target.value)}
+                        placeholder={`${t("themes.subBouquetPlaceholder")} ${i + 1}`}
                         className="flex-1 text-[13px] text-ink border border-line/60 rounded-xl px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
                     </div>
                   ))}
@@ -567,12 +559,12 @@ export default function AnnualPlanPage() {
                   className={`w-full py-2.5 text-[13px] font-semibold rounded-xl transition-all duration-200 ${
                     formName.trim() && !saving ? "bg-primary text-white hover:bg-secondary shadow-[0_1px_3px_rgba(0,102,109,0.25)] active:scale-[0.98]" : "bg-ink/[0.06] text-mute cursor-not-allowed"
                   }`}>
-                  {saving ? "Saving…" : editingTheme ? "Update theme" : "Create theme"}
+                  {saving ? t("themes.saving") : editingTheme ? t("themes.updateTheme") : t("themes.createTheme")}
                 </button>
                 {editingTheme && (
                   <button onClick={() => handleDelete(editingTheme.id)}
                     className="w-full py-2 text-[12px] font-medium text-red-500/80 border border-red-200/60 rounded-xl hover:bg-red-50/50 transition-all duration-200">
-                    Delete theme
+                    {t("themes.deleteTheme")}
                   </button>
                 )}
               </div>
@@ -604,7 +596,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-/* ── Season block: 1 Main theme │ 4 Sub-bouquets │ 4 Sermon titles each ── */
+/* ── Season block ── */
 function SeasonBlock({
   season, themeSermons, onEditTheme, onAddThemeToSeason,
   addingKey, onStartAdd, onCancelAdd, addTitleText, setAddTitleText,
@@ -625,11 +617,16 @@ function SeasonBlock({
   submitAddTitle: (t: Theme) => void;
   addBusy: boolean;
 }) {
+  const { t, isAr } = useI18n();
+  const STATUS_MAP = useStatusMap();
   const theme = season.themes[0] ?? null;
   const color = theme?.color || "#00666d";
   const ss = season.themes.flatMap((t) => themeSermons(t.id));
   const allSubTopics = season.themes.flatMap((t) => t.sub_topics);
   const subSlots = Array.from({ length: 4 }, (_, i) => allSubTopics[i] ?? null);
+  const seasonLabel = isAr ? t(`season.${season.n}`) : season.label;
+  const seasonRange = isAr ? t(`season.${season.n}.range`) : season.range;
+
   return (
     <div className="bg-white border border-line/50 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.02)]">
       {/* Season header */}
@@ -640,14 +637,14 @@ function SeasonBlock({
           </span>
           <div>
             <p className="text-[14px] font-bold text-ink leading-tight">
-              {season.label} <span className="text-mute/70 font-medium">· {season.range}</span>
+              {seasonLabel} <span className="text-mute/70 font-medium">· {seasonRange}</span>
             </p>
             <p className="text-[10.5px] text-mute/50 font-[var(--font-arabic)] mt-0.5" dir="rtl">{season.ar}</p>
           </div>
         </div>
         {theme && (
           <span className="text-[11px] text-mute/70 font-medium tabular-nums hidden sm:inline">
-            {ss.length} titles
+            {ss.length} {t("themes.titles")}
           </span>
         )}
       </div>
@@ -656,7 +653,7 @@ function SeasonBlock({
         <button onClick={onAddThemeToSeason}
           className="w-full py-10 text-center text-[12px] text-mute/50 hover:text-primary transition-all duration-200 flex flex-col items-center gap-2 group">
           <span className="material-symbols-outlined text-2xl text-mute/25 group-hover:text-primary/50 transition-colors duration-200">add_circle</span>
-          Set the main theme for {season.range}
+          {t("themes.setMainTheme")} {seasonRange}
         </button>
       ) : (
         <div>
@@ -670,13 +667,13 @@ function SeasonBlock({
               </button>
             </div>
             <span className="text-[10px] text-mute/70 font-medium">
-              {theme.sub_topics.length}/4 bouquets · {ss.length} titles
+              {theme.sub_topics.length}/4 {t("themes.bouquets")} · {ss.length} {t("themes.titles")}
             </span>
           </div>
 
           {/* Column labels */}
           <div className="hidden sm:grid grid-cols-[170px_minmax(0,1fr)] px-5 pt-3 pb-1.5 text-[10px] font-semibold text-mute/60 uppercase tracking-wide">
-            <span>Sub-bouquet</span><span>Sermon titles</span>
+            <span>{t("themes.subBouquet")}</span><span>{t("themes.sermonTitles")}</span>
           </div>
 
           {/* 4 sub-bouquet slots */}
@@ -693,24 +690,22 @@ function SeasonBlock({
 
               return (
                 <div key={si} className="grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)]">
-                  {/* sub-bouquet name */}
                   <div className="px-5 sm:px-4 pt-2.5 sm:py-3 sm:border-r border-line/30 flex items-center gap-2">
                     <span className="w-[18px] h-[18px] text-[9px] font-bold grid place-items-center shrink-0 text-white"
                       style={{ backgroundColor: hasSubTopic ? color : "#ccc" }}>
                       {si + 1}
                     </span>
                     <span className={`text-[12.5px] font-semibold ${hasSubTopic ? "text-ink" : "text-mute/35 italic"}`}>
-                      {sub?.name ?? "Empty slot"}
+                      {sub?.name ?? t("themes.emptySlot")}
                     </span>
                   </div>
 
-                  {/* titles */}
                   <div className="px-5 sm:px-4 pb-2.5 sm:py-2 flex flex-col">
                     {!hasSubTopic ? (
                       <button onClick={() => onEditTheme(theme)}
                         className="text-[11px] text-mute/40 hover:text-primary py-2 flex items-center gap-1 transition-colors duration-200">
                         <span className="material-symbols-outlined text-[13px]">edit</span>
-                        Edit theme to name this sub-bouquet
+                        {t("themes.editTheme")}
                       </button>
                     ) : (
                       <>
@@ -721,7 +716,7 @@ function SeasonBlock({
                               className="group flex items-center gap-2.5 py-[7px] -mx-2 px-2 hover:bg-ink/[0.03] transition-all duration-200">
                               <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: st.dot }} />
                               <span className="text-[11px] text-mute/70 font-medium tabular-nums w-[42px] shrink-0">
-                                {sr.scheduled_date ? formatFriday(sr.scheduled_date.slice(0, 10)) : "—"}
+                                {sr.scheduled_date ? formatFriday(sr.scheduled_date.slice(0, 10), isAr) : "—"}
                               </span>
                               <span className="text-[13px] text-ink font-medium truncate min-w-0 flex-1 group-hover:text-primary transition-colors duration-200">
                                 {sr.title}
@@ -740,29 +735,29 @@ function SeasonBlock({
                                 if (e.key === "Enter") submitAddTitle(theme);
                                 if (e.key === "Escape") onCancelAdd();
                               }}
-                              placeholder="Sermon title…"
+                              placeholder={t("themes.sermonTitlePlaceholder")}
                               className="text-[12.5px] text-ink font-medium bg-white border border-line/60 px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
                             <div className="flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-[14px] text-mute/50 shrink-0">event</span>
                               <select value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
                                 className="flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none focus:border-primary transition-all duration-200">
-                                {dateOpts.length === 0 && <option value="">No open Fridays</option>}
+                                {dateOpts.length === 0 && <option value="">{t("themes.noOpenFridays")}</option>}
                                 {dateOpts.map((iso) => (
-                                  <option key={iso} value={iso}>Fri {formatFriday(iso)}</option>
+                                  <option key={iso} value={iso}>{isAr ? t("type.friday") : "Fri"} {formatFriday(iso, isAr)}</option>
                                 ))}
                               </select>
                               <button onClick={() => submitAddTitle(theme)} disabled={!addTitleText.trim() || addBusy}
                                 className={`text-[11px] font-bold px-3 py-1.5 transition-all duration-200 ${
                                   addTitleText.trim() && !addBusy ? "bg-primary text-white hover:bg-secondary" : "bg-ink/[0.06] text-mute cursor-not-allowed"
-                                }`}>{addBusy ? "…" : "Add"}</button>
-                              <button onClick={onCancelAdd} className="text-[11px] font-medium text-mute/60 hover:text-ink px-1.5 py-1.5 transition-colors duration-200">Cancel</button>
+                                }`}>{addBusy ? "…" : t("themes.add")}</button>
+                              <button onClick={onCancelAdd} className="text-[11px] font-medium text-mute/60 hover:text-ink px-1.5 py-1.5 transition-colors duration-200">{t("sermons.cancel")}</button>
                             </div>
                           </div>
                         ) : emptySlots > 0 ? (
                           <button onClick={() => onStartAdd(theme, key, sub.id)}
                             className="mt-0.5 self-start text-[11px] font-medium text-mute/50 hover:text-primary transition-all duration-200 flex items-center gap-0.5 py-1">
-                            <span className="material-symbols-outlined text-[13px]">add</span> Add title
-                            <span className="text-mute/30 ml-1">({emptySlots} remaining)</span>
+                            <span className="material-symbols-outlined text-[13px]">add</span> {t("themes.addTitle")}
+                            <span className="text-mute/30 ml-1">({emptySlots} {t("themes.remaining")})</span>
                           </button>
                         ) : null}
                       </>
@@ -795,6 +790,8 @@ function YearGrid({
   onSubmitGridAdd: () => void;
   gridBusy: boolean;
 }) {
+  const { t, isAr } = useI18n();
+  const STATUS_MAP = useStatusMap();
   const cols = 4;
   const perCol = Math.ceil(fridays.length / cols);
   const groups = Array.from({ length: cols }, (_, i) => fridays.slice(i * perCol, (i + 1) * perCol));
@@ -803,8 +800,8 @@ function YearGrid({
   return (
     <div className="max-w-6xl">
       <p className="text-[12px] text-mute mb-4">
-        Every Friday of <span className="font-bold text-ink">{year}</span> — {fridays.length} in total, {openCount} still open.
-        Click a filled row to open its sermon, or an <span className="text-primary font-semibold">open</span> row to title it here.
+        {t("themes.everyFriday")} <span className="font-bold text-ink">{year}</span> — {fridays.length} {t("themes.inTotal")}, {openCount} {t("themes.stillOpen")}
+        {" "}{t("themes.gridHint")} <span className="text-primary font-semibold">{t("themes.openLabel")}</span> {t("themes.gridHint2")}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {groups.map((group, gi) => (
@@ -819,7 +816,7 @@ function YearGrid({
               const lead = (
                 <>
                   <span className="text-[10px] font-bold text-mute/70 tabular-nums w-5 shrink-0">{idx + 1}</span>
-                  <span className="text-[10px] text-mute tabular-nums w-[42px] shrink-0">{d.getDate()} {MONTH_SHORT[d.getMonth()]}</span>
+                  <span className="text-[10px] text-mute tabular-nums w-[42px] shrink-0">{formatFriday(iso, isAr)}</span>
                 </>
               );
 
@@ -842,7 +839,7 @@ function YearGrid({
                       onChange={(e) => setGridAddText(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") onSubmitGridAdd(); if (e.key === "Escape") onCancelGridAdd(); }}
                       onBlur={onSubmitGridAdd}
-                      placeholder="Title, Enter to save…"
+                      placeholder={t("themes.titlePlaceholder")}
                       className="text-[12px] text-ink bg-white border border-primary/40 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-primary/10 min-w-0 flex-1 placeholder:text-mute/50" />
                   </div>
                 );
@@ -852,7 +849,7 @@ function YearGrid({
                 <button key={iso} onClick={() => onStartGridAdd(iso)}
                   className="w-full flex items-center gap-2.5 px-3 py-2 border-b border-line/60 last:border-b-0 min-h-[38px] hover:bg-primary/[0.04] transition-colors text-left group">
                   {lead}
-                  <span className="text-[11px] text-mute/40 italic flex-1 group-hover:text-primary/70">open</span>
+                  <span className="text-[11px] text-mute/40 italic flex-1 group-hover:text-primary/70">{t("themes.openLabel")}</span>
                   <span className="material-symbols-outlined text-[15px] text-line group-hover:text-primary transition-colors shrink-0">add</span>
                 </button>
               );
@@ -866,17 +863,18 @@ function YearGrid({
 
 /* ── Empty state / guided wizard ── */
 function EmptyWizard({ year, onStart }: { year: number; onStart: () => void }) {
+  const { t } = useI18n();
   const steps = [
-    { icon: "category", title: "Choose 4 season themes", desc: "One main theme per quarter of the year." },
-    { icon: "account_tree", title: "Add sub-bouquets", desc: "4 sub-topics under each theme, 16 in total." },
-    { icon: "edit_note", title: "Title the Fridays", desc: "Name each Friday sermon under its sub-bouquet." },
+    { icon: "category", title: t("themes.step1"), desc: t("themes.step1Desc") },
+    { icon: "account_tree", title: t("themes.step2"), desc: t("themes.step2Desc") },
+    { icon: "edit_note", title: t("themes.step3"), desc: t("themes.step3Desc") },
   ];
   return (
     <div className="max-w-2xl mx-auto text-center py-10">
       <span className="material-symbols-outlined text-5xl text-primary/20 mb-3 block">calendar_month</span>
-      <h2 className="text-xl font-extrabold text-primary">Build your {year} plan</h2>
+      <h2 className="text-xl font-extrabold text-primary">{t("themes.buildPlan")} {year} {t("themes.plan")}</h2>
       <p className="text-[13px] text-mute mt-1.5 mb-8">
-        A year of Friday sermons in three steps, from season themes down to each Friday&apos;s title.
+        {t("themes.buildDesc")}
       </p>
       <div className="grid sm:grid-cols-3 gap-3 mb-8 text-left">
         {steps.map((s, i) => (
@@ -892,7 +890,7 @@ function EmptyWizard({ year, onStart }: { year: number; onStart: () => void }) {
       </div>
       <button onClick={onStart}
         className="px-7 py-3 bg-primary text-white text-sm font-bold rounded-full hover:bg-secondary transition-all active:scale-95 shadow-sm">
-        Start with Season 1
+        {t("themes.startSeason1")}
       </button>
     </div>
   );

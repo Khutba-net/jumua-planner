@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/lib/i18n";
 
 interface Sermon {
   id: string;
@@ -15,25 +16,11 @@ interface Sermon {
   theme_name: string | null;
 }
 
-const statusLabel: Record<string, string> = {
-  draft: "Draft",
-  ready: "Ready",
-  delivered: "Delivered",
-  archived: "Archived",
-};
-
 const statusDot: Record<string, string> = {
   draft: "bg-mute/40",
   ready: "bg-green-500",
   delivered: "bg-primary",
   archived: "bg-mute/30",
-};
-
-const typeLabel: Record<string, string> = {
-  friday: "Friday",
-  eid: "Eid",
-  talk: "Talk",
-  other: "Other",
 };
 
 const typeIcon: Record<string, string> = {
@@ -48,16 +35,9 @@ function wordCount(text: string | null) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function formatDate(iso: string) {
-  return new Date(iso + (iso.includes("T") ? "" : "T00:00:00")).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 export default function SermonsPage() {
   const router = useRouter();
+  const { t, isAr } = useI18n();
   const [sermons, setSermons] = useState<Sermon[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -66,6 +46,28 @@ export default function SermonsPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState<"friday" | "eid" | "talk" | "other">("friday");
   const [creating, setCreating] = useState(false);
+
+  const statusLabel: Record<string, string> = {
+    draft: t("status.draft"),
+    ready: t("status.ready"),
+    delivered: t("status.delivered"),
+    archived: t("status.archived"),
+  };
+
+  const typeLabel: Record<string, string> = {
+    friday: t("type.friday"),
+    eid: t("type.eid"),
+    talk: t("type.talk"),
+    other: t("type.other"),
+  };
+
+  function formatDate(iso: string) {
+    return new Date(iso + (iso.includes("T") ? "" : "T00:00:00")).toLocaleDateString(isAr ? "ar-SA" : "en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
 
   useEffect(() => {
     fetch("/api/sermons")
@@ -84,8 +86,8 @@ export default function SermonsPage() {
   });
 
   const typeCounts = sermons.reduce<Record<string, number>>((acc, s) => {
-    const t = s.type || "friday";
-    acc[t] = (acc[t] || 0) + 1;
+    const tp = s.type || "friday";
+    acc[tp] = (acc[tp] || 0) + 1;
     return acc;
   }, {});
 
@@ -110,16 +112,16 @@ export default function SermonsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Sermons</h1>
+          <h1 className="text-2xl font-bold text-ink">{t("sermons.title")}</h1>
           <p className="text-sm text-mute mt-1">
-            {sermons.length} sermon{sermons.length !== 1 && "s"} total
+            {sermons.length} {sermons.length !== 1 ? t("sermons.title").toLowerCase() : t("cal.sermon")} {t("sermons.total")}
           </p>
         </div>
         <button
           onClick={() => { setShowNewForm(true); setNewTitle(""); setNewType("friday"); }}
           className="px-5 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors"
         >
-          + New Sermon
+          {t("sermons.newSermon")}
         </button>
       </div>
 
@@ -127,27 +129,27 @@ export default function SermonsPage() {
       {showNewForm && (
         <div className="bg-white border border-line p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-semibold text-ink">New sermon</p>
+            <p className="text-sm font-semibold text-ink">{t("sermons.newSermonForm")}</p>
             <button onClick={() => setShowNewForm(false)} className="text-mute hover:text-ink transition-colors">
               <span className="material-symbols-outlined text-lg">close</span>
             </button>
           </div>
           <input
             type="text"
-            placeholder="Sermon title"
+            placeholder={t("sermons.sermonTitle")}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
             autoFocus
             className="w-full px-3 py-2 border border-line text-sm text-ink bg-white mb-4 focus:outline-none focus:border-primary"
           />
-          <p className="text-xs text-mute mb-2">Type</p>
+          <p className="text-xs text-mute mb-2">{t("dash.type")}</p>
           <div className="grid grid-cols-4 gap-2 mb-4">
             {([
-              { value: "friday" as const, label: "Friday", icon: "mosque" },
-              { value: "eid" as const, label: "Eid", icon: "auto_awesome" },
-              { value: "talk" as const, label: "Talk", icon: "mic" },
-              { value: "other" as const, label: "Other", icon: "note" },
+              { value: "friday" as const, label: t("type.friday"), icon: "mosque" },
+              { value: "eid" as const, label: t("type.eid"), icon: "auto_awesome" },
+              { value: "talk" as const, label: t("type.talk"), icon: "mic" },
+              { value: "other" as const, label: t("type.other"), icon: "note" },
             ]).map((opt) => (
               <button
                 key={opt.value}
@@ -168,14 +170,14 @@ export default function SermonsPage() {
               onClick={() => setShowNewForm(false)}
               className="px-4 py-2 border border-line text-sm text-mute hover:bg-surface transition-colors"
             >
-              Cancel
+              {t("sermons.cancel")}
             </button>
             <button
               onClick={handleCreate}
               disabled={!newTitle.trim() || creating}
               className="px-4 py-2 bg-primary text-white text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50"
             >
-              {creating ? "Creating..." : "Create sermon"}
+              {creating ? t("sermons.creating") : t("sermons.createSermon")}
             </button>
           </div>
         </div>
@@ -183,23 +185,23 @@ export default function SermonsPage() {
 
       {/* Type filter */}
       <div className="flex gap-2 mb-4">
-        {["all", "friday", "eid", "talk", "other"].map((t) => {
-          const count = t === "all" ? sermons.length : (typeCounts[t] || 0);
-          if (t !== "all" && count === 0) return null;
+        {["all", "friday", "eid", "talk", "other"].map((tp) => {
+          const count = tp === "all" ? sermons.length : (typeCounts[tp] || 0);
+          if (tp !== "all" && count === 0) return null;
           return (
             <button
-              key={t}
-              onClick={() => setTypeFilter(t)}
+              key={tp}
+              onClick={() => setTypeFilter(tp)}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors rounded-full ${
-                typeFilter === t
+                typeFilter === tp
                   ? "bg-primary/10 text-primary"
                   : "text-mute hover:text-ink hover:bg-surface"
               }`}
             >
-              {t !== "all" && (
-                <span className="material-symbols-outlined text-sm">{typeIcon[t]}</span>
+              {tp !== "all" && (
+                <span className="material-symbols-outlined text-sm">{typeIcon[tp]}</span>
               )}
-              {t === "all" ? "All" : typeLabel[t]}
+              {tp === "all" ? t("sermons.all") : typeLabel[tp]}
               <span className="text-xs opacity-60">{count}</span>
             </button>
           );
@@ -218,14 +220,14 @@ export default function SermonsPage() {
                 : "bg-white border border-line text-mute hover:text-ink"
             }`}
           >
-            {f === "all" ? "All statuses" : statusLabel[f]}
+            {f === "all" ? t("sermons.allStatuses") : statusLabel[f]}
           </button>
         ))}
       </div>
 
       {/* List */}
       {loading ? (
-        <div className="text-center py-20 text-mute">Loading sermons...</div>
+        <div className="text-center py-20 text-mute">{t("sermons.loading")}</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20">
           <span className="material-symbols-outlined text-5xl text-line mb-4 block">
@@ -233,15 +235,15 @@ export default function SermonsPage() {
           </span>
           <p className="text-mute mb-4">
             {sermons.length === 0
-              ? "No sermons yet. Start writing your first khutbah."
-              : "No sermons match this filter."}
+              ? t("sermons.noSermons")
+              : t("sermons.noMatch")}
           </p>
           {sermons.length === 0 && (
             <button
               onClick={() => setShowNewForm(true)}
               className="px-5 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors"
             >
-              + New Sermon
+              {t("sermons.newSermon")}
             </button>
           )}
         </div>
@@ -272,12 +274,12 @@ export default function SermonsPage() {
                         <span className="text-xs text-mute">{statusLabel[sermon.status] ?? sermon.status}</span>
                         {sermon.theme_name && (
                           <>
-                            <span className="text-mute/30">·</span>
+                            <span className="text-mute/30">&middot;</span>
                             <span className="text-xs text-accent-gold">{sermon.theme_name}</span>
                           </>
                         )}
-                        <span className="text-mute/30">·</span>
-                        <span className="text-xs text-mute">{wordCount(sermon.content)} words</span>
+                        <span className="text-mute/30">&middot;</span>
+                        <span className="text-xs text-mute">{wordCount(sermon.content)} {t("dash.words")}</span>
                       </div>
                     </div>
                   </div>

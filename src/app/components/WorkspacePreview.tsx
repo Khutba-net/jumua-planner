@@ -481,7 +481,7 @@ const mockups: Record<string, () => React.ReactNode> = {
   editor: EditorMockup,
 };
 
-export default function WorkspacePreview() {
+export default function WorkspacePreview({ lang = "en" }: { lang?: "en" | "ar" }) {
   const [activeTab, setActiveTab] = useState("annual");
   const sidebarActive = activeTab === "annual" ? "annual" : activeTab === "calendar" ? "calendar" : activeTab === "editor" ? "sermons" : "dashboard";
   const MockupComponent = mockups[activeTab];
@@ -489,8 +489,12 @@ export default function WorkspacePreview() {
   return (
     <section id="features" className="py-28 md:py-40 px-5 md:px-8 bg-white scroll-mt-20 overflow-hidden">
       <div className="text-center mb-12 md:mb-16 max-w-4xl mx-auto">
-        <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold text-ink tracking-[-0.02em] leading-[1.08] mb-5">Everything you need to plan your year</h2>
-        <p className="text-lg md:text-xl text-ink/50 max-w-2xl mx-auto">Four connected surfaces, from the annual plan down to Friday&apos;s delivery.</p>
+        <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold text-ink tracking-[-0.02em] leading-[1.08] mb-5">
+          {lang === "ar" ? "كل ما تحتاجه لتخطيط عامك" : "Everything you need to plan your year"}
+        </h2>
+        <p className="text-lg md:text-xl text-ink/50 max-w-2xl mx-auto">
+          {lang === "ar" ? "أربع واجهات متصلة، من الخطة السنوية إلى إلقاء الجمعة." : "Four connected surfaces, from the annual plan down to Friday’s delivery."}
+        </p>
         <div className="flex justify-center gap-1 mt-8 bg-surface p-1 w-fit mx-auto flex-wrap">
           {tabs.map((tab) => (
             <button

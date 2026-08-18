@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { getHijriEventsForYear, type ResolvedHijriEvent } from "@/lib/hijri-events";
+import { useI18n } from "@/lib/i18n";
 
 interface Sermon {
   id: string;
@@ -19,19 +21,8 @@ interface Theme {
   year: number;
 }
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const STATUS_MAP: Record<string, { bg: string; text: string; label: string }> = {
-  draft: { bg: "#f0eeeb", text: "#6d797a", label: "Not started" },
-  ready: { bg: "#e8f5ee", text: "#00666d", label: "Written" },
-  delivered: { bg: "#eef2f7", text: "#5b7fa6", label: "Delivered" },
-  archived: { bg: "#f0eeeb", text: "#6d797a", label: "Archived" },
-};
+const DAY_KEYS = ["day.sun", "day.mon", "day.tue", "day.wed", "day.thu", "day.fri", "day.sat"];
+const DAY_SHORT_KEYS = ["day.short.sun", "day.short.mon", "day.short.tue", "day.short.wed", "day.short.thu", "day.short.fri", "day.short.sat"];
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -51,6 +42,7 @@ function getCalendarDays(year: number, month: number) {
 }
 
 export default function CalendarPage() {
+  const { t, isAr } = useI18n();
   const [sermons, setSermons] = useState<Sermon[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +51,15 @@ export default function CalendarPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [view, setView] = useState<"month" | "year">("month");
+  const yearHijriEvents = useMemo(() => getHijriEventsForYear(year), [year]);
+  const monthHijriEvents = useMemo(() => yearHijriEvents.filter(e => e.gregorianDate.getMonth() === month), [yearHijriEvents, month]);
+
+  const STATUS_MAP: Record<string, { bg: string; text: string; label: string }> = {
+    draft: { bg: "#f0eeeb", text: "#6d797a", label: t("status.notStarted") },
+    ready: { bg: "#e8f5ee", text: "#00666d", label: t("status.written") },
+    delivered: { bg: "#eef2f7", text: "#5b7fa6", label: t("status.delivered") },
+    archived: { bg: "#f0eeeb", text: "#6d797a", label: t("status.archived") },
+  };
 
   useEffect(() => {
     Promise.all([
@@ -93,6 +94,10 @@ export default function CalendarPage() {
     });
   }
 
+  function getHijriEventsForDate(date: Date): ResolvedHijriEvent[] {
+    return yearHijriEvents.filter((e) => isSameDay(e.gregorianDate, date));
+  }
+
   function prevMonth() {
     if (month === 0) { setMonth(11); setYear(year - 1); }
     else setMonth(month - 1);
@@ -120,7 +125,6 @@ export default function CalendarPage() {
   const writtenCount = monthSermons.filter((s) => s.status === "ready" || s.status === "delivered").length;
   const draftCount = monthSermons.filter((s) => s.status === "draft").length;
 
-  // Year view — mini months
   function renderMiniMonth(m: number) {
     const miniDays = getCalendarDays(year, m);
     const monthSermonsForMini = sermons.filter((s) => {
@@ -128,6 +132,7 @@ export default function CalendarPage() {
       const d = new Date(s.scheduled_date);
       return d.getFullYear() === year && d.getMonth() === m;
     });
+    const miniHijriEvents = yearHijriEvents.filter((e) => e.gregorianDate.getMonth() === m);
 
     return (
       <div
@@ -135,10 +140,10 @@ export default function CalendarPage() {
         className="bg-white/50 border border-[#bcc9ca]/20 p-3 cursor-pointer hover:bg-white/80 transition-colors"
         onClick={() => { setMonth(m); setView("month"); }}
       >
-        <p className="text-[11px] font-bold text-[#00666d] mb-2">{MONTH_NAMES[m]}</p>
+        <p className="text-[11px] font-bold text-[#00666d] mb-2">{t(`month.${m}`)}</p>
         <div className="grid grid-cols-7 gap-px text-[8px] text-center">
-          {DAY_LABELS.map((d) => (
-            <div key={d} className="text-[#bcc9ca] font-bold py-0.5">{d[0]}</div>
+          {DAY_SHORT_KEYS.map((dk) => (
+            <div key={dk} className="text-[#bcc9ca] font-bold py-0.5">{t(dk)}</div>
           ))}
           {miniDays.map((day, i) => {
             if (!day) return <div key={`e-${i}`} />;
@@ -146,6 +151,7 @@ export default function CalendarPage() {
               const sd = new Date(s.scheduled_date!);
               return isSameDay(sd, day);
             });
+            const hasHijriEvent = miniHijriEvents.some((e) => isSameDay(e.gregorianDate, day));
             const isToday = isSameDay(day, today);
             const isFriday = day.getDay() === 5;
 
@@ -153,6 +159,7 @@ export default function CalendarPage() {
               <div
                 key={i}
                 className={`py-0.5 ${isToday ? "bg-[#00666d] text-white font-bold" : ""} ${
+                  hasHijriEvent && !isToday ? "bg-[#C4A35A]/15 font-bold text-[#C4A35A]" :
                   isFriday && !isToday ? "text-[#00666d] font-bold" : "text-[#3d494a]"
                 }`}
               >
@@ -166,8 +173,17 @@ export default function CalendarPage() {
         </div>
         {monthSermonsForMini.length > 0 && (
           <p className="text-[9px] text-[#6d797a] mt-2 font-medium">
-            {monthSermonsForMini.length} sermon{monthSermonsForMini.length !== 1 ? "s" : ""}
+            {monthSermonsForMini.length} {monthSermonsForMini.length !== 1 ? t("cal.sermonsLower") : t("cal.sermon")}
           </p>
+        )}
+        {miniHijriEvents.length > 0 && (
+          <div className="mt-1">
+            {miniHijriEvents.map((e) => (
+              <p key={e.name} className="text-[8px] font-bold truncate" style={{ color: e.color }}>
+                {e.gregorianDate.getDate()} — {isAr ? e.nameAr : e.name}
+              </p>
+            ))}
+          </div>
         )}
       </div>
     );
@@ -183,12 +199,12 @@ export default function CalendarPage() {
               className="text-2xl sm:text-3xl font-bold text-[#00666d] italic tracking-tight"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
-              {view === "month" ? `${MONTH_NAMES[month]} ${year}` : `Calendar — ${year}`}
+              {view === "month" ? `${t(`month.${month}`)} ${year}` : `${t("nav.calendar")} — ${year}`}
             </h1>
             <p className="text-[12px] text-[#6d797a] mt-0.5">
               {view === "month"
-                ? `${monthSermons.length} sermons this month`
-                : `${sermons.filter((s) => s.scheduled_date && new Date(s.scheduled_date).getFullYear() === year).length} sermons this year`
+                ? `${monthSermons.length} ${t("cal.sermonsThisMonth")}`
+                : `${sermons.filter((s) => s.scheduled_date && new Date(s.scheduled_date).getFullYear() === year).length} ${t("cal.sermonsThisYear")}`
               }
             </p>
           </div>
@@ -197,7 +213,7 @@ export default function CalendarPage() {
               onClick={goToday}
               className="text-[11px] px-3 py-1.5 border border-[#bcc9ca]/40 bg-white/70 text-[#3d494a] font-semibold hover:bg-white transition-all"
             >
-              Today
+              {t("cal.today")}
             </button>
             <div className="flex items-center bg-white/70 backdrop-blur-sm rounded-full border border-[#bcc9ca]/30 shadow-sm">
               <button
@@ -220,7 +236,7 @@ export default function CalendarPage() {
                   view === "month" ? "bg-[#00666d] text-white" : "text-[#3d494a] hover:bg-white"
                 }`}
               >
-                Month
+                {t("cal.month")}
               </button>
               <button
                 onClick={() => setView("year")}
@@ -228,7 +244,7 @@ export default function CalendarPage() {
                   view === "year" ? "bg-[#00666d] text-white" : "text-[#3d494a] hover:bg-white"
                 }`}
               >
-                Year
+                {t("cal.year")}
               </button>
             </div>
           </div>
@@ -239,15 +255,19 @@ export default function CalendarPage() {
           <div className="flex overflow-x-auto border border-[#bcc9ca]/25 bg-white/60 backdrop-blur-sm">
             <div className="flex-1 min-w-[72px] px-3 py-2.5 text-center border-r border-[#bcc9ca]/20 bg-[#00666d]/[0.04]">
               <div className="text-xl font-bold text-[#00666d]">{monthSermons.length}</div>
-              <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">Sermons</div>
+              <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">{t("cal.sermons")}</div>
             </div>
             <div className="flex-1 min-w-[72px] px-3 py-2.5 text-center border-r border-[#bcc9ca]/20">
               <div className="text-xl font-bold text-[#00666d]">{writtenCount}</div>
-              <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">Written</div>
+              <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">{t("cal.written")}</div>
+            </div>
+            <div className="flex-1 min-w-[72px] px-3 py-2.5 text-center border-r border-[#bcc9ca]/20">
+              <div className="text-xl font-bold text-[#6d797a]">{draftCount}</div>
+              <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">{t("cal.notStarted")}</div>
             </div>
             <div className="flex-1 min-w-[72px] px-3 py-2.5 text-center">
-              <div className="text-xl font-bold text-[#6d797a]">{draftCount}</div>
-              <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">Not Started</div>
+              <div className="text-xl font-bold text-[#C4A35A]">{monthHijriEvents.length}</div>
+              <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">{t("cal.hijriEvents")}</div>
             </div>
           </div>
         )}
@@ -256,25 +276,23 @@ export default function CalendarPage() {
       {/* Calendar body */}
       <div className="px-4 sm:px-6 lg:px-10 py-4">
         {loading ? (
-          <div className="text-center py-20 text-[#6d797a] text-sm">Loading calendar...</div>
+          <div className="text-center py-20 text-[#6d797a] text-sm">{t("cal.loading")}</div>
         ) : view === "year" ? (
-          /* ── Year view ── */
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-px bg-[#bcc9ca]/15">
             {Array.from({ length: 12 }, (_, m) => renderMiniMonth(m))}
           </div>
         ) : (
-          /* ── Month view ── */
           <div className="border border-[#bcc9ca]/20 bg-white/40">
             {/* Day headers */}
             <div className="grid grid-cols-7 border-b border-[#bcc9ca]/20">
-              {DAY_LABELS.map((d) => (
+              {DAY_KEYS.map((dk, i) => (
                 <div
-                  key={d}
+                  key={dk}
                   className={`text-[10px] font-bold tracking-[1px] uppercase text-center py-2 border-r border-[#bcc9ca]/10 last:border-r-0 ${
-                    d === "Fri" ? "text-[#00666d] bg-[#00666d]/[0.03]" : "text-[#6d797a]"
+                    i === 5 ? "text-[#00666d] bg-[#00666d]/[0.03]" : "text-[#6d797a]"
                   }`}
                 >
-                  {d}
+                  {t(dk)}
                 </div>
               ))}
             </div>
@@ -294,6 +312,7 @@ export default function CalendarPage() {
                 const isToday = isSameDay(day, today);
                 const isFriday = day.getDay() === 5;
                 const daySermons = getSermonsForDate(day);
+                const dayHijriEvents = getHijriEventsForDate(day);
 
                 return (
                   <div
@@ -302,7 +321,6 @@ export default function CalendarPage() {
                       isFriday ? "bg-[#00666d]/[0.02]" : ""
                     } ${isToday ? "bg-[#00666d]/[0.06]" : ""}`}
                   >
-                    {/* Date number */}
                     <div className="flex items-center justify-between mb-0.5">
                       <span
                         className={`text-[11px] sm:text-[12px] font-bold w-6 h-6 flex items-center justify-center ${
@@ -316,11 +334,12 @@ export default function CalendarPage() {
                         {day.getDate()}
                       </span>
                       {isFriday && daySermons.length === 0 && (
-                        <span className="text-[8px] text-[#bcc9ca] italic hidden sm:inline">Jumu'ah</span>
+                        <span className="text-[8px] text-[#bcc9ca] italic hidden sm:inline">
+                          {isAr ? "جمعة" : "Jumu'ah"}
+                        </span>
                       )}
                     </div>
 
-                    {/* Sermon events */}
                     <div className="flex flex-col gap-0.5">
                       {daySermons.map((sermon) => {
                         const st = STATUS_MAP[sermon.status] || STATUS_MAP.draft;
@@ -334,7 +353,7 @@ export default function CalendarPage() {
                           >
                             <div
                               className="flex items-start gap-1 px-1 py-0.5 hover:bg-white/80 transition-colors cursor-pointer"
-                              style={{ borderLeft: `2px solid ${color}` }}
+                              style={{ borderLeft: isAr ? undefined : `2px solid ${color}`, borderRight: isAr ? `2px solid ${color}` : undefined }}
                             >
                               <div className="flex-1 min-w-0">
                                 <p className="text-[9px] sm:text-[10px] font-semibold text-[#1a1c1e] truncate leading-tight">
@@ -356,6 +375,26 @@ export default function CalendarPage() {
                           </Link>
                         );
                       })}
+                      {dayHijriEvents.map((event) => (
+                        <div
+                          key={event.name}
+                          className="flex items-center gap-1 px-1 py-0.5"
+                          style={{ borderLeft: isAr ? undefined : `2px solid ${event.color}`, borderRight: isAr ? `2px solid ${event.color}` : undefined }}
+                        >
+                          <span
+                            className="material-symbols-outlined text-[10px]"
+                            style={{ color: event.color }}
+                          >
+                            {event.icon}
+                          </span>
+                          <p
+                            className="text-[9px] sm:text-[10px] font-bold truncate leading-tight"
+                            style={{ color: event.color }}
+                          >
+                            {isAr ? event.nameAr : event.name}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );

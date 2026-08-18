@@ -169,6 +169,24 @@ function initTables(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_references_sermon_id ON references_(sermon_id);
     CREATE INDEX IF NOT EXISTS idx_feedback_sermon_id ON feedback(sermon_id);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+    CREATE TABLE IF NOT EXISTS org_members (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL REFERENCES organizations(id),
+      user_id TEXT REFERENCES users(id),
+      name TEXT NOT NULL,
+      email TEXT,
+      role TEXT NOT NULL DEFAULT 'khatib',
+      status TEXT NOT NULL DEFAULT 'invited',
+      invite_code TEXT UNIQUE,
+      invite_expires_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_org_members_org_id ON org_members(organization_id);
+    CREATE INDEX IF NOT EXISTS idx_org_members_user_id ON org_members(user_id);
+    CREATE INDEX IF NOT EXISTS idx_org_members_invite_code ON org_members(invite_code);
   `);
 
   // Add columns to existing databases

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/lib/i18n";
 
 interface UserData {
   id: string;
@@ -23,31 +24,6 @@ interface SettingsData {
   email_assigned: number;
   weekly_digest: number;
 }
-
-const languageModes = [
-  { value: "ar-first", label: "Arabic first" },
-  { value: "en-first", label: "English first" },
-  { value: "ar-only", label: "Arabic only" },
-  { value: "en-only", label: "English only" },
-];
-
-const reminderOptions = [
-  { value: "1", label: "1 day before" },
-  { value: "2", label: "2 days before" },
-  { value: "3", label: "3 days before" },
-  { value: "5", label: "5 days before" },
-  { value: "7", label: "1 week before" },
-];
-
-const navSections = [
-  { id: "profile", label: "Profile", icon: "person" },
-  { id: "sermon", label: "Sermon Defaults", icon: "edit_note" },
-  { id: "notifications", label: "Notifications", icon: "notifications" },
-  { id: "appearance", label: "Appearance", icon: "palette" },
-  { id: "subscription", label: "Subscription", icon: "credit_card" },
-  { id: "organization", label: "Organization", icon: "groups" },
-  { id: "account", label: "Account", icon: "manage_accounts" },
-];
 
 function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse bg-line/40 ${className}`} />;
@@ -98,6 +74,33 @@ function SettingsSkeleton() {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { t, isAr } = useI18n();
+
+  const languageModes = [
+    { value: "ar-first", label: t("lang.arFirst") },
+    { value: "en-first", label: t("lang.enFirst") },
+    { value: "ar-only", label: t("lang.arOnly") },
+    { value: "en-only", label: t("lang.enOnly") },
+  ];
+
+  const reminderOptions = [
+    { value: "1", label: t("reminder.1") },
+    { value: "2", label: t("reminder.2") },
+    { value: "3", label: t("reminder.3") },
+    { value: "5", label: t("reminder.5") },
+    { value: "7", label: t("reminder.7") },
+  ];
+
+  const navSections = [
+    { id: "profile", label: t("settings.profile"), icon: "person" },
+    { id: "sermon", label: t("settings.sermonDefaults"), icon: "edit_note" },
+    { id: "notifications", label: t("settings.notifications"), icon: "notifications" },
+    { id: "appearance", label: t("settings.appearance"), icon: "palette" },
+    { id: "subscription", label: t("settings.subscription"), icon: "credit_card" },
+    { id: "organization", label: t("settings.organization"), icon: "groups" },
+    { id: "account", label: t("settings.account"), icon: "manage_accounts" },
+  ];
+
   const [user, setUser] = useState<UserData | null>(null);
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [activeSection, setActiveSection] = useState("profile");
@@ -180,9 +183,9 @@ export default function SettingsPage() {
       if (section === "profile") {
         updateSidebarAvatar(avatarUrl, body.name as string);
       }
-      showToast("Settings saved");
+      showToast(t("settings.settingsSaved"));
     } catch {
-      showToast("Failed to save. Please try again.", "error");
+      showToast(t("settings.saveFailed"), "error");
     }
     setSaving(false);
   }
@@ -210,14 +213,17 @@ export default function SettingsPage() {
   }
 
   async function handleDeleteAccount() {
-    if (!confirm("Are you sure you want to delete your account? All your sermons, themes, and data will be permanently deleted. This cannot be undone.")) return;
+    if (!confirm(isAr
+      ? "هل أنت متأكد أنك تريد حذف حسابك؟ سيتم حذف جميع خطبك ومواضيعك وبياناتك نهائياً. لا يمكن التراجع عن هذا الإجراء."
+      : "Are you sure you want to delete your account? All your sermons, themes, and data will be permanently deleted. This cannot be undone."
+    )) return;
     setDeleting(true);
     try {
       const res = await fetch("/api/auth/delete-account", { method: "DELETE" });
       if (!res.ok) throw new Error("Failed");
       router.push("/");
     } catch {
-      showToast("Failed to delete account", "error");
+      showToast(isAr ? "فشل حذف الحساب" : "Failed to delete account", "error");
       setDeleting(false);
     }
   }
@@ -226,11 +232,11 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      showToast("Image must be under 5MB", "error");
+      showToast(isAr ? "يجب أن تكون الصورة أقل من 5 ميغابايت" : "Image must be under 5MB", "error");
       return;
     }
     if (!file.type.startsWith("image/")) {
-      showToast("Please upload an image file", "error");
+      showToast(isAr ? "يرجى رفع ملف صورة" : "Please upload an image file", "error");
       return;
     }
     setUploading(true);
@@ -244,10 +250,10 @@ export default function SettingsPage() {
         const newUrl = data.avatar_url + "?t=" + Date.now();
         setAvatarUrl(newUrl);
         updateSidebarAvatar(newUrl, name);
-        showToast("Photo updated");
+        showToast(isAr ? "تم تحديث الصورة" : "Photo updated");
       }
     } catch {
-      showToast("Failed to upload photo", "error");
+      showToast(isAr ? "فشل رفع الصورة" : "Failed to upload photo", "error");
     }
     setUploading(false);
   }
@@ -257,14 +263,14 @@ export default function SettingsPage() {
     setNameError("");
     setEmailError("");
     if (!name.trim()) {
-      setNameError("Name is required");
+      setNameError(t("settings.nameRequired"));
       valid = false;
     }
     if (!email.trim()) {
-      setEmailError("Email is required");
+      setEmailError(t("settings.emailRequired"));
       valid = false;
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setEmailError("Enter a valid email address");
+      setEmailError(t("settings.emailInvalid"));
       valid = false;
     }
     return valid;
@@ -283,12 +289,12 @@ export default function SettingsPage() {
     return (
       <div className="flex flex-col items-center justify-center h-full text-mute gap-3">
         <span className="material-symbols-outlined text-3xl text-red-400">error</span>
-        <p className="text-sm">Failed to load settings</p>
+        <p className="text-sm">{t("settings.failedToLoad")}</p>
         <button
           onClick={() => window.location.reload()}
           className="px-4 py-2 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors"
         >
-          Retry
+          {t("settings.retry")}
         </button>
       </div>
     );
@@ -297,7 +303,7 @@ export default function SettingsPage() {
   return (
     <div className="flex h-full">
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 text-white text-sm font-medium px-4 py-2.5 shadow-lg flex items-center gap-2 ${
+        <div className={`fixed top-4 ${isAr ? "left-4" : "right-4"} z-50 text-white text-sm font-medium px-4 py-2.5 shadow-lg flex items-center gap-2 ${
           toast.type === "error" ? "bg-red-500" : "bg-primary"
         }`}>
           <span className="material-symbols-outlined text-base">
@@ -307,16 +313,16 @@ export default function SettingsPage() {
         </div>
       )}
       {/* Section nav */}
-      <div className="hidden md:block w-56 border-r border-line p-4 shrink-0">
+      <div className={`hidden md:block w-56 ${isAr ? "border-l" : "border-r"} border-line p-4 shrink-0`}>
         <button
           onClick={() => window.location.href = "/dashboard"}
-          className="flex items-center gap-2 px-3 py-2 mb-3 text-sm text-mute hover:text-primary transition-colors w-full text-left"
+          className="flex items-center gap-2 px-3 py-2 mb-3 text-sm text-mute hover:text-primary transition-colors w-full text-start"
         >
-          <span className="material-symbols-outlined text-base">arrow_back</span>
-          Back to app
+          <span className="material-symbols-outlined text-base">{isAr ? "arrow_forward" : "arrow_back"}</span>
+          {t("settings.backToApp")}
         </button>
         <div className="h-px bg-line mb-3" />
-        <p className="text-[9px] font-bold text-mute tracking-[2px] uppercase mb-4 px-3">Settings</p>
+        <p className="text-[9px] font-bold text-mute tracking-[2px] uppercase mb-4 px-3">{t("settings.title")}</p>
         <nav className="flex flex-col gap-0.5">
           {navSections
             .filter((s) => s.id !== "organization" || isOrg)
@@ -324,7 +330,7 @@ export default function SettingsPage() {
               <button
                 key={s.id}
                 onClick={() => setActiveSection(s.id)}
-                className={`flex items-center gap-2.5 px-3 py-2 text-sm font-medium transition-colors text-left ${
+                className={`flex items-center gap-2.5 px-3 py-2 text-sm font-medium transition-colors text-start ${
                   activeSection === s.id
                     ? "bg-primary/10 text-primary"
                     : "text-mute hover:bg-surface hover:text-ink"
@@ -345,8 +351,8 @@ export default function SettingsPage() {
             onClick={() => window.location.href = "/dashboard"}
             className="flex items-center gap-1.5 text-sm text-mute hover:text-primary transition-colors mb-3"
           >
-            <span className="material-symbols-outlined text-base">arrow_back</span>
-            Back to app
+            <span className="material-symbols-outlined text-base">{isAr ? "arrow_forward" : "arrow_back"}</span>
+            {t("settings.backToApp")}
           </button>
         </div>
         <div className="md:hidden mb-6">
@@ -366,8 +372,8 @@ export default function SettingsPage() {
         {/* Profile */}
         {activeSection === "profile" && (
           <div>
-            <h2 className="text-xl font-bold text-ink mb-1">Profile</h2>
-            <p className="text-sm text-mute mb-6">Your personal information</p>
+            <h2 className="text-xl font-bold text-ink mb-1">{t("settings.profile")}</h2>
+            <p className="text-sm text-mute mb-6">{t("settings.personalInfo")}</p>
 
             <div className="flex items-center gap-5 mb-8">
               <div className="relative group">
@@ -403,14 +409,14 @@ export default function SettingsPage() {
                   disabled={uploading}
                   className="text-xs text-primary font-semibold mt-1 hover:underline disabled:opacity-50"
                 >
-                  {uploading ? "Uploading..." : avatarUrl ? "Change photo" : "Upload photo"}
+                  {uploading ? t("settings.uploading") : avatarUrl ? t("settings.changePhoto") : t("settings.uploadPhoto")}
                 </button>
               </div>
             </div>
 
             <div className="space-y-5">
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">Full Name</label>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.fullName")}</label>
                 <input
                   type="text"
                   value={name}
@@ -422,7 +428,7 @@ export default function SettingsPage() {
                 {nameError && <p className="text-xs text-red-500 mt-1">{nameError}</p>}
               </div>
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">Email</label>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.email")}</label>
                 <input
                   type="email"
                   value={email}
@@ -434,7 +440,7 @@ export default function SettingsPage() {
                 {emailError && <p className="text-xs text-red-500 mt-1">{emailError}</p>}
               </div>
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">Account Type</label>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.accountType")}</label>
                 <p className="text-sm text-ink capitalize px-4 py-2.5 bg-surface border border-line">{user?.account_type ?? "—"}</p>
               </div>
             </div>
@@ -445,7 +451,7 @@ export default function SettingsPage() {
               className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("settings.saving") : t("settings.saveChanges")}
             </button>
           </div>
         )}
@@ -453,12 +459,12 @@ export default function SettingsPage() {
         {/* Sermon Defaults */}
         {activeSection === "sermon" && (
           <div>
-            <h2 className="text-xl font-bold text-ink mb-1">Sermon Defaults</h2>
-            <p className="text-sm text-mute mb-6">Default settings for new sermons</p>
+            <h2 className="text-xl font-bold text-ink mb-1">{t("settings.sermonDefaults")}</h2>
+            <p className="text-sm text-mute mb-6">{t("settings.sermonDefaultsDesc")}</p>
 
             <div className="space-y-5">
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">Default Language Mode</label>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.defaultLang")}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {languageModes.map((mode) => (
                     <button
@@ -477,7 +483,7 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">Default Word Target</label>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.defaultWordTarget")}</label>
                 <div className="flex items-center gap-4">
                   <input
                     type="range"
@@ -488,21 +494,21 @@ export default function SettingsPage() {
                     onChange={(e) => setWordTarget(Number(e.target.value))}
                     className="flex-1 accent-primary"
                   />
-                  <span className="text-sm font-semibold text-ink w-16 text-right">{wordTarget.toLocaleString()}</span>
+                  <span className="text-sm font-semibold text-ink w-16 text-end">{wordTarget.toLocaleString(isAr ? "ar-SA" : "en-US")}</span>
                 </div>
-                <p className="text-xs text-mute mt-1">Recommended: 2,000–3,000 words for a 20–30 min khutbah</p>
+                <p className="text-xs text-mute mt-1">{t("settings.wordTargetHint")}</p>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">Default Status Flow</label>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.statusFlow")}</label>
                 <div className="flex items-center gap-2 text-sm text-mute">
-                  <span className="px-2.5 py-1 bg-surface border border-line text-xs font-bold">DRAFT</span>
+                  <span className="px-2.5 py-1 bg-surface border border-line text-xs font-bold">{t("status.draft").toUpperCase()}</span>
                   <span className="material-symbols-outlined text-base">arrow_forward</span>
-                  <span className="px-2.5 py-1 bg-accent-gold/10 text-accent-gold text-xs font-bold">PLANNED</span>
+                  <span className="px-2.5 py-1 bg-accent-gold/10 text-accent-gold text-xs font-bold">{t("themes.planned").toUpperCase()}</span>
                   <span className="material-symbols-outlined text-base">arrow_forward</span>
-                  <span className="px-2.5 py-1 bg-green-50 text-green-700 text-xs font-bold">READY</span>
+                  <span className="px-2.5 py-1 bg-green-50 text-green-700 text-xs font-bold">{t("status.ready").toUpperCase()}</span>
                   <span className="material-symbols-outlined text-base">arrow_forward</span>
-                  <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold">DELIVERED</span>
+                  <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold">{t("status.delivered").toUpperCase()}</span>
                 </div>
               </div>
             </div>
@@ -513,7 +519,7 @@ export default function SettingsPage() {
               className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("settings.saving") : t("settings.saveChanges")}
             </button>
           </div>
         )}
@@ -521,13 +527,13 @@ export default function SettingsPage() {
         {/* Notifications */}
         {activeSection === "notifications" && (
           <div>
-            <h2 className="text-xl font-bold text-ink mb-1">Notifications</h2>
-            <p className="text-sm text-mute mb-6">How and when you get reminded</p>
+            <h2 className="text-xl font-bold text-ink mb-1">{t("settings.notifications")}</h2>
+            <p className="text-sm text-mute mb-6">{t("settings.howReminded")}</p>
 
             <div className="space-y-6">
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">Friday Reminder</label>
-                <p className="text-xs text-mute mb-2">Get reminded before Jumu&apos;ah to finalize your khutbah</p>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.fridayReminder")}</label>
+                <p className="text-xs text-mute mb-2">{t("settings.fridayReminderDesc")}</p>
                 <div className="flex flex-wrap gap-2">
                   {reminderOptions.map((opt) => (
                     <button
@@ -546,12 +552,12 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block">Email Notifications</label>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block">{t("settings.emailNotifications")}</label>
 
                 <div className="flex items-center justify-between py-3 border-b border-line">
                   <div>
-                    <p className="text-sm text-ink font-medium">Sermon assigned to you</p>
-                    <p className="text-xs text-mute">Get notified when a moderator assigns you a Friday</p>
+                    <p className="text-sm text-ink font-medium">{t("settings.sermonAssigned")}</p>
+                    <p className="text-xs text-mute">{t("settings.sermonAssignedDesc")}</p>
                   </div>
                   <button
                     onClick={() => setEmailAssigned(!emailAssigned)}
@@ -563,8 +569,8 @@ export default function SettingsPage() {
 
                 <div className="flex items-center justify-between py-3 border-b border-line">
                   <div>
-                    <p className="text-sm text-ink font-medium">Weekly prep digest</p>
-                    <p className="text-xs text-mute">Summary of upcoming sermons every Monday morning</p>
+                    <p className="text-sm text-ink font-medium">{t("settings.weeklyDigest")}</p>
+                    <p className="text-xs text-mute">{t("settings.weeklyDigestDesc")}</p>
                   </div>
                   <button
                     onClick={() => setWeeklyDigest(!weeklyDigest)}
@@ -582,7 +588,7 @@ export default function SettingsPage() {
               className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("settings.saving") : t("settings.saveChanges")}
             </button>
           </div>
         )}
@@ -590,36 +596,36 @@ export default function SettingsPage() {
         {/* Appearance */}
         {activeSection === "appearance" && (
           <div>
-            <h2 className="text-xl font-bold text-ink mb-1">Appearance</h2>
-            <p className="text-sm text-mute mb-6">Customize the look and feel</p>
+            <h2 className="text-xl font-bold text-ink mb-1">{t("settings.appearance")}</h2>
+            <p className="text-sm text-mute mb-6">{t("settings.customizeAppearance")}</p>
 
             <div className="space-y-6">
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-3">Theme</label>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-3">{t("settings.theme")}</label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { value: "light", label: "Light", icon: "light_mode" },
-                    { value: "dark", label: "Dark", icon: "dark_mode" },
-                    { value: "system", label: "System", icon: "settings_brightness" },
-                  ].map((t) => (
+                    { value: "light", label: t("settings.light"), icon: "light_mode" },
+                    { value: "dark", label: t("settings.dark"), icon: "dark_mode" },
+                    { value: "system", label: t("settings.system"), icon: "settings_brightness" },
+                  ].map((th) => (
                     <button
-                      key={t.value}
-                      onClick={() => { setThemeMode(t.value); applyTheme(t.value); localStorage.setItem("jp_theme", t.value); saveSection("appearance", { theme_mode: t.value, editor_font_size: Number(editorFontSize) }); }}
+                      key={th.value}
+                      onClick={() => { setThemeMode(th.value); applyTheme(th.value); localStorage.setItem("jp_theme", th.value); saveSection("appearance", { theme_mode: th.value, editor_font_size: Number(editorFontSize) }); }}
                       className={`flex flex-col items-center gap-2 p-4 border transition-colors ${
-                        themeMode === t.value
+                        themeMode === th.value
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-line bg-white text-mute hover:text-ink"
                       }`}
                     >
-                      <span className="material-symbols-outlined text-2xl">{t.icon}</span>
-                      <span className="text-sm font-medium">{t.label}</span>
+                      <span className="material-symbols-outlined text-2xl">{th.icon}</span>
+                      <span className="text-sm font-medium">{th.label}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">Editor Font Size</label>
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.editorFontSize")}</label>
                 <div className="flex items-center gap-3">
                   {["14", "16", "18", "20"].map((size) => (
                     <button
@@ -637,7 +643,7 @@ export default function SettingsPage() {
                   <span className="text-xs text-mute">px</span>
                 </div>
                 <div className="mt-3 border border-line p-4 bg-surface">
-                  <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-2">Preview</p>
+                  <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-2">{t("settings.preview")}</p>
                   <p style={{ fontSize: `${editorFontSize}px` }} className="font-[var(--font-arabic)] text-ink text-right" dir="rtl">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</p>
                   <p style={{ fontSize: `${Number(editorFontSize) - 2}px` }} className="text-mute italic mt-1">In the name of Allah, the Most Gracious, the Most Merciful.</p>
                 </div>
@@ -646,7 +652,7 @@ export default function SettingsPage() {
 
             <p className="mt-4 text-xs text-mute flex items-center gap-1.5">
               <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
-              Changes apply instantly and are saved automatically
+              {t("settings.autoSaved")}
             </p>
           </div>
         )}
@@ -654,16 +660,16 @@ export default function SettingsPage() {
         {/* Subscription */}
         {activeSection === "subscription" && (
           <div>
-            <h2 className="text-xl font-bold text-ink mb-1">Subscription</h2>
-            <p className="text-sm text-mute mb-6">Manage your plan and billing</p>
+            <h2 className="text-xl font-bold text-ink mb-1">{t("settings.subscription")}</h2>
+            <p className="text-sm text-mute mb-6">{t("settings.managePlan")}</p>
 
             <div className="border-2 border-primary/20 p-6 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase">Current Plan</p>
-                  <p className="text-xl font-bold text-primary mt-1">{isOrg ? "Organization" : "Individual"}</p>
+                  <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase">{t("settings.currentPlan")}</p>
+                  <p className="text-xl font-bold text-primary mt-1">{isOrg ? t("settings.organization") : t("settings.individual")}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-end">
                   <p className="text-2xl font-bold text-ink">{isOrg ? "$49" : "$9"}<span className="text-sm font-normal text-mute">/mo</span></p>
                 </div>
               </div>
@@ -674,17 +680,17 @@ export default function SettingsPage() {
             </div>
 
             <div className="mb-6">
-              <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">Plan Includes</p>
+              <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.planIncludes")}</p>
               <ul className="space-y-2">
-                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> Arabic + English sermon editor</li>
-                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> Annual theme planner</li>
-                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> Jumu&apos;ah calendar</li>
-                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> Export to PDF &amp; Word</li>
+                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "محرر خطب عربي + إنجليزي" : "Arabic + English sermon editor"}</li>
+                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "مخطط المواضيع السنوي" : "Annual theme planner"}</li>
+                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "تقويم الجمعة" : "Jumu'ah calendar"}</li>
+                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "تصدير إلى PDF و Word" : "Export to PDF & Word"}</li>
                 {isOrg && (
                   <>
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> Up to 20 khatib accounts</li>
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> Moderator review tools</li>
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> Shared khutbah bank</li>
+                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "حتى 20 حساب خطيب" : "Up to 20 khatib accounts"}</li>
+                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "أدوات مراجعة المشرف" : "Moderator review tools"}</li>
+                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "بنك خطب مشترك" : "Shared khutbah bank"}</li>
                   </>
                 )}
               </ul>
@@ -695,10 +701,10 @@ export default function SettingsPage() {
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-accent-gold text-xl mt-0.5">upgrade</span>
                   <div>
-                    <p className="text-sm font-semibold text-ink">Upgrade to Organization</p>
-                    <p className="text-xs text-mute mt-1">Get multi-khatib management, shared sermon bank, and moderator tools for your masjid.</p>
-                    <button onClick={() => showToast("Coming soon", "error")} className="mt-3 px-5 py-2 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">
-                      Upgrade — $49/mo
+                    <p className="text-sm font-semibold text-ink">{isAr ? "الترقية إلى المؤسسة" : "Upgrade to Organization"}</p>
+                    <p className="text-xs text-mute mt-1">{isAr ? "احصل على إدارة متعددة الخطباء وبنك خطب مشترك وأدوات المشرف لمسجدك." : "Get multi-khatib management, shared sermon bank, and moderator tools for your masjid."}</p>
+                    <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="mt-3 px-5 py-2 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">
+                      {isAr ? "الترقية — $49/شهر" : "Upgrade — $49/mo"}
                     </button>
                   </div>
                 </div>
@@ -706,21 +712,21 @@ export default function SettingsPage() {
             )}
 
             <div>
-              <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">Billing</p>
+              <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.billing")}</p>
               <div className="space-y-3">
                 <div className="flex items-center justify-between py-3 border-b border-line">
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-mute text-lg">credit_card</span>
                     <div>
-                      <p className="text-sm text-ink font-medium">Visa ending in 4242</p>
-                      <p className="text-xs text-mute">Expires 12/2027</p>
+                      <p className="text-sm text-ink font-medium">{isAr ? "Visa تنتهي بـ 4242" : "Visa ending in 4242"}</p>
+                      <p className="text-xs text-mute">{isAr ? "تنتهي 12/2027" : "Expires 12/2027"}</p>
                     </div>
                   </div>
-                  <button onClick={() => showToast("Coming soon", "error")} className="text-xs text-primary font-semibold hover:underline">Update</button>
+                  <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="text-xs text-primary font-semibold hover:underline">{isAr ? "تحديث" : "Update"}</button>
                 </div>
                 <div className="flex items-center justify-between py-3 border-b border-line">
-                  <p className="text-sm text-ink">View invoices</p>
-                  <button onClick={() => showToast("Coming soon", "error")} className="text-xs text-primary font-semibold hover:underline">View all</button>
+                  <p className="text-sm text-ink">{isAr ? "عرض الفواتير" : "View invoices"}</p>
+                  <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="text-xs text-primary font-semibold hover:underline">{t("dash.viewAll")}</button>
                 </div>
               </div>
             </div>
@@ -730,24 +736,24 @@ export default function SettingsPage() {
         {/* Organization */}
         {activeSection === "organization" && isOrg && (
           <div>
-            <h2 className="text-xl font-bold text-ink mb-1">Organization</h2>
-            <p className="text-sm text-mute mb-6">Manage your masjid and team</p>
+            <h2 className="text-xl font-bold text-ink mb-1">{t("settings.organization")}</h2>
+            <p className="text-sm text-mute mb-6">{t("settings.manageMasjid")}</p>
 
             <div className="space-y-5 mb-8">
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">Masjid / Organization Name</label>
-                <input type="text" value={masjidName} onChange={(e) => setMasjidName(e.target.value)} placeholder="e.g. Islamic Centre of Calgary" className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.masjidName")}</label>
+                <input type="text" value={masjidName} onChange={(e) => setMasjidName(e.target.value)} placeholder={isAr ? "مثال: المركز الإسلامي" : "e.g. Islamic Centre of Calgary"} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
               </div>
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">City</label>
-                <input type="text" value={masjidCity} onChange={(e) => setMasjidCity(e.target.value)} placeholder="e.g. Calgary, AB" className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
+                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.city")}</label>
+                <input type="text" value={masjidCity} onChange={(e) => setMasjidCity(e.target.value)} placeholder={isAr ? "مثال: كالغاري" : "e.g. Calgary, AB"} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-4">
-                <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase">Team Members</p>
-                <button onClick={() => showToast("Coming soon", "error")} className="px-4 py-1.5 bg-primary text-white text-xs font-semibold hover:bg-secondary transition-colors">+ Invite Khatib</button>
+                <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase">{t("settings.teamMembers")}</p>
+                <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="px-4 py-1.5 bg-primary text-white text-xs font-semibold hover:bg-secondary transition-colors">{t("settings.inviteKhatib")}</button>
               </div>
               <div className="border border-line divide-y divide-line">
                 {[
@@ -770,10 +776,10 @@ export default function SettingsPage() {
             </div>
 
             <button
-              onClick={() => showToast("Coming soon", "error")}
+              onClick={() => showToast(t("settings.comingSoon"), "error")}
               className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors flex items-center gap-2"
             >
-              Save Changes
+              {t("settings.saveChanges")}
             </button>
           </div>
         )}
@@ -781,23 +787,23 @@ export default function SettingsPage() {
         {/* Account */}
         {activeSection === "account" && (
           <div>
-            <h2 className="text-xl font-bold text-ink mb-1">Account</h2>
-            <p className="text-sm text-mute mb-6">Security and data management</p>
+            <h2 className="text-xl font-bold text-ink mb-1">{t("settings.account")}</h2>
+            <p className="text-sm text-mute mb-6">{t("settings.securityData")}</p>
 
             <div className="space-y-6">
               <div>
-                <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">Change Password</p>
+                <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.changePassword")}</p>
                 <div className="space-y-3">
-                  <input type="password" placeholder="Current password" className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
-                  <input type="password" placeholder="New password" className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
-                  <input type="password" placeholder="Confirm new password" className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
+                  <input type="password" placeholder={t("settings.currentPassword")} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
+                  <input type="password" placeholder={t("settings.newPassword")} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
+                  <input type="password" placeholder={t("settings.confirmPassword")} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
                 </div>
-                <button onClick={() => showToast("Coming soon", "error")} className="mt-3 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">Update Password</button>
+                <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="mt-3 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">{t("settings.updatePassword")}</button>
               </div>
 
               <div className="border-t border-line pt-6">
-                <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-2">Export Your Data</p>
-                <p className="text-xs text-mute mb-3">Download all your sermons, themes, and settings as a JSON file.</p>
+                <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-2">{t("settings.exportData")}</p>
+                <p className="text-xs text-mute mb-3">{t("settings.exportDesc")}</p>
                 <button
                   onClick={async () => {
                     try {
@@ -810,22 +816,22 @@ export default function SettingsPage() {
                       a.download = `jumua-planner-export-${new Date().toISOString().slice(0, 10)}.json`;
                       a.click();
                       URL.revokeObjectURL(url);
-                      showToast("Data exported");
+                      showToast(isAr ? "تم تصدير البيانات" : "Data exported");
                     } catch {
-                      showToast("Failed to export data", "error");
+                      showToast(isAr ? "فشل تصدير البيانات" : "Failed to export data", "error");
                     }
                   }}
                   className="px-5 py-2 border border-line bg-white text-ink text-sm font-medium hover:bg-surface transition-colors flex items-center gap-2"
                 >
                   <span className="material-symbols-outlined text-base">download</span>
-                  Export All Data
+                  {t("settings.exportAll")}
                 </button>
               </div>
 
               <div className="border-t border-line pt-6">
-                <p className="text-[10px] font-bold text-red-600 tracking-[1.5px] uppercase mb-2">Danger Zone</p>
-                <p className="text-xs text-mute mb-3">Permanently delete your account and all associated data. This action cannot be undone.</p>
-                <button onClick={handleDeleteAccount} disabled={deleting} className="px-5 py-2 border border-red-300 bg-white text-red-600 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50">{deleting ? "Deleting..." : "Delete Account"}</button>
+                <p className="text-[10px] font-bold text-red-600 tracking-[1.5px] uppercase mb-2">{t("settings.dangerZone")}</p>
+                <p className="text-xs text-mute mb-3">{t("settings.deleteAccountDesc")}</p>
+                <button onClick={handleDeleteAccount} disabled={deleting} className="px-5 py-2 border border-red-300 bg-white text-red-600 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50">{deleting ? t("settings.deleting") : t("settings.deleteAccount")}</button>
               </div>
             </div>
           </div>

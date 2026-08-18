@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/", "/api/auth/login", "/api/auth/signup", "/api/auth/logout", "/api/seed"];
+const PUBLIC_PREFIXES = ["/api/invite/"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Block unauthenticated access to API routes (except public ones)
-  if (pathname.startsWith("/api/") && !PUBLIC_PATHS.includes(pathname)) {
+  if (pathname.startsWith("/api/") && !PUBLIC_PATHS.includes(pathname) && !PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     const userId = request.cookies.get("user_id")?.value;
     if (!userId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

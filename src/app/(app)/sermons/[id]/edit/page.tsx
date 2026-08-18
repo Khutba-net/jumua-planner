@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, use } from "react";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/lib/i18n";
 
 interface Reference {
   id: string;
@@ -31,13 +32,6 @@ function wordCount(text: string | null) {
 
 const allStatuses = ["draft", "ready", "delivered", "archived"];
 
-const statusLabel: Record<string, string> = {
-  draft: "DRAFT",
-  ready: "READY",
-  delivered: "DELIVERED",
-  archived: "ARCHIVED",
-};
-
 const statusStyle: Record<string, string> = {
   draft: "bg-[#f3f0ea] text-[#8a7968]",
   ready: "bg-green-50 text-green-700",
@@ -54,7 +48,7 @@ const statusIcon: Record<string, string> = {
 
 interface CheckItem {
   key: string;
-  label: string;
+  labelKey: string;
   check: (ctx: CheckContext) => boolean;
   required: boolean;
 }
@@ -70,18 +64,18 @@ interface CheckContext {
 }
 
 const checklist: CheckItem[] = [
-  { key: "title", label: "Sermon title set", check: (c) => c.title.length > 0 && c.title !== "Untitled Sermon", required: true },
-  { key: "content", label: "Sermon content written", check: (c) => c.content.length >= 50, required: true },
-  { key: "date", label: "Scheduled date set", check: (c) => c.scheduledDate.length > 0, required: true },
-  { key: "length", label: "Within target (15-25 min)", check: (c) => c.estMinutes >= 15 && c.estMinutes <= 25, required: false },
-  { key: "references", label: "References added", check: (c) => c.hasReferences, required: false },
+  { key: "title", labelKey: "editor.titleSet", check: (c) => c.title.length > 0 && c.title !== "Untitled Sermon", required: true },
+  { key: "content", labelKey: "editor.contentWritten", check: (c) => c.content.length >= 50, required: true },
+  { key: "date", labelKey: "editor.dateSet", check: (c) => c.scheduledDate.length > 0, required: true },
+  { key: "length", labelKey: "editor.withinTarget", check: (c) => c.estMinutes >= 15 && c.estMinutes <= 25, required: false },
+  { key: "references", labelKey: "editor.refsAdded", check: (c) => c.hasReferences, required: false },
 ];
 
-const sectionChecks = [
-  { id: "opening", label: "Opening praise", icon: "wb_twilight" },
-  { id: "main", label: "Main theme", icon: "auto_stories" },
-  { id: "second", label: "Second khutbah", icon: "looks_two" },
-  { id: "dua", label: "Closing du'a", icon: "volunteer_activism" },
+const sectionCheckKeys = [
+  { id: "opening", labelKey: "editor.openingPraise", icon: "wb_twilight" },
+  { id: "main", labelKey: "editor.mainTheme", icon: "auto_stories" },
+  { id: "second", labelKey: "editor.secondKhutbah", icon: "looks_two" },
+  { id: "dua", labelKey: "editor.closingDua", icon: "volunteer_activism" },
 ];
 
 export default function SermonEditorPage({
@@ -91,6 +85,7 @@ export default function SermonEditorPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const { t, isAr } = useI18n();
   const [sermon, setSermon] = useState<Sermon | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -115,6 +110,15 @@ export default function SermonEditorPage({
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  const locale = isAr ? "ar-SA" : "en-US";
+
+  const statusLabel: Record<string, string> = {
+    draft: t("status.draft"),
+    ready: t("status.ready"),
+    delivered: t("status.delivered"),
+    archived: t("status.archived"),
+  };
 
   useEffect(() => {
     fetch("/api/settings")
@@ -237,7 +241,7 @@ export default function SermonEditorPage({
       if (res.ok) {
         const ref = await res.json();
         setReferences((prev) => [...prev, ref]);
-        const label = refType === "quran" ? "Quran" : "Hadith";
+        const label = refType === "quran" ? t("editor.quran") : t("editor.hadith");
         insertAtCursor(`\n[${label} — ${refTitle.trim()}]\n`);
         setRefTitle("");
         setRefSource("");
@@ -256,7 +260,7 @@ export default function SermonEditorPage({
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this sermon? This cannot be undone.")) return;
+    if (!confirm(t("editor.deleteConfirm"))) return;
     await fetch(`/api/sermons/${id}`, { method: "DELETE" });
     router.push("/sermons");
   }
@@ -273,7 +277,7 @@ export default function SermonEditorPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full text-mute">
-        Loading...
+        {t("editor.loading")}
       </div>
     );
   }
@@ -281,7 +285,7 @@ export default function SermonEditorPage({
   if (!sermon) {
     return (
       <div className="flex items-center justify-center h-full text-mute">
-        Sermon not found
+        {t("editor.notFound")}
       </div>
     );
   }
@@ -305,8 +309,8 @@ export default function SermonEditorPage({
   };
 
   const nextAction: Record<string, string> = {
-    draft: "Mark Ready",
-    ready: "Mark Delivered",
+    draft: t("editor.markReady"),
+    ready: t("editor.markDelivered"),
   };
 
   function handleStatusAdvance() {
@@ -315,6 +319,11 @@ export default function SermonEditorPage({
     if (status === "draft" && !allRequiredPassed) return;
     changeStatus(next);
   }
+
+  const chevronCollapse = isAr ? "chevron_right" : "chevron_left";
+  const chevronExpandLeft = isAr ? "chevron_left" : "chevron_right";
+  const chevronExpandRight = isAr ? "chevron_right" : "chevron_left";
+  const backArrow = isAr ? "→" : "←";
 
   return (
     <div className="flex flex-col h-full">
@@ -325,10 +334,10 @@ export default function SermonEditorPage({
             onClick={() => router.push("/sermons")}
             className="text-xs px-2 sm:px-2.5 py-1 border border-line bg-white text-ink hover:bg-surface transition-colors shrink-0"
           >
-            ←<span className="hidden sm:inline"> Sermons</span>
+            {backArrow}<span className="hidden sm:inline"> {t("editor.sermons")}</span>
           </button>
           <span className="text-sm text-ink font-[var(--font-arabic)] italic truncate hidden sm:inline">
-            {title || "Untitled"}{scheduledDate ? ` — ${new Date(scheduledDate).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+            {title || t("editor.untitled")}{scheduledDate ? ` — ${new Date(scheduledDate).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""}
           </span>
           {sermon.theme_name && (
             <span className="text-[9px] font-bold px-2 py-0.5 bg-accent-gold/10 text-accent-gold tracking-wide shrink-0 hidden md:inline">
@@ -345,13 +354,13 @@ export default function SermonEditorPage({
             onClick={handleDelete}
             className="text-xs px-2 sm:px-2.5 py-1 border border-line text-red-500 hover:bg-red-50 transition-colors hidden sm:inline-flex"
           >
-            Delete
+            {t("editor.delete")}
           </button>
           <button
             onClick={() => save()}
             className="text-xs px-3 py-1 bg-primary text-white font-semibold hover:bg-secondary transition-colors"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("editor.saving") : t("editor.save")}
           </button>
         </div>
       </div>
@@ -359,9 +368,9 @@ export default function SermonEditorPage({
       {/* Mobile panel tabs */}
       <div className="flex md:hidden border-b border-line bg-white">
         {([
-          { key: "info", label: "Info", icon: "info" },
-          { key: "editor", label: "Editor", icon: "edit" },
-          { key: "checklist", label: "Checklist", icon: "checklist" },
+          { key: "info", labelKey: "editor.info", icon: "info" },
+          { key: "editor", labelKey: "editor.editorTab", icon: "edit" },
+          { key: "checklist", labelKey: "editor.checklist", icon: "checklist" },
         ] as const).map((tab) => (
           <button
             key={tab.key}
@@ -373,7 +382,7 @@ export default function SermonEditorPage({
             }`}
           >
             <span className="material-symbols-outlined text-base">{tab.icon}</span>
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -381,17 +390,17 @@ export default function SermonEditorPage({
       {/* 3-column layout */}
       <div className="flex-1 flex min-h-0">
         {/* Left panel — Speech info */}
-        <div className={`${mobilePanel === "info" ? "flex" : "hidden"} md:flex border-r border-line bg-white overflow-hidden shrink-0 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${leftOpen ? "w-full md:w-[175px] p-3.5" : "md:w-0 md:p-0 md:border-none"}`}>
+        <div className={`${mobilePanel === "info" ? "flex" : "hidden"} md:flex ${isAr ? "border-l" : "border-r"} border-line bg-white overflow-hidden shrink-0 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${leftOpen ? "w-full md:w-[175px] p-3.5" : "md:w-0 md:p-0 md:border-none"}`}>
           <div className={`${leftOpen ? "opacity-100" : "opacity-0 pointer-events-none"} transition-opacity duration-200 flex flex-col min-w-[160px]`}>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[9px] tracking-[2px] text-mute/60">SPEECH INFO</p>
-            <button onClick={() => setLeftOpen(false)} className="hidden md:flex items-center justify-center w-5 h-5 rounded-md text-mute/40 hover:text-mute hover:bg-surface transition-colors" title="Collapse panel">
-              <span className="material-symbols-outlined text-[14px]">chevron_left</span>
+            <p className="text-[9px] tracking-[2px] text-mute/60">{t("editor.speechInfo")}</p>
+            <button onClick={() => setLeftOpen(false)} className="hidden md:flex items-center justify-center w-5 h-5 rounded-md text-mute/40 hover:text-mute hover:bg-surface transition-colors" title={t("editor.collapsePanel")}>
+              <span className="material-symbols-outlined text-[14px]">{chevronCollapse}</span>
             </button>
           </div>
 
           <div className="mb-2.5">
-            <p className="text-[10px] text-mute/60">Date</p>
+            <p className="text-[10px] text-mute/60">{t("editor.date")}</p>
             <input
               type="date"
               value={scheduledDate}
@@ -401,7 +410,7 @@ export default function SermonEditorPage({
           </div>
 
           <div className="mb-2.5">
-            <p className="text-[10px] text-mute/60">Status</p>
+            <p className="text-[10px] text-mute/60">{t("status.label")}</p>
             <select
               value={status}
               onChange={(e) => changeStatus(e.target.value)}
@@ -414,24 +423,24 @@ export default function SermonEditorPage({
           </div>
 
           <div className="mb-2.5">
-            <p className="text-[10px] text-mute/60">Words</p>
+            <p className="text-[10px] text-mute/60">{t("editor.words")}</p>
             <p className="text-xs font-medium text-ink">{words}</p>
           </div>
 
           <div className="mb-2.5">
-            <p className="text-[10px] text-mute/60">Estimated delivery</p>
-            <p className="text-xs font-medium text-ink">{estMinutes} min</p>
+            <p className="text-[10px] text-mute/60">{t("editor.estDelivery")}</p>
+            <p className="text-xs font-medium text-ink">{estMinutes} {t("editor.min")}</p>
           </div>
 
           <div className="h-px bg-line my-2.5" />
 
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">STRUCTURE</p>
+          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">{t("editor.structure")}</p>
           <div className="flex flex-col gap-1">
-            {sectionChecks.map((sec) => (
+            {sectionCheckKeys.map((sec) => (
               <button
                 key={sec.id}
                 onClick={() => toggleSection(sec.id)}
-                className="flex items-center gap-2 text-[11px] px-1.5 py-1.5 text-left transition-colors hover:bg-surface group"
+                className="flex items-center gap-2 text-[11px] px-1.5 py-1.5 text-start transition-colors hover:bg-surface group"
               >
                 <span className={`material-symbols-outlined text-[14px] shrink-0 transition-colors ${
                   completedSections.has(sec.id) ? "text-green-600" : "text-line group-hover:text-mute"
@@ -442,7 +451,7 @@ export default function SermonEditorPage({
                   completedSections.has(sec.id) ? "text-primary/40" : "text-line"
                 }`}>{sec.icon}</span>
                 <span className={completedSections.has(sec.id) ? "text-mute line-through" : "text-mute"}>
-                  {sec.label}
+                  {t(sec.labelKey)}
                 </span>
               </button>
             ))}
@@ -450,11 +459,11 @@ export default function SermonEditorPage({
 
           <div className="h-px bg-line my-2.5" />
 
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">NOTES</p>
+          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">{t("editor.notes")}</p>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Private notes..."
+            placeholder={t("editor.privateNotes")}
             rows={4}
             className="w-full text-[11px] text-ink bg-surface border border-line p-2 resize-none outline-none focus:border-primary transition-colors"
           />
@@ -464,7 +473,7 @@ export default function SermonEditorPage({
               onClick={handleDelete}
               className="text-xs px-3 py-1.5 border border-line text-red-500 hover:bg-red-50 transition-colors flex-1"
             >
-              Delete
+              {t("editor.delete")}
             </button>
           </div>
           </div>
@@ -476,10 +485,10 @@ export default function SermonEditorPage({
           {!leftOpen && (
             <button
               onClick={() => setLeftOpen(true)}
-              className="hidden md:flex absolute left-0 top-3 z-10 items-center justify-center w-5 h-10 bg-white border border-l-0 border-line rounded-r-lg text-mute/50 hover:text-primary hover:bg-primary/5 transition-colors shadow-sm"
-              title="Show speech info"
+              className={`hidden md:flex absolute ${isAr ? "right-0" : "left-0"} top-3 z-10 items-center justify-center w-5 h-10 bg-white border ${isAr ? "border-r-0 rounded-l-lg" : "border-l-0 rounded-r-lg"} border-line text-mute/50 hover:text-primary hover:bg-primary/5 transition-colors shadow-sm`}
+              title={t("editor.showSpeechInfo")}
             >
-              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+              <span className="material-symbols-outlined text-[14px]">{chevronExpandLeft}</span>
             </button>
           )}
 
@@ -487,10 +496,10 @@ export default function SermonEditorPage({
           {!rightOpen && (
             <button
               onClick={() => setRightOpen(true)}
-              className="hidden md:flex absolute right-0 top-3 z-10 items-center justify-center w-5 h-10 bg-white border border-r-0 border-line rounded-l-lg text-mute/50 hover:text-primary hover:bg-primary/5 transition-colors shadow-sm"
-              title="Show checklist"
+              className={`hidden md:flex absolute ${isAr ? "left-0" : "right-0"} top-3 z-10 items-center justify-center w-5 h-10 bg-white border ${isAr ? "border-l-0 rounded-r-lg" : "border-r-0 rounded-l-lg"} border-line text-mute/50 hover:text-primary hover:bg-primary/5 transition-colors shadow-sm`}
+              title={t("editor.showChecklist")}
             >
-              <span className="material-symbols-outlined text-[14px]">chevron_left</span>
+              <span className="material-symbols-outlined text-[14px]">{chevronExpandRight}</span>
             </button>
           )}
 
@@ -508,21 +517,21 @@ export default function SermonEditorPage({
                 className="flex items-center gap-1 px-2 py-1 border border-line bg-white text-ink/70 hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-colors shrink-0 text-[11px] font-medium"
               >
                 <span className="material-symbols-outlined text-[14px]">menu_book</span>
-                <span className="hidden sm:inline">Quran</span>
+                <span className="hidden sm:inline">{t("editor.quran")}</span>
               </button>
               <button
                 onClick={() => { setRefType("hadith"); setShowRefModal(true); }}
                 className="flex items-center gap-1 px-2 py-1 border border-line bg-white text-ink/70 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors shrink-0 text-[11px] font-medium"
               >
                 <span className="material-symbols-outlined text-[14px]">auto_stories</span>
-                <span className="hidden sm:inline">Hadith</span>
+                <span className="hidden sm:inline">{t("editor.hadith")}</span>
               </button>
             </div>
-            <span className="text-[10px] text-mute shrink-0 ml-2">
+            <span className="text-[10px] text-mute shrink-0 ms-2">
               {saving
-                ? "Saving..."
+                ? t("editor.saving")
                 : lastSaved
-                ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                ? `${t("editor.saved")} ${lastSaved.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`
                 : ""}
             </span>
           </div>
@@ -535,7 +544,7 @@ export default function SermonEditorPage({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Sermon title..."
+                placeholder={t("editor.titlePlaceholder")}
                 className="w-full text-xl sm:text-2xl font-bold text-ink placeholder:text-line bg-transparent border-none outline-none"
               />
             </div>
@@ -546,7 +555,7 @@ export default function SermonEditorPage({
                 ref={editorRef}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="بسم الله الرحمن الرحيم — Begin writing your khutbah here. Mix Arabic and English freely..."
+                placeholder={t("editor.contentPlaceholder")}
                 className="w-full h-full min-h-0 leading-[2.2] text-ink bg-transparent border-none resize-none outline-none"
                 style={{ fontSize: `${editorFontSize}px` }}
                 dir="auto"
@@ -558,22 +567,22 @@ export default function SermonEditorPage({
           <div className="flex items-center justify-between px-3 sm:px-3.5 py-1.5 border-t border-line bg-white text-[10px] text-mute/60">
             <span>
               {saving
-                ? "Saving..."
+                ? t("editor.saving")
                 : lastSaved
-                ? `Auto-saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                : "Not saved yet"}
+                ? `${t("editor.autoSaved")} ${lastSaved.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`
+                : t("editor.notSaved")}
             </span>
-            <span>{words} words · ~{estMinutes} min</span>
+            <span>{words} {t("editor.words")} · ~{estMinutes} {t("editor.min")}</span>
           </div>
         </div>
 
         {/* Right panel — Checklist & References */}
-        <div className={`${mobilePanel === "checklist" ? "flex" : "hidden"} md:flex border-l border-line bg-white overflow-hidden shrink-0 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${rightOpen ? "w-full md:w-[200px] p-3.5" : "md:w-0 md:p-0 md:border-none"}`}>
+        <div className={`${mobilePanel === "checklist" ? "flex" : "hidden"} md:flex ${isAr ? "border-r" : "border-l"} border-line bg-white overflow-hidden shrink-0 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${rightOpen ? "w-full md:w-[200px] p-3.5" : "md:w-0 md:p-0 md:border-none"}`}>
           <div className={`${rightOpen ? "opacity-100" : "opacity-0 pointer-events-none"} transition-opacity duration-200 flex flex-col min-w-[185px]`}>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[9px] tracking-[2px] text-mute/60">READINESS</p>
-            <button onClick={() => setRightOpen(false)} className="hidden md:flex items-center justify-center w-5 h-5 rounded-md text-mute/40 hover:text-mute hover:bg-surface transition-colors" title="Collapse panel">
-              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+            <p className="text-[9px] tracking-[2px] text-mute/60">{t("editor.readiness")}</p>
+            <button onClick={() => setRightOpen(false)} className="hidden md:flex items-center justify-center w-5 h-5 rounded-md text-mute/40 hover:text-mute hover:bg-surface transition-colors" title={t("editor.collapsePanel")}>
+              <span className="material-symbols-outlined text-[14px]">{isAr ? "chevron_left" : "chevron_right"}</span>
             </button>
           </div>
           <div className="mb-3">
@@ -603,8 +612,8 @@ export default function SermonEditorPage({
                       {passed ? "check_circle" : "radio_button_unchecked"}
                     </span>
                     <span className={passed ? "text-green-700" : "text-mute"}>
-                      {item.label}
-                      {item.required && !passed && <span className="text-red-400 ml-0.5">*</span>}
+                      {t(item.labelKey)}
+                      {item.required && !passed && <span className={`text-red-400 ${isAr ? "me-0.5" : "ms-0.5"}`}>*</span>}
                     </span>
                   </div>
                 );
@@ -631,40 +640,40 @@ export default function SermonEditorPage({
             )}
 
             {!allRequiredPassed && status === "draft" && (
-              <p className="text-[9px] text-red-400 mt-1">Complete required items (*) first</p>
+              <p className="text-[9px] text-red-400 mt-1">{t("editor.completeRequired")}</p>
             )}
 
             {status === "delivered" && (
               <div className="mt-2 bg-[#f0eef8] p-2 text-center">
                 <span className="material-symbols-outlined text-[#6b5fa0] text-lg">event_available</span>
-                <p className="text-[10px] text-[#6b5fa0] font-bold mt-0.5">Delivered</p>
+                <p className="text-[10px] text-[#6b5fa0] font-bold mt-0.5">{statusLabel.delivered}</p>
               </div>
             )}
           </div>
 
           <div className="h-px bg-line my-2.5" />
 
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">THIS FRIDAY</p>
+          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">{t("editor.thisFriday")}</p>
           <div className="bg-primary/5 p-2.5 mb-3">
             {scheduledDate ? (
               <>
                 <p className="text-[10px] text-mute/60">
-                  {new Date(scheduledDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                  {new Date(scheduledDate).toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" })}
                 </p>
                 <p className="text-xs font-medium text-primary mt-0.5">
-                  {new Date(scheduledDate).toLocaleDateString("en-US", { year: "numeric" })}
+                  {new Date(scheduledDate).toLocaleDateString(locale, { year: "numeric" })}
                 </p>
               </>
             ) : (
-              <p className="text-[10px] text-mute">No date set</p>
+              <p className="text-[10px] text-mute">{t("editor.noDate")}</p>
             )}
           </div>
 
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2 mt-1">WORD TARGET</p>
+          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2 mt-1">{t("editor.wordTarget")}</p>
           <div className="mb-3">
             <div className="flex items-baseline gap-1.5 mb-1">
               <span className="text-lg font-bold text-ink">{words}</span>
-              <span className="text-[10px] text-mute">/ {userWordTarget.toLocaleString()}</span>
+              <span className="text-[10px] text-mute">/ {userWordTarget.toLocaleString(locale)}</span>
             </div>
             <div className="w-full h-1 bg-surface overflow-hidden">
               <div
@@ -676,7 +685,7 @@ export default function SermonEditorPage({
 
           <div className="h-px bg-line my-2.5" />
 
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">REFERENCES</p>
+          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">{t("editor.references")}</p>
           {references.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {references.map((ref) => (
@@ -696,7 +705,7 @@ export default function SermonEditorPage({
                         <span className={`text-[9px] font-bold uppercase tracking-wide ${
                           ref.type === "quran" ? "text-green-600" : "text-amber-600"
                         }`}>
-                          {ref.type}
+                          {ref.type === "quran" ? t("editor.quran") : t("editor.hadith")}
                         </span>
                       </div>
                       <p className="font-medium text-ink leading-tight">{ref.title}</p>
@@ -714,7 +723,7 @@ export default function SermonEditorPage({
               ))}
             </div>
           ) : (
-            <p className="text-[10px] text-mute/50">No references added</p>
+            <p className="text-[10px] text-mute/50">{t("editor.noRefs")}</p>
           )}
           <div className="flex gap-1 mt-2">
             <button
@@ -722,14 +731,14 @@ export default function SermonEditorPage({
               className="flex-1 text-[10px] font-medium py-1.5 border border-line text-mute hover:text-green-700 hover:border-green-200 hover:bg-green-50 transition-colors flex items-center justify-center gap-1"
             >
               <span className="material-symbols-outlined text-[12px]">add</span>
-              Quran
+              {t("editor.quran")}
             </button>
             <button
               onClick={() => { setRefType("hadith"); setShowRefModal(true); }}
               className="flex-1 text-[10px] font-medium py-1.5 border border-line text-mute hover:text-amber-700 hover:border-amber-200 hover:bg-amber-50 transition-colors flex items-center justify-center gap-1"
             >
               <span className="material-symbols-outlined text-[12px]">add</span>
-              Hadith
+              {t("editor.hadith")}
             </button>
           </div>
           </div>
@@ -749,9 +758,9 @@ export default function SermonEditorPage({
                 {refType === "quran" ? "menu_book" : "auto_stories"}
               </span>
               <h3 className="text-sm font-bold text-ink">
-                {refType === "quran" ? "Add Quran verse" : "Add Hadith"}
+                {refType === "quran" ? t("editor.addQuranVerse") : t("editor.addHadith")}
               </h3>
-              <div className="flex ml-auto gap-1">
+              <div className={`flex ${isAr ? "me-auto" : "ms-auto"} gap-1`}>
                 <button
                   onClick={() => setRefType("quran")}
                   className={`text-[10px] px-2 py-0.5 font-medium transition-colors ${
@@ -760,7 +769,7 @@ export default function SermonEditorPage({
                       : "bg-white border border-line text-mute hover:text-green-600"
                   }`}
                 >
-                  Quran
+                  {t("editor.quran")}
                 </button>
                 <button
                   onClick={() => setRefType("hadith")}
@@ -770,7 +779,7 @@ export default function SermonEditorPage({
                       : "bg-white border border-line text-mute hover:text-amber-600"
                   }`}
                 >
-                  Hadith
+                  {t("editor.hadith")}
                 </button>
               </div>
             </div>
@@ -778,7 +787,7 @@ export default function SermonEditorPage({
             <div className="p-5 flex flex-col gap-3">
               <div>
                 <label className="text-[10px] font-bold tracking-[1.5px] text-accent-gold uppercase block mb-1">
-                  {refType === "quran" ? "Verse / Ayah" : "Hadith text"}
+                  {refType === "quran" ? t("editor.verseAyah") : t("editor.hadithText")}
                 </label>
                 <textarea
                   value={refContent}
@@ -795,7 +804,7 @@ export default function SermonEditorPage({
 
               <div>
                 <label className="text-[10px] font-bold tracking-[1.5px] text-accent-gold uppercase block mb-1">
-                  {refType === "quran" ? "Reference (e.g. Al-Sharh 94:6)" : "Title / summary"}
+                  {refType === "quran" ? t("editor.reference") : t("editor.titleSummary")}
                 </label>
                 <input
                   type="text"
@@ -811,7 +820,7 @@ export default function SermonEditorPage({
 
               <div>
                 <label className="text-[10px] font-bold tracking-[1.5px] text-accent-gold uppercase block mb-1">
-                  {refType === "quran" ? "Translation (optional)" : "Source (e.g. Sahih Bukhari)"}
+                  {refType === "quran" ? t("editor.translationOpt") : t("editor.sourceLabel")}
                 </label>
                 <input
                   type="text"
@@ -831,7 +840,7 @@ export default function SermonEditorPage({
                 onClick={() => { setShowRefModal(false); setRefTitle(""); setRefSource(""); setRefContent(""); }}
                 className="text-xs px-4 py-2 border border-line text-mute hover:bg-white transition-colors"
               >
-                Cancel
+                {t("btn.cancel")}
               </button>
               <button
                 onClick={handleAddReference}
@@ -843,7 +852,7 @@ export default function SermonEditorPage({
                 } disabled:opacity-50`}
               >
                 {refSaving && <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>}
-                Add {refType === "quran" ? "verse" : "hadith"}
+                {refType === "quran" ? t("editor.addVerse") : t("editor.addHadithBtn")}
               </button>
             </div>
           </div>
