@@ -128,6 +128,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "org.sick": "Sick",
     "org.travel": "Travel",
     "org.other": "Other",
+    "org.myAssignments": "My assigned Fridays",
+    "org.noAssignments": "No upcoming assignments",
+    "org.assignedTo": "Assigned to you",
+    "org.thisWeekSchedule": "This Friday",
 
     // Dashboard
     "dash.greeting": "Asalamu alaykom,",
@@ -559,6 +563,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "org.sick": "مرض",
     "org.travel": "سفر",
     "org.other": "أخرى",
+    "org.myAssignments": "أيام الجمعة المعيّنة لي",
+    "org.noAssignments": "لا توجد تعيينات قادمة",
+    "org.assignedTo": "معيّن لك",
+    "org.thisWeekSchedule": "جمعة هذا الأسبوع",
 
     // Dashboard
     "dash.greeting": "السلام عليكم ورحمة الله وبركاته،",

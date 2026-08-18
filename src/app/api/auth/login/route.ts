@@ -27,8 +27,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  const { password_hash: _, ...safeUser } = user as Record<string, unknown>;
-  const res = NextResponse.json({ user: toJSON(safeUser) });
+  const { invite_code } = parsed.data as { invite_code?: string };
+  if (invite_code) {
+    const member = db.prepare(
+      "SELECT id, organization_id, status FROM org_members WHERE invite_code = ? AND status = 'invited'"
+    ).get(invite_code) as { id: string; organization_id: string; status: string } | undefined;
+
+    if (member) {
+      const tx = db.transaction(() => {
+        db.prepare(
+          "UPDATE org_members SET user_id = ?, email = ?, status = 'active', updated_at = datetime('now') WHERE id = ?"
+        ).run(user.id, email, member.id);
+        db.prepare(
+          "UPDATE users SET organization_id = ?, account_type = 'organization', role = 'khatib', updated_at = datetime('now') WHERE id = ?"
+        ).run(member.organization_id, user.id);
+      });
+      tx();
+    }
+  }
+
+  const freshUser = db.prepare(
+    "SELECT id, email, name, account_type, onboarding_complete FROM users WHERE id = ?"
+  ).get(user.id);
+
+  const res = NextResponse.json({ user: toJSON(freshUser) });
   res.cookies.set("user_id", user.id, {
     path: "/",
     httpOnly: true,

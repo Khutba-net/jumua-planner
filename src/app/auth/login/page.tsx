@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 const tr = {
   en: {
@@ -39,6 +40,9 @@ const tr = {
 };
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const inviteCode = searchParams.get("invite") || "";
+
   const [lang, setLang] = useState<"en" | "ar">("en");
   const c = tr[lang];
   const isAr = lang === "ar";
@@ -62,7 +66,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, invite_code: inviteCode || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {

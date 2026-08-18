@@ -134,6 +134,7 @@ export default function SetupPage() {
   const [planningYear, setPlanningYear] = useState(new Date().getFullYear());
   const [saving, setSaving] = useState(false);
   const [userName, setUserName] = useState("");
+  const [isInvitedKhatib, setIsInvitedKhatib] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("jp_lang");
@@ -150,6 +151,11 @@ export default function SetupPage() {
         if (!d) return;
         if (d.onboarding_complete) { window.location.href = "/dashboard"; return; }
         setUserName(d.name || "");
+        if (d.organization_id && d.role === "khatib") {
+          setIsInvitedKhatib(true);
+          setSelectedType("organization");
+          setStep("year");
+        }
       });
   }, []);
 

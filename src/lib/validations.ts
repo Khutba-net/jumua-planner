@@ -3,6 +3,7 @@ import { z } from "zod";
 export const loginSchema = z.object({
   email: z.string().email("Invalid email format").max(255),
   password: z.string().min(1, "Password is required").max(128),
+  invite_code: z.string().max(20).optional(),
 });
 
 export const signupSchema = z.object({

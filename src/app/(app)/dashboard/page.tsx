@@ -72,6 +72,8 @@ interface DashboardData {
     reviewed: { done: number; total: number };
   };
   planningYear: number;
+  orgName: string | null;
+  myAssignments: { friday_date: string; notes: string | null }[];
 }
 
 const statusDot: Record<string, string> = {
@@ -212,7 +214,7 @@ export default function DashboardPage() {
     return <div className="flex items-center justify-center h-full text-mute">{t("dash.failedToLoad")}</div>;
   }
 
-  const { user, stats, recentSermons, upcomingSermons, thisFriday, lastFriday, backlogCount, backlogSermons, seasons, checklist } = data;
+  const { user, stats, recentSermons, upcomingSermons, thisFriday, lastFriday, backlogCount, backlogSermons, seasons, checklist, orgName, myAssignments } = data;
 
   const seasonLabelMap: Record<string, string> = {
     "Season 1": t("season.1"),
@@ -367,6 +369,45 @@ export default function DashboardPage() {
             >
               {t("dash.planSermon")}
             </button>
+          </div>
+        )}
+
+        {/* My Assigned Fridays (for org khatibs) */}
+        {myAssignments && myAssignments.length > 0 && (
+          <div className="bg-white border border-line p-5 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="material-symbols-outlined text-primary text-lg">event</span>
+              <p className="text-sm font-semibold text-ink">{t("org.myAssignments")}</p>
+              {orgName && (
+                <span className="text-[11px] text-mute font-medium bg-surface px-2 py-0.5 rounded">{orgName}</span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              {myAssignments.map((a) => {
+                const isThisWeek = a.friday_date === thisFriday.date;
+                return (
+                  <div
+                    key={a.friday_date}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border ${
+                      isThisWeek ? "border-primary/20 bg-primary/5" : "border-line"
+                    }`}
+                  >
+                    <span className="text-xs font-semibold text-primary whitespace-nowrap min-w-[42px]">
+                      {new Date(a.friday_date + "T00:00:00").toLocaleDateString(isAr ? "ar-SA" : "en-US", { day: "numeric", month: "short" }).toUpperCase()}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-ink">
+                        {new Date(a.friday_date + "T00:00:00").toLocaleDateString(isAr ? "ar-SA" : "en-US", { weekday: "long", month: "long", day: "numeric" })}
+                      </p>
+                      {a.notes && <p className="text-[11px] text-mute mt-0.5">{a.notes}</p>}
+                    </div>
+                    {isThisWeek && (
+                      <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">{t("org.thisWeekLabel")}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

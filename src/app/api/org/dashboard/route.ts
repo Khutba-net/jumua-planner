@@ -43,9 +43,30 @@ export async function GET() {
   const activeKhatibs = members.filter((m) => m.role === "khatib" && m.status === "active").length;
   const pendingInvites = members.filter((m) => m.role === "khatib" && m.status === "invited").length;
 
+  const now = new Date();
+  const day = now.getDay();
+  const diff = (5 - day + 7) % 7;
+  const friday = new Date(now);
+  friday.setDate(now.getDate() + (diff === 0 ? 0 : diff));
+  const thisFridayDate = friday.toISOString().split("T")[0];
+
+  const thisFridayAssignment = db.prepare(`
+    SELECT fa.id, fa.friday_date, fa.guest_name, fa.notes, m.name as khatib_name
+    FROM friday_assignments fa
+    LEFT JOIN org_members m ON fa.member_id = m.id
+    WHERE fa.organization_id = ? AND fa.friday_date = ?
+    LIMIT 1
+  `).get(user.organization_id, thisFridayDate) as { id: string; friday_date: string; guest_name: string | null; khatib_name: string | null; notes: string | null } | undefined;
+
   return NextResponse.json(toJSON({
     organization: org,
     stats: { totalKhatibs, activeKhatibs, pendingInvites },
     khatibStats,
+    thisFriday: thisFridayAssignment ? {
+      date: thisFridayAssignment.friday_date,
+      khatib: thisFridayAssignment.guest_name || thisFridayAssignment.khatib_name,
+      isGuest: !!thisFridayAssignment.guest_name,
+      notes: thisFridayAssignment.notes,
+    } : { date: thisFridayDate, khatib: null, isGuest: false, notes: null },
   }));
 }

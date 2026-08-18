@@ -179,6 +179,27 @@ export async function GET() {
 
   const deliveredThisYear = planSermonStats.delivered;
 
+  let myAssignments: unknown[] = [];
+  let orgName: string | null = null;
+  if (user.organization_id) {
+    const org = db.prepare("SELECT name FROM organizations WHERE id = ?").get(user.organization_id as string) as { name: string } | undefined;
+    orgName = org?.name || null;
+
+    const member = db.prepare(
+      "SELECT id FROM org_members WHERE user_id = ? AND organization_id = ?"
+    ).get(userId, user.organization_id as string) as { id: string } | undefined;
+
+    if (member) {
+      myAssignments = db.prepare(`
+        SELECT fa.friday_date, fa.notes
+        FROM friday_assignments fa
+        WHERE fa.member_id = ? AND fa.friday_date >= date('now')
+        ORDER BY fa.friday_date ASC
+        LIMIT 8
+      `).all(member.id);
+    }
+  }
+
   return NextResponse.json(toJSON({
     user,
     stats: {
@@ -209,5 +230,7 @@ export async function GET() {
       reviewed: { done: feedbackCount, total: deliveredThisYear || 1 },
     },
     planningYear,
+    orgName,
+    myAssignments,
   }));
 }

@@ -18,6 +18,7 @@ type DashboardData = {
   organization: { id: string; name: string; type: string; city: string; country: string };
   stats: { totalKhatibs: number; activeKhatibs: number; pendingInvites: number };
   khatibStats: KhatibStat[];
+  thisFriday: { date: string; khatib: string | null; isGuest: boolean; notes: string | null };
 };
 
 export default function OrgDashboardPage() {
@@ -50,9 +51,14 @@ export default function OrgDashboardPage() {
     );
   }
 
-  const { organization, stats, khatibStats } = data;
+  const { organization, stats, khatibStats, thisFriday } = data;
   const totalSermons = khatibStats.reduce((s, k) => s + k.total_sermons, 0);
   const deliveredSermons = khatibStats.reduce((s, k) => s + k.delivered_sermons, 0);
+
+  const fridayFormatted = new Date(thisFriday.date + "T00:00:00").toLocaleDateString(
+    isAr ? "ar-SA" : "en-US",
+    { weekday: "long", month: "long", day: "numeric" }
+  );
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -70,6 +76,28 @@ export default function OrgDashboardPage() {
           <span className="material-symbols-outlined text-lg">group</span>
           {t("org.manageKhatibs")}
         </Link>
+      </div>
+
+      {/* This Friday's Schedule */}
+      <div className={`border p-5 rounded-xl mb-6 ${thisFriday.khatib ? "bg-primary/5 border-primary/15" : "bg-amber-50 border-amber-200"}`}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className={`material-symbols-outlined text-lg ${thisFriday.khatib ? "text-primary" : "text-amber-500"}`}>mosque</span>
+          <span className="text-xs font-semibold text-primary">{t("org.thisWeekSchedule")}</span>
+          <span className="text-xs text-mute">{fridayFormatted}</span>
+        </div>
+        {thisFriday.khatib ? (
+          <div className="flex items-center gap-2">
+            <p className="text-base font-semibold text-ink">{thisFriday.khatib}</p>
+            {thisFriday.isGuest && (
+              <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">({t("org.guest")})</span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-mute">{t("org.noSchedule")}</p>
+            <Link href="/org/schedule" className="text-xs font-semibold text-primary hover:underline">{t("org.assignKhatib")}</Link>
+          </div>
+        )}
       </div>
 
       {/* Stats cards */}
