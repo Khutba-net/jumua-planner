@@ -187,6 +187,23 @@ function initTables(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_org_members_org_id ON org_members(organization_id);
     CREATE INDEX IF NOT EXISTS idx_org_members_user_id ON org_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_org_members_invite_code ON org_members(invite_code);
+
+    CREATE TABLE IF NOT EXISTS friday_assignments (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL REFERENCES organizations(id),
+      member_id TEXT REFERENCES org_members(id),
+      friday_date TEXT NOT NULL,
+      guest_name TEXT,
+      status TEXT NOT NULL DEFAULT 'assigned',
+      swap_reason TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(organization_id, friday_date)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_friday_assignments_org_date ON friday_assignments(organization_id, friday_date);
+    CREATE INDEX IF NOT EXISTS idx_friday_assignments_member ON friday_assignments(member_id);
   `);
 
   // Add columns to existing databases

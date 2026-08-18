@@ -108,7 +108,7 @@ export default function OrgDashboardPage() {
           {khatibStats.map((k) => {
             const progress = k.total_sermons > 0 ? Math.round((k.delivered_sermons / 52) * 100) : 0;
             return (
-              <div key={k.member_id} className="bg-white border border-line rounded-xl p-5">
+              <Link key={k.member_id} href={`/org/khatibs/${k.member_id}`} className="bg-white border border-line rounded-xl p-5 hover:border-primary/30 transition-colors block">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
                     {k.name[0]}
@@ -147,7 +147,7 @@ export default function OrgDashboardPage() {
                     <p className="text-xs text-mute">{t("org.noSermonThisWeek")}</p>
                   </div>
                 )}
-              </div>
+              </Link>
             );
           })}
         </div>

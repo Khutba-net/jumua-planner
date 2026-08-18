@@ -11,14 +11,16 @@ export async function GET() {
     throw e;
   }
 
+  const user = db.prepare("SELECT organization_id, role FROM users WHERE id = ?").get(userId) as { organization_id: string | null; role: string } | undefined;
+
   const themes = db.prepare(`
     SELECT t.*,
       (SELECT COUNT(*) FROM sub_topics WHERE theme_id = t.id) as sub_topic_count,
       (SELECT COUNT(*) FROM sermons WHERE theme_id = t.id) as sermon_count
     FROM themes t
-    WHERE t.owner_id = ?
+    WHERE t.owner_id = ? OR (t.organization_id = ? AND t.organization_id IS NOT NULL)
     ORDER BY t.year DESC, t.month ASC
-  `).all(userId);
+  `).all(userId, user?.organization_id || "");
 
   const themeIds = (themes as { id: string }[]).map(t => t.id);
   let allSubTopics: Record<string, unknown>[] = [];
@@ -44,13 +46,16 @@ export async function POST(req: Request) {
     throw e;
   }
 
+  const admin = db.prepare("SELECT organization_id, role FROM users WHERE id = ?").get(userId) as { organization_id: string | null; role: string } | undefined;
+
   const body = await req.json();
   const { name, description, month, year, color } = body;
 
+  const isOrgAdmin = admin?.role === "admin" && admin?.organization_id;
   const id = cuid();
   db.prepare(
-    "INSERT INTO themes (id, name, description, month, year, color, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(id, name, description ?? "", month, year, color ?? "#00666d", userId);
+    "INSERT INTO themes (id, name, description, month, year, color, owner_id, organization_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(id, name, description ?? "", month, year, color ?? "#00666d", userId, isOrgAdmin ? admin.organization_id : null);
 
   if (body.subTopics && Array.isArray(body.subTopics)) {
     const insert = db.prepare(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 
 type Member = {
@@ -167,6 +168,15 @@ export default function KhatibsPage() {
             </span>
 
             <div className="flex items-center gap-1">
+              {m.status === "active" && (
+                <Link
+                  href={`/org/khatibs/${m.id}`}
+                  className="p-1.5 rounded-lg text-mute hover:text-primary hover:bg-primary/5 transition-colors"
+                  title={t("org.viewSermons")}
+                >
+                  <span className="material-symbols-outlined text-lg">visibility</span>
+                </Link>
+              )}
               {m.status === "invited" && m.invite_code && (
                 <button
                   onClick={() => copyInviteLink(m.invite_code!)}
