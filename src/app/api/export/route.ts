@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -11,23 +11,23 @@ export async function GET() {
     throw e;
   }
 
-  const user = db.prepare("SELECT id, name, email, bio, phone FROM users WHERE id = ?").get(userId) as Record<string, unknown> | undefined;
+  const user = await queryOne("SELECT id, name, email, bio, phone FROM users WHERE id = $1", [userId]);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const settings = db.prepare("SELECT * FROM user_settings WHERE user_id = ?").get(userId);
-  const themes = db.prepare("SELECT * FROM themes WHERE owner_id = ?").all(userId);
-  const subTopics = db.prepare("SELECT st.* FROM sub_topics st JOIN themes t ON st.theme_id = t.id WHERE t.owner_id = ?").all(userId);
-  const sermons = db.prepare("SELECT * FROM sermons WHERE author_id = ?").all(userId);
-  const sermonIds = (sermons as { id: string }[]).map((s) => s.id);
+  const settings = await queryOne("SELECT * FROM user_settings WHERE user_id = $1", [userId]);
+  const themes = await query("SELECT * FROM themes WHERE owner_id = $1", [userId]);
+  const subTopics = await query("SELECT st.* FROM sub_topics st JOIN themes t ON st.theme_id = t.id WHERE t.owner_id = $1", [userId]);
+  const sermons = await query("SELECT * FROM sermons WHERE author_id = $1", [userId]);
+  const sermonIds = sermons.map((s) => s.id as string);
 
   let references: unknown[] = [];
   let feedback: unknown[] = [];
   if (sermonIds.length > 0) {
-    const placeholders = sermonIds.map(() => "?").join(",");
-    references = db.prepare(`SELECT * FROM references_ WHERE sermon_id IN (${placeholders})`).all(...sermonIds);
-    feedback = db.prepare(`SELECT * FROM feedback WHERE sermon_id IN (${placeholders})`).all(...sermonIds);
+    const placeholders = sermonIds.map((_, i) => `$${i + 1}`).join(",");
+    references = await query(`SELECT * FROM references_ WHERE sermon_id IN (${placeholders})`, sermonIds);
+    feedback = await query(`SELECT * FROM feedback WHERE sermon_id IN (${placeholders})`, sermonIds);
   }
 
   const exportData = {

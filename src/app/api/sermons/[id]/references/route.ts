@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, cuid, toJSON } from "@/lib/db";
+import { query, queryOne, exec, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 async function verifySermonOwnership(sermonId: string, userId: string) {
-  return db.prepare("SELECT id FROM sermons WHERE id = ? AND author_id = ?").get(sermonId, userId);
+  return queryOne("SELECT id FROM sermons WHERE id = $1 AND author_id = $2", [sermonId, userId]);
 }
 
 export async function POST(
@@ -32,11 +32,12 @@ export async function POST(
   }
 
   const refId = cuid();
-  db.prepare(
-    "INSERT INTO references_ (id, type, title, source, content, sermon_id) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(refId, type, title, source || null, content || null, id);
+  await query(
+    "INSERT INTO references_ (id, type, title, source, content, sermon_id) VALUES ($1, $2, $3, $4, $5, $6)",
+    [refId, type, title, source || null, content || null, id]
+  );
 
-  const ref = db.prepare("SELECT * FROM references_ WHERE id = ?").get(refId);
+  const ref = await queryOne("SELECT * FROM references_ WHERE id = $1", [refId]);
   return NextResponse.json(toJSON(ref), { status: 201 });
 }
 
@@ -63,6 +64,6 @@ export async function DELETE(
     return NextResponse.json({ error: "refId is required" }, { status: 400 });
   }
 
-  db.prepare("DELETE FROM references_ WHERE id = ? AND sermon_id = ?").run(refId, id);
+  await exec("DELETE FROM references_ WHERE id = $1 AND sermon_id = $2", [refId, id]);
   return NextResponse.json({ ok: true });
 }

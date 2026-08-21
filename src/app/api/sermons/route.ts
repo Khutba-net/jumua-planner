@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, cuid, toJSON } from "@/lib/db";
+import { query, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -20,19 +20,19 @@ export async function GET(req: NextRequest) {
     FROM sermons s
     LEFT JOIN themes t ON s.theme_id = t.id
     LEFT JOIN users u ON s.author_id = u.id
-    WHERE s.author_id = ?
+    WHERE s.author_id = $1
   `;
   const params: unknown[] = [userId];
 
   if (status) {
-    sql += " AND s.status = ?";
+    sql += " AND s.status = $2";
     params.push(status);
   }
 
   sql += " ORDER BY s.updated_at DESC";
 
   try {
-    const sermons = db.prepare(sql).all(...params);
+    const sermons = await query(sql, params);
     return NextResponse.json(toJSON(sermons));
   } catch (err) {
     return NextResponse.json({ error: "Failed to load sermons", detail: String(err) }, { status: 500 });
@@ -53,27 +53,28 @@ export async function POST(req: NextRequest) {
   const sermonType = validTypes.includes(body.type) ? body.type : "friday";
 
   try {
-    db.prepare(`
-      INSERT INTO sermons (id, title, content, outline, status, type, scheduled_date, notes, author_id, mosque_id, theme_id, sub_topic_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      body.title || "Untitled Sermon",
-      body.content ?? "",
-      body.outline ?? "",
-      body.status ?? "draft",
-      sermonType,
-      body.scheduledDate ?? null,
-      body.notes ?? "",
-      userId,
-      body.mosqueId ?? null,
-      body.themeId ?? null,
-      body.subTopicId ?? null
+    await query(
+      `INSERT INTO sermons (id, title, content, outline, status, type, scheduled_date, notes, author_id, mosque_id, theme_id, sub_topic_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        id,
+        body.title || "Untitled Sermon",
+        body.content ?? "",
+        body.outline ?? "",
+        body.status ?? "draft",
+        sermonType,
+        body.scheduledDate ?? null,
+        body.notes ?? "",
+        userId,
+        body.mosqueId ?? null,
+        body.themeId ?? null,
+        body.subTopicId ?? null,
+      ]
     );
   } catch (err) {
     return NextResponse.json({ error: "Failed to create sermon", detail: String(err) }, { status: 500 });
   }
 
-  const sermon = db.prepare("SELECT * FROM sermons WHERE id = ?").get(id);
-  return NextResponse.json(toJSON(sermon), { status: 201 });
+  const sermon = await query("SELECT * FROM sermons WHERE id = $1", [id]);
+  return NextResponse.json(toJSON(sermon[0]), { status: 201 });
 }

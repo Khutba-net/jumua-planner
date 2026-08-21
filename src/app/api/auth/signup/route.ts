@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, cuid, toJSON, hashPassword } from "@/lib/db";
+import { query, queryOne, cuid, toJSON, hashPassword } from "@/lib/db";
 import { rateLimitByIp } from "@/lib/rate-limit";
 import { signupSchema, parseBody } from "@/lib/validations";
 
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   }
   const { name, email, password } = parsed.data;
 
-  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  const existing = await queryOne("SELECT id FROM users WHERE email = $1", [email]);
   if (existing) {
     return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
   }
@@ -27,11 +27,12 @@ export async function POST(req: Request) {
   const userId = cuid();
   const passwordHash = hashPassword(password);
 
-  db.prepare(
-    "INSERT INTO users (id, email, name, password_hash, role, onboarding_complete) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(userId, email, name, passwordHash, "khatib", 0);
+  await query(
+    "INSERT INTO users (id, email, name, password_hash, role, onboarding_complete) VALUES ($1, $2, $3, $4, $5, $6)",
+    [userId, email, name, passwordHash, "khatib", 0]
+  );
 
-  const user = db.prepare("SELECT id, email, name, onboarding_complete FROM users WHERE id = ?").get(userId);
+  const user = await queryOne("SELECT id, email, name, onboarding_complete FROM users WHERE id = $1", [userId]);
 
   const res = NextResponse.json({ user: toJSON(user) });
   res.cookies.set("user_id", userId, {

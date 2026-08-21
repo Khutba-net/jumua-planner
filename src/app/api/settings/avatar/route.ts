@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { exec } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { writeFile } from "fs/promises";
 import path from "path";
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   await writeFile(filepath, buffer);
 
   const avatarUrl = `/avatars/${safeFilename}`;
-  db.prepare("UPDATE users SET avatar_url = ?, updated_at = datetime('now') WHERE id = ?").run(avatarUrl, userId);
+  await exec("UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2", [avatarUrl, userId]);
 
   return NextResponse.json({ avatar_url: avatarUrl });
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, cuid, hashPassword } from "@/lib/db";
+import { query, queryOne, exec, cuid, hashPassword, withTransaction } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -15,27 +15,28 @@ async function seed() {
   try {
   const userId = "demo-user";
 
-  // Clear existing content first (foreign keys)
-  db.prepare("DELETE FROM references_ WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = ?)").run(userId);
-  db.prepare("DELETE FROM feedback WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = ?)").run(userId);
-  db.prepare("DELETE FROM sermons WHERE author_id = ?").run(userId);
-  db.prepare("DELETE FROM sub_topics WHERE theme_id IN (SELECT id FROM themes WHERE owner_id = ?)").run(userId);
-  db.prepare("DELETE FROM themes WHERE owner_id = ?").run(userId);
-  db.prepare("DELETE FROM user_settings WHERE user_id = ?").run(userId);
+  await exec("DELETE FROM references_ WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = $1)", [userId]);
+  await exec("DELETE FROM feedback WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = $1)", [userId]);
+  await exec("DELETE FROM sermons WHERE author_id = $1", [userId]);
+  await exec("DELETE FROM sub_topics WHERE theme_id IN (SELECT id FROM themes WHERE owner_id = $1)", [userId]);
+  await exec("DELETE FROM themes WHERE owner_id = $1", [userId]);
+  await exec("DELETE FROM user_settings WHERE user_id = $1", [userId]);
 
-  // Recreate demo user with known credentials
-  db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+  await exec("DELETE FROM users WHERE id = $1", [userId]);
   const demoHash = hashPassword("demo1234");
-  db.prepare(
-    "INSERT INTO users (id, email, name, password_hash, role, account_type, onboarding_complete) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(userId, "ahmed@example.com", "Sheikh Ahmed", demoHash, "khatib", "individual", 1);
+  await query(
+    "INSERT INTO users (id, email, name, password_hash, role, account_type, onboarding_complete) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    [userId, "ahmed@example.com", "Sheikh Ahmed", demoHash, "khatib", "individual", 1]
+  );
 
-  // Settings
-  db.prepare("INSERT OR REPLACE INTO user_settings (user_id, default_language, word_target, editor_font_size) VALUES (?, ?, ?, ?)").run(userId, "ar-first", 2500, 18);
+  await query(
+    `INSERT INTO user_settings (user_id, default_language, word_target, editor_font_size) VALUES ($1, $2, $3, $4)
+     ON CONFLICT(user_id) DO UPDATE SET default_language = EXCLUDED.default_language, word_target = EXCLUDED.word_target, editor_font_size = EXCLUDED.editor_font_size`,
+    [userId, "ar-first", 2500, 18]
+  );
 
   const year = 2026;
 
-  // ── 4-season annual plan: 1 theme × 4 sub-bouquets × ~4 titles ──
   const themes = [
     {
       name: "Foundations of Faith",
@@ -120,7 +121,6 @@ async function seed() {
     },
   ];
 
-  // Reference library per sermon (keyed by sermon title substring)
   const refMap: Record<string, Array<{ type: string; title: string; source: string; content: string }>> = {
     "Tawheed": [
       { type: "quran", title: "Surah Al-Ikhlas 112:1-4", source: "Quran", content: "قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ" },
@@ -180,33 +180,26 @@ async function seed() {
     ],
   };
 
-  const insertTheme = db.prepare(
-    "INSERT INTO themes (id, name, description, month, year, color, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  );
-  const insertSub = db.prepare(
-    "INSERT INTO sub_topics (id, name, week_number, theme_id) VALUES (?, ?, ?, ?)"
-  );
-  const insertSermon = db.prepare(
-    "INSERT INTO sermons (id, title, content, status, scheduled_date, author_id, theme_id, sub_topic_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  );
-  const insertRef = db.prepare(
-    "INSERT INTO references_ (id, type, title, source, content, sermon_id) VALUES (?, ?, ?, ?, ?, ?)"
-  );
-
   let totalSermons = 0;
   let totalRefs = 0;
 
-  const txn = db.transaction(() => {
+  await withTransaction(async (client) => {
     for (const theme of themes) {
       const themeId = cuid();
-      insertTheme.run(themeId, theme.name, theme.description, theme.month, year, theme.color, userId);
+      await client.query(
+        "INSERT INTO themes (id, name, description, month, year, color, owner_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [themeId, theme.name, theme.description, theme.month, year, theme.color, userId]
+      );
 
       const subIds: string[] = [];
-      theme.subs.forEach((sub, idx) => {
+      for (let idx = 0; idx < theme.subs.length; idx++) {
         const subId = cuid();
         subIds.push(subId);
-        insertSub.run(subId, sub, idx + 1, themeId);
-      });
+        await client.query(
+          "INSERT INTO sub_topics (id, name, week_number, theme_id) VALUES ($1, $2, $3, $4)",
+          [subId, theme.subs[idx], idx + 1, themeId]
+        );
+      }
 
       const perSub = subIds.length > 0 ? Math.ceil(theme.sermons.length / subIds.length) : 0;
       for (let si = 0; si < theme.sermons.length; si++) {
@@ -215,13 +208,19 @@ async function seed() {
         const updatedAt = s.date + "T12:00:00.000Z";
         const subIdx = Math.min(Math.floor(si / perSub), subIds.length - 1);
         const subTopicId = subIds[subIdx] ?? null;
-        insertSermon.run(sermonId, s.title, s.content, s.status, s.date, userId, themeId, subTopicId, updatedAt);
+        await client.query(
+          "INSERT INTO sermons (id, title, content, status, scheduled_date, author_id, theme_id, sub_topic_id, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+          [sermonId, s.title, s.content, s.status, s.date, userId, themeId, subTopicId, updatedAt]
+        );
         totalSermons++;
 
         for (const [key, refs] of Object.entries(refMap)) {
           if (s.title.includes(key)) {
             for (const r of refs) {
-              insertRef.run(cuid(), r.type, r.title, r.source, r.content, sermonId);
+              await client.query(
+                "INSERT INTO references_ (id, type, title, source, content, sermon_id) VALUES ($1, $2, $3, $4, $5, $6)",
+                [cuid(), r.type, r.title, r.source, r.content, sermonId]
+              );
               totalRefs++;
             }
           }
@@ -230,45 +229,46 @@ async function seed() {
     }
   });
 
-  txn();
-
-  // ── Seed a khatib user linked to an existing org ──
+  // Seed khatib user
   const khatibUserId = "demo-khatib";
-  db.prepare("DELETE FROM references_ WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = ?)").run(khatibUserId);
-  db.prepare("DELETE FROM feedback WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = ?)").run(khatibUserId);
-  db.prepare("DELETE FROM sermons WHERE author_id = ?").run(khatibUserId);
-  db.prepare("DELETE FROM sub_topics WHERE theme_id IN (SELECT id FROM themes WHERE owner_id = ?)").run(khatibUserId);
-  db.prepare("DELETE FROM themes WHERE owner_id = ?").run(khatibUserId);
-  db.prepare("DELETE FROM user_settings WHERE user_id = ?").run(khatibUserId);
-  db.prepare("DELETE FROM friday_assignments WHERE organization_id IN (SELECT organization_id FROM org_members WHERE user_id = ?)").run(khatibUserId);
-  db.prepare("DELETE FROM org_members WHERE user_id = ?").run(khatibUserId);
-  db.prepare("DELETE FROM users WHERE id = ?").run(khatibUserId);
+  await exec("DELETE FROM references_ WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = $1)", [khatibUserId]);
+  await exec("DELETE FROM feedback WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = $1)", [khatibUserId]);
+  await exec("DELETE FROM sermons WHERE author_id = $1", [khatibUserId]);
+  await exec("DELETE FROM sub_topics WHERE theme_id IN (SELECT id FROM themes WHERE owner_id = $1)", [khatibUserId]);
+  await exec("DELETE FROM themes WHERE owner_id = $1", [khatibUserId]);
+  await exec("DELETE FROM user_settings WHERE user_id = $1", [khatibUserId]);
+  await exec("DELETE FROM friday_assignments WHERE organization_id IN (SELECT organization_id FROM org_members WHERE user_id = $1)", [khatibUserId]);
+  await exec("DELETE FROM org_members WHERE user_id = $1", [khatibUserId]);
+  await exec("DELETE FROM users WHERE id = $1", [khatibUserId]);
 
-  const existingOrg = db.prepare("SELECT id, name FROM organizations LIMIT 1").get() as { id: string; name: string } | undefined;
+  const existingOrg = await queryOne<{ id: string; name: string }>("SELECT id, name FROM organizations LIMIT 1");
 
   if (existingOrg) {
     const khatibHash = hashPassword("khatib123");
-    db.prepare(
-      "INSERT INTO users (id, email, name, password_hash, role, account_type, organization_id, onboarding_complete, planning_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run(khatibUserId, "bilal@example.com", "Sheikh Bilal", khatibHash, "khatib", "organization", existingOrg.id, 1, 2026);
+    await query(
+      "INSERT INTO users (id, email, name, password_hash, role, account_type, organization_id, onboarding_complete, planning_year) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+      [khatibUserId, "bilal@example.com", "Sheikh Bilal", khatibHash, "khatib", "organization", existingOrg.id, 1, 2026]
+    );
 
     const khatibMemberId = cuid();
-    db.prepare(
-      "INSERT INTO org_members (id, organization_id, user_id, name, email, role, status) VALUES (?, ?, ?, ?, ?, 'khatib', 'active')"
-    ).run(khatibMemberId, existingOrg.id, khatibUserId, "Sheikh Bilal", "bilal@example.com");
+    await query(
+      "INSERT INTO org_members (id, organization_id, user_id, name, email, role, status) VALUES ($1, $2, $3, $4, $5, 'khatib', 'active')",
+      [khatibMemberId, existingOrg.id, khatibUserId, "Sheikh Bilal", "bilal@example.com"]
+    );
 
     const khatibThemeId = cuid();
-    db.prepare(
-      "INSERT INTO themes (id, name, description, month, year, color, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).run(khatibThemeId, "Community & Compassion", "Building bridges and nurturing mercy in our community", 7, 2026, "#2563eb", khatibUserId);
+    await query(
+      "INSERT INTO themes (id, name, description, month, year, color, owner_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [khatibThemeId, "Community & Compassion", "Building bridges and nurturing mercy in our community", 7, 2026, "#2563eb", khatibUserId]
+    );
 
     const khatibSubs = ["Neighborly Love", "Supporting the Vulnerable", "Forgiveness & Reconciliation", "Collective Worship"];
     const kSubIds: string[] = [];
-    khatibSubs.forEach((sub, idx) => {
+    for (let idx = 0; idx < khatibSubs.length; idx++) {
       const subId = cuid();
       kSubIds.push(subId);
-      db.prepare("INSERT INTO sub_topics (id, name, week_number, theme_id) VALUES (?, ?, ?, ?)").run(subId, sub, idx + 1, khatibThemeId);
-    });
+      await query("INSERT INTO sub_topics (id, name, week_number, theme_id) VALUES ($1, $2, $3, $4)", [subId, khatibSubs[idx], idx + 1, khatibThemeId]);
+    }
 
     const kSermons = [
       { title: "The Right of the Neighbor in Islam", date: "2026-07-03", status: "delivered" },
@@ -281,13 +281,15 @@ async function seed() {
       { title: "The Sunnah of Smiling", date: "2026-08-21", status: "draft" },
     ];
 
-    kSermons.forEach((s, i) => {
+    for (let i = 0; i < kSermons.length; i++) {
+      const s = kSermons[i];
       const sermonId = cuid();
       const subIdx = Math.min(Math.floor(i / 2), kSubIds.length - 1);
-      db.prepare(
-        "INSERT INTO sermons (id, title, content, status, scheduled_date, author_id, theme_id, sub_topic_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      ).run(sermonId, s.title, s.status === "delivered" ? genContent("brotherhood") : "", s.status, s.date, khatibUserId, khatibThemeId, kSubIds[subIdx], s.date + "T12:00:00.000Z");
-    });
+      await query(
+        "INSERT INTO sermons (id, title, content, status, scheduled_date, author_id, theme_id, sub_topic_id, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        [sermonId, s.title, s.status === "delivered" ? genContent("brotherhood") : "", s.status, s.date, khatibUserId, khatibThemeId, kSubIds[subIdx], s.date + "T12:00:00.000Z"]
+      );
+    }
 
     const now = new Date();
     const day = now.getDay();
@@ -295,27 +297,30 @@ async function seed() {
     const thisFri = new Date(now);
     thisFri.setDate(now.getDate() + (diff === 0 ? 0 : diff));
 
-    const fridaysToAssign = [];
+    const fridaysToAssign: string[] = [];
     const f = new Date(thisFri);
     for (let i = 0; i < 4; i++) {
       fridaysToAssign.push(f.toISOString().split("T")[0]);
       f.setDate(f.getDate() + 7);
     }
 
-    db.prepare("DELETE FROM friday_assignments WHERE organization_id = ?").run(existingOrg.id);
+    await exec("DELETE FROM friday_assignments WHERE organization_id = $1", [existingOrg.id]);
 
     const guests = ["Sheikh Abdullah", "Imam Hassan"];
-    fridaysToAssign.forEach((fd, i) => {
+    for (let i = 0; i < fridaysToAssign.length; i++) {
+      const fd = fridaysToAssign[i];
       if (i % 2 === 0) {
-        db.prepare(
-          "INSERT INTO friday_assignments (id, organization_id, member_id, friday_date) VALUES (?, ?, ?, ?)"
-        ).run(cuid(), existingOrg.id, khatibMemberId, fd);
+        await query(
+          "INSERT INTO friday_assignments (id, organization_id, member_id, friday_date) VALUES ($1, $2, $3, $4)",
+          [cuid(), existingOrg.id, khatibMemberId, fd]
+        );
       } else {
-        db.prepare(
-          "INSERT INTO friday_assignments (id, organization_id, member_id, friday_date, guest_name) VALUES (?, ?, ?, ?, ?)"
-        ).run(cuid(), existingOrg.id, null, fd, guests[Math.floor(i / 2)] || "Guest Khatib");
+        await query(
+          "INSERT INTO friday_assignments (id, organization_id, member_id, friday_date, guest_name) VALUES ($1, $2, $3, $4, $5)",
+          [cuid(), existingOrg.id, null, fd, guests[Math.floor(i / 2)] || "Guest Khatib"]
+        );
       }
-    });
+    }
   }
 
   return NextResponse.json({
@@ -340,15 +345,7 @@ Dear brothers and sisters in Islam,
 
 Today we reflect on the most fundamental principle of our faith — Tawheed, the absolute Oneness of Allah. This is not merely a theological concept confined to textbooks; it is the very foundation upon which our entire existence should be built.
 
-Allah says in Surah Al-Ikhlas:
-
-قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ
-
-"Say: He is Allah, the One. Allah, the Eternal Refuge. He neither begets nor is born, nor is there to Him any equivalent."
-
 When we truly internalize Tawheed, it transforms every aspect of our daily life. We wake up knowing that our sustenance is from Allah alone. We go to work knowing that success comes only from Him. We face hardship knowing that relief is in His hands.
-
-The Prophet ﷺ said: "Whoever dies knowing that there is no god but Allah shall enter Paradise." This knowing is not passive — it is an active, living conviction that shapes every decision we make.
 
 Brothers and sisters, let us ask ourselves: does our Tawheed show in how we speak? In how we spend? In how we treat our neighbors? True Tawheed frees us from the slavery of dunya and anchors us to the worship of the One who created us.
 
@@ -362,25 +359,11 @@ All praise belongs to Allah, and may peace and blessings be upon His Messenger M
 
 Brothers and sisters,
 
-Life is a test. Allah tells us clearly in the Quran:
+Life is a test. Allah tells us clearly in the Quran. Every single one of us is being tested — some with poverty, others with wealth. The question is not whether we will face trials, but how we respond.
 
-أَحَسِبَ النَّاسُ أَن يُتْرَكُوا أَن يَقُولُوا آمَنَّا وَهُمْ لَا يُفْتَنُونَ
+Dear community, patience is not passivity. It is not giving up. It is active trust in Allah's wisdom. It is continuing to pray when you feel nothing.
 
-"Do the people think that they will be left to say 'We believe' and they will not be tried?" (Al-Ankabut 29:2)
-
-Every single one of us is being tested — some with poverty, others with wealth. Some with illness, others with health that makes them heedless. The question is not whether we will face trials, but how we respond.
-
-The Prophet ﷺ taught us: "Patience is at the first stroke of a calamity." Not after we have complained. Not after we have lost hope. But at the very first moment, when the heart wants to scream — that is when true Sabr shines.
-
-و بشر الصابرين الذين إذا أصابتهم مصيبة قالوا إنا لله و إنا إليه راجعون
-
-"And give good tidings to the patient, who, when disaster strikes them, say: Indeed we belong to Allah, and indeed to Him we will return." (Al-Baqarah 2:155-156)
-
-Dear community, patience is not passivity. It is not giving up. It is active trust in Allah's wisdom. It is continuing to pray when you feel nothing. It is being kind when people are unkind to you. It is holding your tongue when anger burns inside.
-
-May Allah grant us all beautiful patience — the kind that draws us closer to Him rather than pushing us away.
-
-أَقُولُ قَوْلِي هَذَا وَأَسْتَغْفِرُ اللَّهَ الْعَظِيمَ لِي وَلَكُمْ`,
+May Allah grant us all beautiful patience — the kind that draws us closer to Him rather than pushing us away.`,
 
     certainty: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
@@ -388,13 +371,9 @@ All praise is due to Allah, the Most Wise, the All-Knowing.
 
 Brothers and sisters in faith,
 
-We live in an age of uncertainty — economic instability, political turmoil, personal anxieties about the future. Yet as believers, we are called to a higher certainty, one that transcends worldly circumstances.
+We live in an age of uncertainty. Yet as believers, we are called to a higher certainty, one that transcends worldly circumstances.
 
-Yaqeen — certainty in Allah — is what separates mere knowledge from transformative faith. You may know that Allah provides, but do you feel it when your bank account is empty? You may know that Allah heals, but do you trust it when the diagnosis is grim?
-
-Ibrahim عليه السلام stood before a blazing fire with absolute certainty. Musa عليه السلام faced the sea with Pharaoh's army behind him and said with yaqeen: "Indeed, with me is my Lord; He will guide me."
-
-This certainty is built, not born. It comes through the daily practice of turning to Allah in every situation — the small ones and the big ones. It comes through reading His Book and finding that He has already addressed every fear in your heart.
+This certainty is built, not born. It comes through the daily practice of turning to Allah in every situation.
 
 May Allah fill our hearts with yaqeen that cannot be shaken.`,
 
@@ -402,17 +381,9 @@ May Allah fill our hearts with yaqeen that cannot be shaken.`,
 
 Dear brothers and sisters,
 
-The Prophet ﷺ told us: "Tie your camel, then put your trust in Allah." In this one sentence lies the entire philosophy of Tawakkul.
-
 Tawakkul is not laziness. It is not abandoning effort. It is the inner peace that comes from knowing that after you have done your best, the outcome belongs to Allah.
 
-وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ
-
-"Whoever puts their trust in Allah — He is sufficient for them." (At-Talaq 65:3)
-
-Study for your exam, then trust Allah with the result. Apply for the job, then trust Allah with the outcome. Take your medicine, then trust Allah with your healing.
-
-The birds leave their nests each morning with empty stomachs and return full. They do not sit idle — they go out and seek. But they trust that Allah will provide.
+Study for your exam, then trust Allah with the result. Apply for the job, then trust Allah with the outcome.
 
 Let us be people of both effort and trust. This is the balanced path of Islam.
 
@@ -424,31 +395,13 @@ All praise to Allah who sent His Messenger as a mercy to mankind.
 
 Brothers and sisters,
 
-Our Prophet Muhammad ﷺ was described by Allah Himself:
-
-فَبِمَا رَحْمَةٍ مِّنَ اللَّهِ لِنتَ لَهُمْ
-
-"It was by the mercy of Allah that you were gentle with them." (Aal Imran 3:159)
-
-In a world that rewards harshness, aggression, and dominance, the Sunnah teaches us that true strength lies in gentleness.
-
-The Prophet ﷺ said: "Gentleness is not found in anything except that it beautifies it, and it is not removed from anything except that it makes it ugly."
-
-This applies to our marriages, our parenting, our work relationships, our community interactions, and even how we speak about those who disagree with us.
-
-When Aisha رضي الله عنها was insulted by some people, the Prophet ﷺ did not respond with anger. He responded with calm and taught her to respond with patience.
+In a world that rewards harshness, the Sunnah teaches us that true strength lies in gentleness.
 
 Let us carry this prophetic gentleness into every room we enter.`,
 
     mercy: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
-وَمَا أَرْسَلْنَاكَ إِلَّا رَحْمَةً لِّلْعَالَمِينَ
-
-"We have not sent you except as a mercy to the worlds." (Al-Anbiya 21:107)
-
-Brothers and sisters, mercy is not weakness — it is the very essence of our religion. Every chapter of the Quran begins with "In the name of Allah, the Most Merciful, the Especially Merciful."
-
-The Prophet ﷺ said: "Be merciful to those on earth, and the One above the heavens will be merciful to you."
+Brothers and sisters, mercy is not weakness — it is the very essence of our religion.
 
 Mercy in Islam extends to everything — to children, to the elderly, to animals, to the environment, to those who wrong us.
 
@@ -460,9 +413,7 @@ Brothers and sisters,
 
 The Sunnah is not merely a collection of historical practices — it is a living, breathing guide for every moment of our day.
 
-From the way we eat (with the right hand, saying Bismillah), to how we greet (with Salam), to how we sleep (on the right side, reciting the evening adhkar) — the Prophet ﷺ left us a complete system of living.
-
-In our modern world, we often think these small acts are insignificant. But it is precisely in these small, daily practices that our faith is built and sustained. The Sunnah turns routine into worship.
+In our modern world, we often think these small acts are insignificant. But it is precisely in these small, daily practices that our faith is built and sustained.
 
 Let us revive a Sunnah this week. Pick one practice you have neglected, and bring it back to life.`,
 
@@ -470,13 +421,7 @@ Let us revive a Sunnah this week. Pick one practice you have neglected, and brin
 
 Brothers and sisters,
 
-أَلَا تُحِبُّونَ أَن يَغْفِرَ اللَّهُ لَكُمْ
-
-"Would you not like that Allah should forgive you?" (An-Nur 24:22)
-
-This powerful question was revealed when Abu Bakr رضي الله عنه considered cutting off support to a relative who had slandered his daughter Aisha. Allah reminded him: if you want My forgiveness, you must forgive others.
-
-Forgiveness is the Prophet's greatest strength. On the day of the conquest of Makkah, he stood before the very people who had tortured him, expelled him, killed his companions — and he said: "Go, you are free."
+Forgiveness is the Prophet's greatest strength. On the day of the conquest of Makkah, he stood before the very people who had tortured him and said: "Go, you are free."
 
 Carrying grudges is heavy. It poisons the heart. Forgiveness is not saying what happened was okay — it is freeing yourself from the weight of bitterness.
 
@@ -486,11 +431,7 @@ Who do you need to forgive today?`,
 
 Brothers and sisters,
 
-The Prophet ﷺ said: "Beware, in the body there is a piece of flesh; if it is sound, the whole body is sound, and if it is corrupt, the whole body is corrupt. Verily, it is the heart."
-
-The diseases of the heart — hasad (envy), kibr (arrogance), riya (showing off), ghadab (uncontrolled anger) — these are more dangerous than any physical illness, because they destroy our connection with Allah.
-
-We may pray five times a day, fast in Ramadan, and give charity — but if our hearts harbor resentment, jealousy, or pride, our worship is diminished.
+The diseases of the heart — hasad, kibr, riya, ghadab — these are more dangerous than any physical illness.
 
 The first step to healing is recognition. Let us examine our hearts honestly today.`,
 
@@ -498,9 +439,7 @@ The first step to healing is recognition. Let us examine our hearts honestly tod
 
 Brothers and sisters,
 
-Envy was the first sin that caused destruction — Iblis envied Adam, and Qabil envied Habil. The Prophet ﷺ warned: "Do not envy one another."
-
-The cure for envy is gratitude. When you see someone blessed with something, say "MashaAllah, Allahumma barik" — and then look at your own blessings. You will find that Allah has given you abundantly in ways you have stopped noticing.
+The cure for envy is gratitude. When you see someone blessed with something, say "MashaAllah" — and then look at your own blessings.
 
 Make a habit: every night before sleep, name five blessings. Gratitude starves envy.`,
 
@@ -508,9 +447,7 @@ Make a habit: every night before sleep, name five blessings. Gratitude starves e
 
 Brothers and sisters,
 
-The Prophet ﷺ said: "No one who has an atom's weight of arrogance in their heart will enter Paradise."
-
-Humility before Allah means recognizing that every talent, every achievement, every breath is from Him. And humility before creation means treating every person — the janitor, the CEO, the child — with equal dignity.
+Humility before Allah means recognizing that every talent, every achievement, every breath is from Him.
 
 The Prophet ﷺ mended his own shoes, served his family, and sat with the poor. This is our standard.`,
 
@@ -518,73 +455,41 @@ The Prophet ﷺ mended his own shoes, served his family, and sat with the poor. 
 
 Brothers and sisters,
 
-أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ
+In an age of anxiety, the prescription is ancient and simple: remember Allah often.
 
-"Verily, in the remembrance of Allah do hearts find rest." (Ar-Ra'd 13:28)
-
-In an age of anxiety, the prescription is ancient and simple: remember Allah often. SubhanAllah, Alhamdulillah, Allahu Akbar, La ilaha illallah — these are not just words. They are the medicine for restless hearts.
-
-The Prophet ﷺ made dhikr constantly — while walking, while waiting, while lying down. Let us bring this practice back into our daily rhythm.`,
+The Prophet ﷺ made dhikr constantly. Let us bring this practice back into our daily rhythm.`,
 
     marriage: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا لِّتَسْكُنُوا إِلَيْهَا وَجَعَلَ بَيْنَكُم مَّوَدَّةً وَرَحْمَةً
-
-"And among His signs is that He created for you mates from among yourselves, that you may find tranquility in them, and He placed between you affection and mercy." (Ar-Rum 30:21)
-
-Marriage in Islam is described as a sign of Allah — not merely a contract, but a sacred bond designed for peace, love, and mercy.
-
-The Prophet ﷺ said: "The best of you are those who are best to their families." Our marriages are the first place our faith is tested and demonstrated.`,
+Marriage in Islam is described as a sign of Allah — not merely a contract, but a sacred bond designed for peace, love, and mercy.`,
 
     parenting: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-Our children are an amanah — a trust from Allah. They do not belong to us; they are entrusted to us for a time.
-
-The Prophet ﷺ was the most loving father. He would extend his sujood because his grandson was on his back. He kissed his children openly and was shocked when a man told him he had ten children and had never kissed any of them.
-
-Raising children with purpose means giving them roots in faith and wings of confidence. It means being present, not just providing.`,
+Our children are an amanah — a trust from Allah. Raising children with purpose means giving them roots in faith and wings of confidence.`,
 
     parents: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
-وَقَضَىٰ رَبُّكَ أَلَّا تَعْبُدُوا إِلَّا إِيَّاهُ وَبِالْوَالِدَيْنِ إِحْسَانًا
-
-"Your Lord has decreed that you worship none but Him, and that you be kind to parents." (Al-Isra 17:23)
-
-Notice — Allah placed kindness to parents immediately after His own worship. This is not coincidence. It is priority.
-
-Brothers and sisters, our parents sacrificed sleep, health, wealth, and years of their lives for us. No amount of service can repay them. But we try — with gentleness, with patience, with du'a.`,
+Brothers and sisters, our parents sacrificed sleep, health, wealth, and years of their lives for us. No amount of service can repay them.`,
 
     kinship: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-The Prophet ﷺ said: "Whoever would like his provision to be increased and his lifespan to be extended, let him maintain family ties."
-
-In our busy world, it is easy to let family connections fade. A cousin we haven't called in months. An aunt we haven't visited in years. These ties are sacred in Islam.
-
-Even if maintaining ties is difficult — even if the other person is cold or distant — the believer takes the first step. That is Silat ar-Rahm.`,
+In our busy world, it is easy to let family connections fade. These ties are sacred in Islam. Even if maintaining ties is difficult, the believer takes the first step.`,
 
     justice: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
-يَا أَيُّهَا الَّذِينَ آمَنُوا كُونُوا قَوَّامِينَ بِالْقِسْطِ
-
-"O you who believe, be persistently standing firm in justice." (An-Nisa 4:135)
-
-Justice in Islam is not optional — it is obligatory. And it does not bend for family, friendship, or self-interest. We must stand for truth even when it is against ourselves.
-
-This is the standard Allah set for the Muslim community — to be witnesses for justice among mankind.`,
+Justice in Islam is not optional — it is obligatory. And it does not bend for family, friendship, or self-interest.`,
 
     sadaqah: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-The Prophet ﷺ said: "Charity does not decrease wealth." This is a divine promise.
-
-But sadaqah is more than money. A smile is charity. Removing harm from the road is charity. A kind word is charity. Helping someone carry their groceries is charity.
+Sadaqah is more than money. A smile is charity. Removing harm from the road is charity. A kind word is charity.
 
 Let us expand our understanding of generosity beyond the donation box.`,
 
@@ -592,33 +497,23 @@ Let us expand our understanding of generosity beyond the donation box.`,
 
 Brothers and sisters,
 
-The Prophet ﷺ said: "Help your brother, whether he is an oppressor or oppressed." They asked: "How do we help an oppressor?" He said: "By preventing him from oppressing."
+Islam demands that we do not remain silent in the face of injustice. Silence is complicity.
 
-Islam demands that we do not remain silent in the face of injustice. Silence is complicity. Speaking truth to power is an act of worship.
-
-May Allah give us the courage to stand with every oppressed soul, regardless of their color, nationality, or religion.`,
+May Allah give us the courage to stand with every oppressed soul.`,
 
     wealth: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-Wealth is not evil in Islam — but attachment to it is. Money is a tool, not a goal. It is a means of doing good, not an end in itself.
+Wealth is not evil in Islam — but attachment to it is. Money is a tool, not a goal.
 
-The Prophet ﷺ said: "The son of Adam says 'My wealth, my wealth.' But what is your wealth except what you eat and consume, wear and wear out, or give in charity and send forward?"
-
-Let us earn halal, spend wisely, and give generously — knowing that what we send ahead is what truly belongs to us.`,
+Let us earn halal, spend wisely, and give generously.`,
 
     quran_companion: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-وَلَقَدْ يَسَّرْنَا الْقُرْآنَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ
-
-"We have made the Quran easy for remembrance — so is there anyone who will remember?" (Al-Qamar 54:17)
-
-The Quran is not just a book to be placed on the highest shelf and opened occasionally. It is meant to be a daily companion — the first voice you hear in the morning and the last before sleep.
-
-The Prophet ﷺ said: "The best of you are those who learn the Quran and teach it."
+The Quran is not just a book to be placed on the highest shelf and opened occasionally. It is meant to be a daily companion.
 
 Let us commit to even one page a day. Consistency over quantity.`,
 
@@ -626,11 +521,7 @@ Let us commit to even one page a day. Consistency over quantity.`,
 
 Brothers and sisters,
 
-أَفَلَا يَتَدَبَّرُونَ الْقُرْآنَ أَمْ عَلَىٰ قُلُوبٍ أَقْفَالُهَا
-
-"Do they not reflect upon the Quran, or are there locks upon their hearts?" (Muhammad 47:24)
-
-Reciting the Quran is beautiful. But reflecting on it — tadabbur — is transformative. It means pausing at each verse and asking: what is Allah saying to me? How does this apply to my life today?
+Reciting the Quran is beautiful. But reflecting on it — tadabbur — is transformative.
 
 One verse reflected upon deeply is worth more than rushing through entire juz without thought.`,
 
@@ -638,111 +529,61 @@ One verse reflected upon deeply is worth more than rushing through entire juz wi
 
 Brothers and sisters,
 
-The Quran dedicates a significant portion to the stories of the Prophets — not as entertainment, but as lessons.
-
-In Yusuf عليه السلام we learn patience through injustice. In Ayyub عليه السلام we learn endurance through suffering. In Ibrahim عليه السلام we learn sacrifice for truth. In Musa عليه السلام we learn courage before tyranny.
-
-These are not ancient tales — they are mirrors for our own struggles today.`,
+The stories of the Prophets are not ancient tales — they are mirrors for our own struggles today.`,
 
     ethics: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-How many of us live the Quran at work? Do we apply honesty in our dealings? Do we avoid riba in our transactions? Do we treat our employees and colleagues with the justice the Quran demands?
-
-Islam does not separate the spiritual from the professional. Every honest transaction is worship. Every fair dealing is sadaqah. Every kept promise is a reflection of iman.`,
+Islam does not separate the spiritual from the professional. Every honest transaction is worship. Every fair dealing is sadaqah.`,
 
     brotherhood: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 إِنَّمَا الْمُؤْمِنُونَ إِخْوَةٌ
 
-"The believers are but brothers." (Al-Hujurat 49:10)
-
 Brothers and sisters,
 
-This brotherhood is not based on ethnicity, language, or nationality. It is based on La ilaha illallah. The Arab and the non-Arab, the rich and the poor, the scholar and the layperson — all are equal before Allah, distinguished only by Taqwa.
-
-The Prophet ﷺ said: "The believers in their mutual kindness, compassion, and sympathy are like one body. When one limb aches, the whole body reacts with sleeplessness and fever."
-
-Are we living this? When our brother in Palestine suffers, do we lose sleep? When our sister in any corner of the world is oppressed, does our heart ache? Brotherhood demands action, not just feelings.`,
+This brotherhood is not based on ethnicity, language, or nationality. It is based on La ilaha illallah. Are we living this? Brotherhood demands action, not just feelings.`,
 
     unity: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
-وَاعْتَصِمُوا بِحَبْلِ اللَّهِ جَمِيعًا وَلَا تَفَرَّقُوا
-
-"And hold firmly to the rope of Allah all together and do not become divided." (Aal Imran 3:103)
-
-Brothers and sisters, division is the weapon of Shaytan. When we are united, we are strong. When we fracture over petty differences — political opinions, cultural practices, school of fiqh — we weaken the entire Ummah.
-
-Unity does not mean uniformity. We can disagree on matters of ijtihad while remaining one body, praying behind one imam, working toward one goal.`,
+Brothers and sisters, division is the weapon of Shaytan. Unity does not mean uniformity. We can disagree on matters of ijtihad while remaining one body.`,
 
     broken_ties: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-How many relationships in our community are broken? Families that don't speak. Friends who avoid each other at the masjid. Committee members who carry years-old grudges.
-
-The Prophet ﷺ said: "It is not permissible for a Muslim to forsake his brother for more than three days."
-
-Three days. Not three months. Not three years. The standard is clear.
-
-Repairing broken ties requires swallowing pride. It requires being the first to say Salam, even when you feel you were right. This is not weakness — this is the strength of faith.`,
+Repairing broken ties requires swallowing pride. It requires being the first to say Salam, even when you feel you were right.`,
 
     taqwa: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
-يَا أَيُّهَا الَّذِينَ آمَنُوا اتَّقُوا اللَّهَ حَقَّ تُقَاتِهِ وَلَا تَمُوتُنَّ إِلَّا وَأَنتُم مُّسْلِمُونَ
-
-"O you who believe, fear Allah as He should be feared, and do not die except as Muslims." (Aal Imran 3:102)
-
 Brothers and sisters,
 
-Taqwa — God-consciousness — is the single most repeated instruction in the Quran. It is the quality that Allah looks for above all else.
+Taqwa — God-consciousness — is the single most repeated instruction in the Quran. It is being aware of Allah in every moment.
 
-إِنَّ أَكْرَمَكُمْ عِنْدَ اللَّهِ أَتْقَاكُمْ
-
-"The most honored of you in the sight of Allah is the one with the most Taqwa." (Al-Hujurat 49:13)
-
-Taqwa is not just avoiding haram. It is being aware of Allah in every moment — when you are alone and when you are in a crowd. When you are online and when you are offline. When no one is watching and when everyone is.
-
-The Prophet ﷺ said: "Fear Allah wherever you are, follow a bad deed with a good deed and it will erase it, and treat people with good character."
-
-This is the comprehensive formula for a righteous life. Three instructions that cover our relationship with Allah, with ourselves, and with others.
-
-May Allah make us among the people of Taqwa — those who walk this earth with awareness of their Lord in every step.
-
-أَقُولُ قَوْلِي هَذَا وَأَسْتَغْفِرُ اللَّهَ الْعَظِيمَ لِي وَلَكُمْ وَلِسَائِرِ الْمُسْلِمِينَ فَاسْتَغْفِرُوهُ إِنَّهُ هُوَ الْغَفُورُ الرَّحِيمُ`,
+May Allah make us among the people of Taqwa.`,
 
     difference: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-The companions of the Prophet ﷺ disagreed on many matters — but they never allowed those disagreements to divide them. Abu Bakr and Umar رضي الله عنهما had different opinions on many issues, yet their brotherhood was legendary.
-
 Ikhtilaf (scholarly difference) is a mercy when handled with adab. It becomes a curse when it becomes personal, tribal, or political.
 
-Let us learn to say: "I respect your view, even as I hold my own." This is the way of our righteous predecessors.`,
+Let us learn to say: "I respect your view, even as I hold my own."`,
 
     knowledge: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
-هَلْ يَسْتَوِي الَّذِينَ يَعْلَمُونَ وَالَّذِينَ لَا يَعْلَمُونَ
-
-"Are those who know equal to those who do not know?" (Az-Zumar 39:9)
-
 Brothers and sisters,
 
-The very first word revealed to our Prophet ﷺ was "Iqra" — Read. Before Salah was ordained, before Zakat was prescribed, before fasting was commanded — the first instruction was to seek knowledge.
+The very first word revealed to our Prophet ﷺ was "Iqra" — Read. Before Salah was ordained, before Zakat was prescribed — the first instruction was to seek knowledge.
 
-The Prophet ﷺ said: "Seeking knowledge is an obligation upon every Muslim."
-
-This is not limited to religious knowledge. Any knowledge that benefits humanity is valued in Islam — medicine, engineering, technology, education. But all knowledge must be grounded in Taqwa, or it becomes a tool of destruction rather than benefit.`,
+All knowledge must be grounded in Taqwa.`,
 
     etiquette: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 
 Brothers and sisters,
 
-Imam Malik رحمه الله would perform wudu, wear his best clothes, and apply perfume before sitting to teach hadith. When asked why, he said: "I am dealing with the words of the Messenger of Allah ﷺ."
-
-The etiquette of seeking knowledge includes humility, patience, consistency, and acting upon what one learns. Knowledge without adab is like a tree without fruit.
+The etiquette of seeking knowledge includes humility, patience, consistency, and acting upon what one learns.
 
 Let us be students who honor what we learn by living it.`,
   };

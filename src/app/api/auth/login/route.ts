@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, toJSON, verifyPassword } from "@/lib/db";
+import { query, queryOne, exec, toJSON, verifyPassword, withTransaction } from "@/lib/db";
 import { rateLimitByIp } from "@/lib/rate-limit";
 import { loginSchema, parseBody } from "@/lib/validations";
 
@@ -19,9 +19,10 @@ export async function POST(req: Request) {
   }
   const { email, password } = parsed.data;
 
-  const user = db.prepare(
-    "SELECT id, email, name, password_hash, account_type, onboarding_complete FROM users WHERE email = ?"
-  ).get(email) as { id: string; password_hash: string | null } | undefined;
+  const user = await queryOne<{ id: string; password_hash: string | null }>(
+    "SELECT id, email, name, password_hash, account_type, onboarding_complete FROM users WHERE email = $1",
+    [email]
+  );
 
   if (!user || !user.password_hash || !verifyPassword(password, user.password_hash)) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
@@ -29,26 +30,29 @@ export async function POST(req: Request) {
 
   const { invite_code } = parsed.data as { invite_code?: string };
   if (invite_code) {
-    const member = db.prepare(
-      "SELECT id, organization_id, status FROM org_members WHERE invite_code = ? AND status = 'invited'"
-    ).get(invite_code) as { id: string; organization_id: string; status: string } | undefined;
+    const member = await queryOne<{ id: string; organization_id: string; status: string }>(
+      "SELECT id, organization_id, status FROM org_members WHERE invite_code = $1 AND status = 'invited'",
+      [invite_code]
+    );
 
     if (member) {
-      const tx = db.transaction(() => {
-        db.prepare(
-          "UPDATE org_members SET user_id = ?, email = ?, status = 'active', updated_at = datetime('now') WHERE id = ?"
-        ).run(user.id, email, member.id);
-        db.prepare(
-          "UPDATE users SET organization_id = ?, account_type = 'organization', role = 'khatib', updated_at = datetime('now') WHERE id = ?"
-        ).run(member.organization_id, user.id);
+      await withTransaction(async (client) => {
+        await client.query(
+          "UPDATE org_members SET user_id = $1, email = $2, status = 'active', updated_at = NOW() WHERE id = $3",
+          [user.id, email, member.id]
+        );
+        await client.query(
+          "UPDATE users SET organization_id = $1, account_type = 'organization', role = 'khatib', updated_at = NOW() WHERE id = $2",
+          [member.organization_id, user.id]
+        );
       });
-      tx();
     }
   }
 
-  const freshUser = db.prepare(
-    "SELECT id, email, name, account_type, onboarding_complete FROM users WHERE id = ?"
-  ).get(user.id);
+  const freshUser = await queryOne(
+    "SELECT id, email, name, account_type, onboarding_complete FROM users WHERE id = $1",
+    [user.id]
+  );
 
   const res = NextResponse.json({ user: toJSON(freshUser) });
   res.cookies.set("user_id", user.id, {
