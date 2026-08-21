@@ -31,8 +31,12 @@ export async function GET(req: NextRequest) {
 
   sql += " ORDER BY s.updated_at DESC";
 
-  const sermons = db.prepare(sql).all(...params);
-  return NextResponse.json(toJSON(sermons));
+  try {
+    const sermons = db.prepare(sql).all(...params);
+    return NextResponse.json(toJSON(sermons));
+  } catch (err) {
+    return NextResponse.json({ error: "Failed to load sermons", detail: String(err) }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {

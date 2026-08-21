@@ -210,7 +210,17 @@ function initTables(db: Database.Database) {
   try { db.exec("ALTER TABLE users ADD COLUMN onboarding_complete INTEGER NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN planning_year INTEGER"); } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN password_hash TEXT"); } catch {}
+  try { db.exec("ALTER TABLE users ADD COLUMN organization_id TEXT"); } catch {}
+  try { db.exec("ALTER TABLE users ADD COLUMN account_type TEXT NOT NULL DEFAULT 'individual'"); } catch {}
+  try { db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'khatib'"); } catch {}
+  try { db.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT"); } catch {}
+  try { db.exec("ALTER TABLE users ADD COLUMN phone TEXT"); } catch {}
+  try { db.exec("ALTER TABLE users ADD COLUMN bio TEXT"); } catch {}
   try { db.exec("ALTER TABLE sermons ADD COLUMN type TEXT NOT NULL DEFAULT 'friday'"); } catch {}
+  try { db.exec("ALTER TABLE sermons ADD COLUMN sub_topic_id TEXT REFERENCES sub_topics(id)"); } catch {}
+  try { db.exec("ALTER TABLE themes ADD COLUMN color TEXT"); } catch {}
+  try { db.exec("ALTER TABLE themes ADD COLUMN owner_id TEXT"); } catch {}
+  try { db.exec("ALTER TABLE themes ADD COLUMN organization_id TEXT REFERENCES organizations(id)"); } catch {}
 
   // Remove UNIQUE constraint on sub_topic_id by recreating table if needed
   try {
