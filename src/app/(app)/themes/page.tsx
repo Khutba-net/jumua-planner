@@ -284,16 +284,19 @@ export default function AnnualPlanPage() {
     const title = addTitleText.trim();
     if (!title || addBusy) { if (!title) cancelAddTitle(); return; }
     setAddBusy(true);
-    await fetch("/api/sermons", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, themeId: theme.id, subTopicId: addSubTopicId, status: "draft", scheduledDate: addDate || nextFridayForTheme(theme) }),
-    });
-    setAddTitleText("");
-    setAddingKey(null);
-    setAddSubTopicId(null);
-    setAddBusy(false);
-    fetchAll();
+    try {
+      const res = await fetch("/api/sermons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, themeId: theme.id, subTopicId: addSubTopicId, status: "draft", scheduledDate: addDate || nextFridayForTheme(theme) }),
+      });
+      if (!res.ok) { setAddBusy(false); return; }
+      setAddTitleText("");
+      setAddingKey(null);
+      setAddSubTopicId(null);
+      setAddBusy(false);
+      fetchAll();
+    } catch { setAddBusy(false); }
   }
 
   function startGridAdd(iso: string) {
@@ -308,15 +311,18 @@ export default function AnnualPlanPage() {
     const title = gridAddText.trim();
     if (!title || !gridAddIso || gridBusy) { if (!title) cancelGridAdd(); return; }
     setGridBusy(true);
-    await fetch("/api/sermons", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, themeId: themeIdForDate(gridAddIso), status: "draft", scheduledDate: gridAddIso }),
-    });
-    setGridAddText("");
-    setGridAddIso(null);
-    setGridBusy(false);
-    fetchAll();
+    try {
+      const res = await fetch("/api/sermons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, themeId: themeIdForDate(gridAddIso), status: "draft", scheduledDate: gridAddIso }),
+      });
+      if (!res.ok) { setGridBusy(false); return; }
+      setGridAddText("");
+      setGridAddIso(null);
+      setGridBusy(false);
+      fetchAll();
+    } catch { setGridBusy(false); }
   }
 
   async function handleNewSermonBlank() {

@@ -48,23 +48,27 @@ export async function POST(req: NextRequest) {
   const validTypes = ["friday", "eid", "talk", "other"];
   const sermonType = validTypes.includes(body.type) ? body.type : "friday";
 
-  db.prepare(`
-    INSERT INTO sermons (id, title, content, outline, status, type, scheduled_date, notes, author_id, mosque_id, theme_id, sub_topic_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    body.title || "Untitled Sermon",
-    body.content ?? "",
-    body.outline ?? "",
-    body.status ?? "draft",
-    sermonType,
-    body.scheduledDate ?? null,
-    body.notes ?? "",
-    userId,
-    body.mosqueId ?? null,
-    body.themeId ?? null,
-    body.subTopicId ?? null
-  );
+  try {
+    db.prepare(`
+      INSERT INTO sermons (id, title, content, outline, status, type, scheduled_date, notes, author_id, mosque_id, theme_id, sub_topic_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      body.title || "Untitled Sermon",
+      body.content ?? "",
+      body.outline ?? "",
+      body.status ?? "draft",
+      sermonType,
+      body.scheduledDate ?? null,
+      body.notes ?? "",
+      userId,
+      body.mosqueId ?? null,
+      body.themeId ?? null,
+      body.subTopicId ?? null
+    );
+  } catch (err) {
+    return NextResponse.json({ error: "Failed to create sermon", detail: String(err) }, { status: 500 });
+  }
 
   const sermon = db.prepare("SELECT * FROM sermons WHERE id = ?").get(id);
   return NextResponse.json(toJSON(sermon), { status: 201 });
