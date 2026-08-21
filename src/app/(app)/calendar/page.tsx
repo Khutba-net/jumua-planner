@@ -63,12 +63,12 @@ export default function CalendarPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/sermons").then((r) => r.json()),
-      fetch("/api/themes").then((r) => r.json()),
+      fetch("/api/sermons").then((r) => r.ok ? r.json() : []),
+      fetch("/api/themes").then((r) => r.ok ? r.json() : []),
     ])
       .then(([s, t]) => {
-        setSermons(s);
-        setThemes(t);
+        setSermons(Array.isArray(s) ? s : []);
+        setThemes(Array.isArray(t) ? t : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));

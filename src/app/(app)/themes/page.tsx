@@ -129,10 +129,14 @@ export default function AnnualPlanPage() {
 
   function fetchAll() {
     Promise.all([
-      fetch("/api/themes").then((r) => r.json()),
-      fetch("/api/sermons").then((r) => r.json()),
+      fetch("/api/themes").then((r) => r.ok ? r.json() : []),
+      fetch("/api/sermons").then((r) => r.ok ? r.json() : []),
     ])
-      .then(([t, s]) => { setThemes(t); setSermons(s); setLoading(false); })
+      .then(([t, s]) => {
+        setThemes(Array.isArray(t) ? t : []);
+        setSermons(Array.isArray(s) ? s : []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }
 

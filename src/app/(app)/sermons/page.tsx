@@ -71,9 +71,9 @@ export default function SermonsPage() {
 
   useEffect(() => {
     fetch("/api/sermons")
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : [])
       .then((data) => {
-        setSermons(data);
+        setSermons(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
