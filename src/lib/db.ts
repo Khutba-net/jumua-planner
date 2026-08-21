@@ -225,7 +225,7 @@ function initTables(db: Database.Database) {
   // Remove UNIQUE constraint on sub_topic_id by recreating table if needed
   try {
     const tblSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sermons'").get() as { sql: string } | undefined)?.sql ?? "";
-    if (tblSql.includes("sub_topic_id TEXT UNIQUE")) {
+    if (tblSql.includes("sub_topic_id") && tblSql.includes("UNIQUE")) {
       db.exec(`
         CREATE TABLE sermons_new (
           id TEXT PRIMARY KEY,
@@ -233,6 +233,7 @@ function initTables(db: Database.Database) {
           content TEXT DEFAULT '',
           outline TEXT DEFAULT '',
           status TEXT NOT NULL DEFAULT 'draft',
+          type TEXT NOT NULL DEFAULT 'friday',
           scheduled_date TEXT,
           delivered_date TEXT,
           duration INTEGER,
@@ -244,7 +245,8 @@ function initTables(db: Database.Database) {
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
-        INSERT INTO sermons_new SELECT * FROM sermons;
+        INSERT INTO sermons_new (id, title, content, outline, status, type, scheduled_date, delivered_date, duration, notes, author_id, mosque_id, theme_id, sub_topic_id, created_at, updated_at)
+          SELECT id, title, content, outline, status, type, scheduled_date, delivered_date, duration, notes, author_id, mosque_id, theme_id, sub_topic_id, created_at, updated_at FROM sermons;
         DROP TABLE sermons;
         ALTER TABLE sermons_new RENAME TO sermons;
       `);
