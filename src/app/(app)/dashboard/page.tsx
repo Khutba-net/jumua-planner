@@ -7,7 +7,7 @@ import { getUpcomingHijriEvents, getHijriDateString, type ResolvedHijriEvent } f
 import { useI18n } from "@/lib/i18n";
 
 interface DashboardData {
-  user: { name: string; account_type: string; email: string };
+  user: { name: string; account_type: string; email: string; role: string };
   stats: {
     total: number;
     drafts: number;
@@ -116,10 +116,15 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    fetch("/api/dashboard")
-      .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+    function fetchDashboard() {
+      fetch("/api/dashboard")
+        .then((r) => r.json())
+        .then((d) => { setData(d); setLoading(false); })
+        .catch(() => setLoading(false));
+    }
+    fetchDashboard();
+    window.addEventListener("focus", fetchDashboard);
+    return () => window.removeEventListener("focus", fetchDashboard);
   }, []);
 
   function timeAgo(iso: string) {
@@ -215,6 +220,7 @@ export default function DashboardPage() {
   }
 
   const { user, stats, recentSermons, upcomingSermons, thisFriday, lastFriday, backlogCount, backlogSermons, seasons, checklist, orgName, myAssignments } = data;
+  const isOrgAdmin = user.role === "admin" && user.account_type !== "individual";
 
   const seasonLabelMap: Record<string, string> = {
     "Season 1": t("season.1"),
@@ -249,25 +255,53 @@ export default function DashboardPage() {
               {new Date().toLocaleDateString(isAr ? "ar-SA" : "en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Link
-              href="/themes"
-              className="px-4 py-2 border border-line bg-white text-ink text-sm font-medium hover:bg-surface transition-colors flex items-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-base">calendar_month</span>
-              {t("dash.yearPlan")}
-            </Link>
-            <button
-              onClick={openNewForm}
-              className="px-4 py-2 bg-primary text-white text-sm font-medium hover:bg-secondary transition-colors"
-            >
-              {t("dash.newSermon")}
-            </button>
-          </div>
+          {!isOrgAdmin && (
+            <div className="flex gap-2">
+              <Link
+                href="/themes"
+                className="px-4 py-2 border border-line bg-white text-ink text-sm font-medium hover:bg-surface transition-colors flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-base">calendar_month</span>
+                {t("dash.yearPlan")}
+              </Link>
+              <button
+                onClick={openNewForm}
+                className="px-4 py-2 bg-primary text-white text-sm font-medium hover:bg-secondary transition-colors"
+              >
+                {t("dash.newSermon")}
+              </button>
+            </div>
+          )}
         </div>
 
+        {isOrgAdmin && (
+          <div className="bg-white border border-line p-6 mb-4">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="material-symbols-outlined text-primary text-2xl">admin_panel_settings</span>
+              <div>
+                <p className="text-sm font-semibold text-ink">{t("dash.adminDashboard")}</p>
+                <p className="text-xs text-mute">{t("dash.adminDesc")}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link href="/org/dashboard" className="bg-surface border border-line/50 p-4 hover:bg-primary/5 transition-colors flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary">monitoring</span>
+                <span className="text-sm font-medium text-ink">{t("nav.orgDashboard")}</span>
+              </Link>
+              <Link href="/org/schedule" className="bg-surface border border-line/50 p-4 hover:bg-primary/5 transition-colors flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary">date_range</span>
+                <span className="text-sm font-medium text-ink">{t("nav.schedule")}</span>
+              </Link>
+              <Link href="/org/khatibs" className="bg-surface border border-line/50 p-4 hover:bg-primary/5 transition-colors flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary">group</span>
+                <span className="text-sm font-medium text-ink">{t("nav.khatibs")}</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* New Sermon Form */}
-        {showNewForm && (
+        {!isOrgAdmin && showNewForm && (
           <div className="bg-white border border-line p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm font-semibold text-ink">{t("dash.newSermonTitle")}</p>
@@ -327,6 +361,7 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {!isOrgAdmin && (<>
         {/* This Friday Banner */}
         {thisFriday.sermon ? (
           <Link
@@ -587,9 +622,12 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
+        </>
+        )}
       </div>
 
-      {/* Right sidebar */}
+      {/* Right sidebar — khatib only */}
+      {!isOrgAdmin && (
       <div className={`lg:w-[280px] border-t lg:border-t-0 ${isAr ? "lg:border-r" : "lg:border-l"} border-line p-4 sm:p-5 shrink-0 overflow-y-auto`}>
         {/* Annual Progress */}
         <div className="mb-6">
@@ -783,6 +821,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

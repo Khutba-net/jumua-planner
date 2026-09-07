@@ -40,6 +40,15 @@ function AppShell({ children }: { children: React.ReactNode }) {
     setSidebarOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!user) return;
+    const isOrgAdmin = user.role === "admin" && user.account_type !== "individual";
+    const khatibOnlyRoutes = ["/sermons", "/themes", "/calendar", "/resources"];
+    if (isOrgAdmin && khatibOnlyRoutes.some((r) => pathname.startsWith(r))) {
+      router.push("/dashboard");
+    }
+  }, [user, pathname]);
+
   return (
     <div className="min-h-screen bg-cream-bg flex" dir={isAr ? "rtl" : "ltr"}>
       {/* Mobile top bar */}
@@ -91,7 +100,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          {navKeys.map((item) => {
+          {navKeys
+            .filter((item) => {
+              if (user?.role !== "admin" || user?.account_type === "individual") return true;
+              return item.href === "/dashboard";
+            })
+            .map((item) => {
             const isActive = pathname.startsWith(item.href);
             return (
               <Link

@@ -27,6 +27,7 @@ interface Sermon {
   id: string;
   title: string;
   status: string;
+  type: string;
   scheduled_date: string | null;
   theme_id: string | null;
   sub_topic_id: string | null;
@@ -67,7 +68,65 @@ function useStatusMap() {
   } as Record<string, { bg: string; text: string; dot: string; label: string }>;
 }
 
-const TARGET_FRIDAYS = 52;
+const SLOTS_PER_SEASON = 16;
+const DEFAULT_FRIDAY_SLOTS = 13;
+const DEFAULT_OCCASION_SLOTS = 3;
+const TARGET_SLOTS = SLOTS_PER_SEASON * 4; // 64
+
+/* ── Hijri ↔ Gregorian conversion (Kuwaiti algorithm) ── */
+function hijriToGregorian(hY: number, hM: number, hD: number): Date {
+  const jd = Math.floor((11 * hY + 3) / 30) + 354 * hY + 30 * hM - Math.floor((hM - 1) / 2) + hD + 1948440 - 385;
+  const l = jd + 68569;
+  const n = Math.floor(4 * l / 146097);
+  const ll = l - Math.floor((146097 * n + 3) / 4);
+  const i = Math.floor(4000 * (ll + 1) / 1461001);
+  const lll = ll - Math.floor(1461 * i / 4) + 31;
+  const j = Math.floor(80 * lll / 2447);
+  const day = lll - Math.floor(2447 * j / 80);
+  const month = j + 2 - 12 * Math.floor(j / 11);
+  const gYear = 100 * (n - 49) + i + Math.floor(j / 11);
+  return new Date(gYear, month - 1, day);
+}
+
+function gregorianToHijriYear(gYear: number): number {
+  return Math.floor((gYear - 622) * 33 / 32);
+}
+
+interface HijriEvent {
+  key: string;
+  hMonth: number;
+  hDay: number;
+  icon: string;
+  color: string;
+}
+
+const HIJRI_EVENTS: HijriEvent[] = [
+  { key: "hijri.islamicNewYear", hMonth: 1, hDay: 1, icon: "celebration", color: "#00666d" },
+  { key: "hijri.ashura", hMonth: 1, hDay: 10, icon: "water_drop", color: "#5b7fa6" },
+  { key: "hijri.mawlid", hMonth: 3, hDay: 12, icon: "star", color: "#4a7c59" },
+  { key: "hijri.israMiraj", hMonth: 7, hDay: 27, icon: "nights_stay", color: "#8a5c6e" },
+  { key: "hijri.shaabanMid", hMonth: 8, hDay: 15, icon: "dark_mode", color: "#5b7fa6" },
+  { key: "hijri.ramadanStart", hMonth: 9, hDay: 1, icon: "crescent_moon", color: "#00666d" },
+  { key: "hijri.laylatAlQadr", hMonth: 9, hDay: 27, icon: "auto_awesome", color: "#C4A35A" },
+  { key: "hijri.eidAlFitr", hMonth: 10, hDay: 1, icon: "mosque", color: "#C4A35A" },
+  { key: "hijri.dhulHijjahStart", hMonth: 12, hDay: 1, icon: "landscape", color: "#4a7c59" },
+  { key: "hijri.arafah", hMonth: 12, hDay: 9, icon: "terrain", color: "#8a5c6e" },
+  { key: "hijri.eidAlAdha", hMonth: 12, hDay: 10, icon: "mosque", color: "#C4A35A" },
+];
+
+function hijriEventsForYear(gYear: number) {
+  const baseHY = gregorianToHijriYear(gYear);
+  const results: { key: string; icon: string; color: string; date: Date; hijriYear: number; hMonth: number; hDay: number }[] = [];
+  for (const ev of HIJRI_EVENTS) {
+    for (const hy of [baseHY - 1, baseHY, baseHY + 1]) {
+      const d = hijriToGregorian(hy, ev.hMonth, ev.hDay);
+      if (d.getFullYear() === gYear) {
+        results.push({ ...ev, date: d, hijriYear: hy, hMonth: ev.hMonth, hDay: ev.hDay });
+      }
+    }
+  }
+  return results.sort((a, b) => a.date.getTime() - b.date.getTime());
+}
 
 function seasonIndexOf(month: number) {
   return Math.floor((Math.min(12, Math.max(1, month)) - 1) / 3);
@@ -104,7 +163,7 @@ export default function AnnualPlanPage() {
   const [sermons, setSermons] = useState<Sermon[]>([]);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [view, setView] = useState<"seasons" | "grid">("seasons");
+  const [view, setView] = useState<"seasons" | "grid" | "hijri">("seasons");
 
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -120,10 +179,33 @@ export default function AnnualPlanPage() {
   const [addDate, setAddDate] = useState<string>("");
   const [addBusy, setAddBusy] = useState(false);
   const [addSubTopicId, setAddSubTopicId] = useState<string | null>(null);
+  const [addType, setAddType] = useState<string>("friday");
 
   const [gridAddIso, setGridAddIso] = useState<string | null>(null);
   const [gridAddText, setGridAddText] = useState("");
   const [gridBusy, setGridBusy] = useState(false);
+
+  const [seasonFullModal, setSeasonFullModal] = useState<{ seasonN: number; theme: Theme } | null>(null);
+  const [overwriteTarget, setOverwriteTarget] = useState<string | null>(null);
+  const [deliveryCounts, setDeliveryCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("jp_delivery_counts");
+      if (saved) setDeliveryCounts(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  function cycleDelivery(sermonId: string) {
+    setDeliveryCounts((prev) => {
+      const cur = prev[sermonId] ?? 1;
+      const next = cur >= 3 ? 1 : cur + 1;
+      const updated = { ...prev, [sermonId]: next };
+      if (next === 1) delete updated[sermonId];
+      try { localStorage.setItem("jp_delivery_counts", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  }
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -165,7 +247,7 @@ export default function AnnualPlanPage() {
   const titled = yearSermons.length;
   const written = yearSermons.filter((s) => s.status === "ready" || s.status === "delivered").length;
   const delivered = yearSermons.filter((s) => s.status === "delivered").length;
-  const pct = Math.min(100, Math.round((titled / TARGET_FRIDAYS) * 100));
+  const pct = Math.min(100, Math.round((titled / TARGET_SLOTS) * 100));
 
   const seasonGroups = SEASONS.map((s) => ({
     ...s,
@@ -269,16 +351,22 @@ export default function AnnualPlanPage() {
 
   function setSubField(i: number, v: string) { setFormTopics(formTopics.map((t, idx) => (idx === i ? v : t))); }
 
-  function startAddTitle(theme: Theme, key: string, subTopicId: string | null) {
+  function startAddTitle(theme: Theme, key: string, subTopicId: string | null, type: string = "friday") {
     setAddingKey(key);
     setAddTitleText("");
-    setAddDate(nextFridayForTheme(theme) ?? "");
+    setAddType(type);
+    if (type === "friday") {
+      setAddDate(nextFridayForTheme(theme) ?? "");
+    } else {
+      setAddDate("");
+    }
     setAddSubTopicId(subTopicId);
   }
   function cancelAddTitle() {
     setAddingKey(null);
     setAddTitleText("");
     setAddSubTopicId(null);
+    setAddType("friday");
   }
   async function submitAddTitle(theme: Theme) {
     const title = addTitleText.trim();
@@ -288,7 +376,7 @@ export default function AnnualPlanPage() {
       const res = await fetch("/api/sermons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, themeId: theme.id, subTopicId: addSubTopicId, status: "draft", scheduledDate: addDate || nextFridayForTheme(theme) }),
+        body: JSON.stringify({ title, themeId: theme.id, subTopicId: addSubTopicId, type: addType, status: "draft", scheduledDate: addDate || (addType === "friday" ? nextFridayForTheme(theme) : null) }),
       });
       if (!res.ok) { setAddBusy(false); return; }
       setAddTitleText("");
@@ -323,6 +411,35 @@ export default function AnnualPlanPage() {
       setGridBusy(false);
       fetchAll();
     } catch { setGridBusy(false); }
+  }
+
+  async function toggleSermonType(sermon: Sermon) {
+    const newType = (!sermon.type || sermon.type === "friday") ? "eid" : "friday";
+    await fetch(`/api/sermons/${sermon.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: newType }),
+    });
+    fetchAll();
+  }
+
+  async function pushToNextSeason(currentSeasonN: number, theme: Theme) {
+    const nextSeason = SEASONS.find((s) => s.n === currentSeasonN + 1);
+    if (!nextSeason) return;
+    const nextTheme = yearThemes.find((t) => seasonIndexOf(t.month) === nextSeason.n - 1);
+    setSeasonFullModal(null);
+    startAddTitle(
+      nextTheme ?? theme,
+      `${nextTheme?.id ?? theme.id}:0`,
+      nextTheme?.sub_topics[0]?.id ?? null,
+    );
+  }
+
+  async function overwriteSlot(sermonId: string, theme: Theme) {
+    await fetch(`/api/sermons/${sermonId}`, { method: "DELETE" });
+    setOverwriteTarget(null);
+    setSeasonFullModal(null);
+    fetchAll();
   }
 
   async function handleNewSermonBlank() {
@@ -382,7 +499,7 @@ export default function AnnualPlanPage() {
                 {t("themes.annualPlan")} <span className="text-mute font-normal">·</span> <span className="text-primary">{year}</span>
               </h1>
               <p className="mt-2 text-[13px] text-mute/70 font-[var(--font-arabic)]" dir="rtl">
-                {t("themes.annualPlanAr")} — {TARGET_FRIDAYS} {t("themes.fridays")}
+                {t("themes.annualPlanAr")} · {TARGET_SLOTS} {t("themes.slots")}
               </p>
             </div>
 
@@ -399,13 +516,13 @@ export default function AnnualPlanPage() {
                 </button>
               </div>
               <div className="flex items-center bg-white border border-line/60 rounded-xl p-[3px] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                {(["seasons", "grid"] as const).map((v) => (
+                {(["seasons", "grid", "hijri"] as const).map((v) => (
                   <button key={v} onClick={() => setView(v)}
                     className={`text-[12px] font-medium px-3 py-[7px] rounded-[9px] transition-all duration-200 flex items-center gap-1.5 ${
-                      view === v ? "bg-primary text-white shadow-[0_1px_3px_rgba(0,102,109,0.3)]" : "text-mute hover:text-ink"
+                      view === v ? (v === "hijri" ? "bg-accent-gold text-white shadow-[0_1px_3px_rgba(196,163,90,0.3)]" : "bg-primary text-white shadow-[0_1px_3px_rgba(0,102,109,0.3)]") : "text-mute hover:text-ink"
                     }`}>
-                    <span className="material-symbols-outlined text-[15px]">{v === "seasons" ? "table_rows" : "grid_view"}</span>
-                    {v === "seasons" ? t("themes.seasons") : t("themes.52fridays")}
+                    <span className="material-symbols-outlined text-[15px]">{v === "seasons" ? "table_rows" : v === "grid" ? "grid_view" : "crescent_moon"}</span>
+                    {v === "seasons" ? t("themes.seasons") : v === "grid" ? t("themes.52fridays") : t("themes.hijriEvents")}
                   </button>
                 ))}
               </div>
@@ -423,23 +540,23 @@ export default function AnnualPlanPage() {
               <div className="flex items-baseline justify-between mb-2">
                 <p className="text-[13px] text-ink">
                   <span className="text-primary text-[17px] font-bold tabular-nums">{titled}</span>
-                  <span className="text-mute/80 font-normal"> / {TARGET_FRIDAYS} {t("themes.fridaysTitled")}</span>
+                  <span className="text-mute/80 font-normal"> / {TARGET_SLOTS} {t("themes.slotsTitled")}</span>
                 </p>
                 <p className="text-[12px] text-mute/60 font-medium tabular-nums">{pct}%</p>
               </div>
               <div className="h-[6px] rounded-full bg-ink/[0.06] overflow-hidden flex">
                 <div className="h-full bg-primary rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                  style={{ width: `${Math.min(100, (delivered / TARGET_FRIDAYS) * 100)}%` }} title={`${delivered} ${t("themes.delivered")}`} />
+                  style={{ width: `${Math.min(100, (delivered / TARGET_SLOTS) * 100)}%` }} title={`${delivered} ${t("themes.delivered")}`} />
                 <div className="h-full bg-primary/35 transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                  style={{ width: `${Math.min(100, ((written - delivered) / TARGET_FRIDAYS) * 100)}%` }} title={t("themes.written")} />
+                  style={{ width: `${Math.min(100, ((written - delivered) / TARGET_SLOTS) * 100)}%` }} title={t("themes.written")} />
                 <div className="h-full bg-accent-gold/45 transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                  style={{ width: `${Math.min(100, ((titled - written) / TARGET_FRIDAYS) * 100)}%` }} title={t("themes.planned")} />
+                  style={{ width: `${Math.min(100, ((titled - written) / TARGET_SLOTS) * 100)}%` }} title={t("themes.planned")} />
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2.5">
                 <Legend color="#00666d" label={`${delivered} ${t("themes.delivered")}`} />
                 <Legend color="rgba(0,102,109,0.35)" label={`${written - delivered} ${t("themes.written")}`} />
                 <Legend color="rgba(196,163,90,0.55)" label={`${titled - written} ${t("themes.planned")}`} />
-                <Legend color="rgba(28,28,26,0.08)" label={`${Math.max(0, TARGET_FRIDAYS - titled)} ${t("themes.open")}`} />
+                <Legend color="rgba(28,28,26,0.08)" label={`${Math.max(0, TARGET_SLOTS - titled)} ${t("themes.open")}`} />
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
@@ -457,6 +574,8 @@ export default function AnnualPlanPage() {
         <div className="px-4 sm:px-6 lg:px-10 py-6">
           {loading ? (
             <SkeletonSeasons />
+          ) : view === "hijri" ? (
+            <HijriEventsTab year={year} />
           ) : view === "grid" ? (
             <YearGrid fridays={fridays} taken={takenDates} year={year}
               gridAddIso={gridAddIso} gridAddText={gridAddText} setGridAddText={setGridAddText}
@@ -469,6 +588,7 @@ export default function AnnualPlanPage() {
                 <section key={sg.n} className="annual-rise" style={{ animationDelay: `${i * 60}ms` }}>
                   <SeasonBlock
                     season={sg}
+                    allSeasons={seasonGroups}
                     themeSermons={themeSermons}
                     onEditTheme={openEdit}
                     onAddThemeToSeason={() => openCreate(sg.startMonth)}
@@ -482,14 +602,14 @@ export default function AnnualPlanPage() {
                     dateOptionsFor={(t) => openSeasonFridays(t, addDate)}
                     submitAddTitle={submitAddTitle}
                     addBusy={addBusy}
+                    addType={addType}
+                    onToggleType={toggleSermonType}
+                    onSeasonFull={(theme) => setSeasonFullModal({ seasonN: sg.n, theme })}
+                    deliveryCounts={deliveryCounts}
+                    onCycleDelivery={cycleDelivery}
                   />
                 </section>
               ))}
-              <button onClick={handleNewSermonBlank}
-                className="self-start text-[11px] text-mute/45 hover:text-primary transition-all duration-200 flex items-center gap-1.5 mt-2 py-1">
-                <span className="material-symbols-outlined text-[15px]">add</span>
-                {t("themes.addStandalone")}
-              </button>
             </div>
           )}
         </div>
@@ -582,6 +702,74 @@ export default function AnnualPlanPage() {
           </aside>
         </>
       )}
+
+      {/* ── Season full modal ── */}
+      {seasonFullModal && (() => {
+        const sfSeason = seasonGroups.find((sg) => sg.n === seasonFullModal.seasonN);
+        const sfSermons = sfSeason ? sfSeason.themes.flatMap((t) => themeSermons(t.id)) : [];
+        const nextSeason = SEASONS.find((s) => s.n === seasonFullModal.seasonN + 1);
+        const nextSeasonTheme = nextSeason ? yearThemes.find((t) => seasonIndexOf(t.month) === nextSeason.n - 1) : null;
+        const nextSeasonSermons = nextSeasonTheme ? themeSermons(nextSeasonTheme.id) : [];
+        const nextSeasonFull = nextSeasonSermons.length >= SLOTS_PER_SEASON;
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50" onClick={() => { setSeasonFullModal(null); setOverwriteTarget(null); }} />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="bg-white border border-line/40 shadow-xl max-w-md w-full p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="w-10 h-10 bg-red-50 text-red-500 grid place-items-center">
+                    <span className="material-symbols-outlined text-xl">block</span>
+                  </span>
+                  <div>
+                    <p className="text-[15px] font-bold text-ink">{t("themes.seasonFullTitle")}</p>
+                    <p className="text-[12px] text-mute">{t("themes.seasonFullDesc")}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 mb-4">
+                  {nextSeason && !nextSeasonFull && (
+                    <button onClick={() => pushToNextSeason(seasonFullModal.seasonN, seasonFullModal.theme)}
+                      className="w-full flex items-center gap-3 px-4 py-3 border border-line/40 hover:border-primary/40 hover:bg-primary/[0.03] transition-all text-left group">
+                      <span className="material-symbols-outlined text-primary text-lg">arrow_forward</span>
+                      <div>
+                        <p className="text-[13px] font-semibold text-ink group-hover:text-primary transition-colors">{t("themes.pushToNext")}</p>
+                        <p className="text-[11px] text-mute">{isAr ? t(`season.${nextSeason.n}`) : nextSeason.label} · {nextSeasonSermons.length}/{SLOTS_PER_SEASON} {t("themes.slots")}</p>
+                      </div>
+                    </button>
+                  )}
+
+                  <button onClick={() => setOverwriteTarget(overwriteTarget ? null : "picking")}
+                    className="w-full flex items-center gap-3 px-4 py-3 border border-line/40 hover:border-red-300/60 hover:bg-red-50/30 transition-all text-left group">
+                    <span className="material-symbols-outlined text-red-400 text-lg">swap_horiz</span>
+                    <div>
+                      <p className="text-[13px] font-semibold text-ink group-hover:text-red-600 transition-colors">{t("themes.overwriteSlot")}</p>
+                      <p className="text-[11px] text-mute">{t("themes.selectSlot")}</p>
+                    </div>
+                  </button>
+                </div>
+
+                {overwriteTarget === "picking" && sfSermons.length > 0 && (
+                  <div className="border border-line/40 max-h-48 overflow-y-auto mb-4">
+                    {sfSermons.map((sr) => (
+                      <button key={sr.id} onClick={() => overwriteSlot(sr.id, seasonFullModal.theme)}
+                        className="w-full flex items-center gap-2 px-3 py-2 border-b border-line/20 last:border-b-0 hover:bg-red-50/50 transition-colors text-left">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-300 shrink-0" />
+                        <span className="text-[12px] text-ink truncate flex-1">{sr.title}</span>
+                        <span className="text-[10px] text-mute">{sr.scheduled_date?.slice(0, 10) ?? "—"}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button onClick={() => { setSeasonFullModal(null); setOverwriteTarget(null); }}
+                  className="w-full py-2 text-[12px] font-medium text-mute hover:text-ink transition-colors">
+                  {t("sermons.cancel")}
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -608,34 +796,49 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 /* ── Season block ── */
 function SeasonBlock({
-  season, themeSermons, onEditTheme, onAddThemeToSeason,
+  season, allSeasons, themeSermons, onEditTheme, onAddThemeToSeason,
   addingKey, onStartAdd, onCancelAdd, addTitleText, setAddTitleText,
   addDate, setAddDate, dateOptionsFor, submitAddTitle, addBusy,
+  addType, onToggleType, onSeasonFull, deliveryCounts, onCycleDelivery,
 }: {
   season: { n: number; label: string; ar: string; range: string; startMonth: number; themes: Theme[] };
+  allSeasons: { n: number; label: string; ar: string; range: string; startMonth: number; themes: Theme[] }[];
   themeSermons: (id: string) => Sermon[];
   onEditTheme: (t: Theme) => void;
   onAddThemeToSeason: () => void;
   addingKey: string | null;
-  onStartAdd: (t: Theme, key: string, subTopicId: string | null) => void;
+  onStartAdd: (t: Theme, key: string, subTopicId: string | null, type?: string) => void;
   onCancelAdd: () => void;
   addTitleText: string;
   setAddTitleText: (v: string) => void;
   addDate: string;
   setAddDate: (v: string) => void;
   dateOptionsFor: (t: Theme) => string[];
+  addType: string;
   submitAddTitle: (t: Theme) => void;
   addBusy: boolean;
+  onToggleType: (sermon: Sermon) => void;
+  onSeasonFull: (theme: Theme) => void;
+  deliveryCounts: Record<string, number>;
+  onCycleDelivery: (sermonId: string) => void;
 }) {
   const { t, isAr } = useI18n();
   const STATUS_MAP = useStatusMap();
   const theme = season.themes[0] ?? null;
   const color = theme?.color || "#00666d";
   const ss = season.themes.flatMap((t) => themeSermons(t.id));
+  const fridayCount = ss.filter((s) => !s.type || s.type === "friday").length;
+  const occasionCount = ss.filter((s) => s.type && s.type !== "friday").length;
   const allSubTopics = season.themes.flatMap((t) => t.sub_topics);
   const subSlots = Array.from({ length: 4 }, (_, i) => allSubTopics[i] ?? null);
   const seasonLabel = isAr ? t(`season.${season.n}`) : season.label;
   const seasonRange = isAr ? t(`season.${season.n}.range`) : season.range;
+
+  const themeName = theme?.name?.toLowerCase() ?? "";
+  const prevSeason = allSeasons.find((s) => s.n === season.n - 1);
+  const nextSeason = allSeasons.find((s) => s.n === season.n + 1);
+  const continuesFromPrev = prevSeason?.themes.some((t) => t.name.toLowerCase() === themeName) ?? false;
+  const continuesInNext = nextSeason?.themes.some((t) => t.name.toLowerCase() === themeName) ?? false;
 
   return (
     <div className="bg-white border border-line/50 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.02)]">
@@ -653,9 +856,13 @@ function SeasonBlock({
           </div>
         </div>
         {theme && (
-          <span className="text-[11px] text-mute/70 font-medium tabular-nums hidden sm:inline">
-            {ss.length} {t("themes.titles")}
-          </span>
+          <div className="hidden sm:flex items-center gap-3 text-[11px] text-mute/70 font-medium tabular-nums">
+            <span>{ss.length}/{SLOTS_PER_SEASON} {t("themes.slots")}</span>
+            <span className="text-mute/30">|</span>
+            <span>{fridayCount} {t("themes.fridayShort")}</span>
+            <span className="text-mute/30">·</span>
+            <span className="text-accent-gold/80">{occasionCount} {t("themes.occasionShort")}</span>
+          </div>
         )}
       </div>
 
@@ -664,6 +871,7 @@ function SeasonBlock({
           className="w-full py-10 text-center text-[12px] text-mute/50 hover:text-primary transition-all duration-200 flex flex-col items-center gap-2 group">
           <span className="material-symbols-outlined text-2xl text-mute/25 group-hover:text-primary/50 transition-colors duration-200">add_circle</span>
           {t("themes.setMainTheme")} {seasonRange}
+          <span className="text-[10px] text-mute/30">{SLOTS_PER_SEASON} {t("themes.slots")} · {DEFAULT_FRIDAY_SLOTS} {t("themes.fridayShort")} + {DEFAULT_OCCASION_SLOTS} {t("themes.occasionShort")}</span>
         </button>
       ) : (
         <div>
@@ -676,9 +884,23 @@ function SeasonBlock({
                 {theme.name}
               </button>
             </div>
-            <span className="text-[10px] text-mute/70 font-medium">
-              {theme.sub_topics.length}/4 {t("themes.bouquets")} · {ss.length} {t("themes.titles")}
-            </span>
+            <div className="flex items-center gap-2">
+              {continuesFromPrev && prevSeason && (
+                <span className="text-[9px] font-medium text-primary/50 flex items-center gap-0.5">
+                  <span className="material-symbols-outlined text-[11px]">arrow_back</span>
+                  {t("themes.continuesFrom")} {isAr ? t(`season.${prevSeason.n}`) : prevSeason.label}
+                </span>
+              )}
+              {continuesInNext && nextSeason && (
+                <span className="text-[9px] font-medium text-primary/50 flex items-center gap-0.5">
+                  {t("themes.continuesIn")} {isAr ? t(`season.${nextSeason.n}`) : nextSeason.label}
+                  <span className="material-symbols-outlined text-[11px]">arrow_forward</span>
+                </span>
+              )}
+              <span className="text-[10px] text-mute/70 font-medium">
+                {theme.sub_topics.length}/4 {t("themes.bouquets")} · {ss.length}/{SLOTS_PER_SEASON} {t("themes.slots")}
+              </span>
+            </div>
           </div>
 
           {/* Column labels */}
@@ -686,105 +908,263 @@ function SeasonBlock({
             <span>{t("themes.subBouquet")}</span><span>{t("themes.sermonTitles")}</span>
           </div>
 
-          {/* 4 sub-bouquet slots */}
-          <div className="divide-y divide-line/30">
-            {subSlots.map((sub, si) => {
-              const slice = sub
-                ? ss.filter((s) => s.sub_topic_id === sub.id).slice(0, 4)
-                : [];
-              const key = `${theme.id}:${si}`;
-              const isAdding = addingKey === key;
-              const dateOpts = isAdding ? dateOptionsFor(theme) : [];
-              const hasSubTopic = sub !== null;
-              const emptySlots = 4 - slice.length;
+          {/* 4 elastic sub-bouquets — season hard cap 16, sub-bouquet distribution is flexible */}
+          {(() => {
+            const allSorted = [...ss].sort((a, b) => (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? ""));
+            const totalUsed = ss.length;
+            const seasonFull = totalUsed >= SLOTS_PER_SEASON;
+            const seasonRemaining = Math.max(0, SLOTS_PER_SEASON - totalUsed);
 
-              return (
-                <div key={si} className="grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)]">
-                  <div className="px-5 sm:px-4 pt-2.5 sm:py-3 sm:border-r border-line/30 flex items-center gap-2">
-                    <span className="w-[18px] h-[18px] text-[9px] font-bold grid place-items-center shrink-0 text-white"
-                      style={{ backgroundColor: hasSubTopic ? color : "#ccc" }}>
-                      {si + 1}
-                    </span>
-                    <span className={`text-[12.5px] font-semibold ${hasSubTopic ? "text-ink" : "text-mute/35 italic"}`}>
-                      {sub?.name ?? t("themes.emptySlot")}
-                    </span>
-                  </div>
+            const fridaysBySubId = new Map<string, Sermon[]>();
+            for (const sub of subSlots) {
+              if (!sub) continue;
+              fridaysBySubId.set(sub.id, allSorted.filter((s) => s.sub_topic_id === sub.id && (!s.type || s.type === "friday")));
+            }
 
-                  <div className="px-5 sm:px-4 pb-2.5 sm:py-2 flex flex-col">
-                    {!hasSubTopic ? (
-                      <button onClick={() => onEditTheme(theme)}
-                        className="text-[11px] text-mute/40 hover:text-primary py-2 flex items-center gap-1 transition-colors duration-200">
-                        <span className="material-symbols-outlined text-[13px]">edit</span>
-                        {t("themes.editTheme")}
-                      </button>
-                    ) : (
-                      <>
-                        {slice.map((sr) => {
-                          const st = STATUS_MAP[sr.status] ?? STATUS_MAP.draft;
-                          return (
-                            <Link key={sr.id} href={`/sermons/${sr.id}/edit`}
-                              className="group flex items-center gap-2.5 py-[7px] -mx-2 px-2 hover:bg-ink/[0.03] transition-all duration-200">
-                              <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: st.dot }} />
-                              <span className="text-[11px] text-mute/70 font-medium tabular-nums w-[42px] shrink-0">
-                                {sr.scheduled_date ? formatFriday(sr.scheduled_date.slice(0, 10), isAr) : "—"}
-                              </span>
-                              <span className="text-[13px] text-ink font-medium truncate min-w-0 flex-1 group-hover:text-primary transition-colors duration-200">
-                                {sr.title}
-                              </span>
-                              <span className="text-[9.5px] font-semibold px-1.5 py-[3px] whitespace-nowrap"
-                                style={{ backgroundColor: st.bg, color: st.text }}>{st.label}</span>
-                            </Link>
-                          );
-                        })}
+            const occasions = allSorted.filter((s) => s.type && s.type !== "friday");
+            const occasionBuckets = new Map<number, Sermon[]>();
+            for (const oc of occasions) {
+              const d = oc.scheduled_date?.slice(0, 10) ?? "";
+              let target = subSlots.length - 1;
+              for (let i = 0; i < subSlots.length; i++) {
+                const sub = subSlots[i];
+                if (!sub) continue;
+                const fris = fridaysBySubId.get(sub.id) ?? [];
+                if (fris.length === 0) continue;
+                const minD = fris[0]?.scheduled_date?.slice(0, 10) ?? "";
+                const maxD = fris[fris.length - 1]?.scheduled_date?.slice(0, 10) ?? "";
+                if (d >= minD && d <= maxD) { target = i; break; }
+                if (i < subSlots.length - 1) {
+                  const nextSub = subSlots[i + 1];
+                  const nextFris = nextSub ? (fridaysBySubId.get(nextSub.id) ?? []) : [];
+                  const nextMinD = nextFris.length > 0 ? (nextFris[0]?.scheduled_date?.slice(0, 10) ?? "9999") : "9999";
+                  if (d > maxD && d < nextMinD) { target = i; break; }
+                }
+              }
+              occasionBuckets.set(target, [...(occasionBuckets.get(target) ?? []), oc]);
+            }
 
-                        {isAdding ? (
-                          <div className="mt-1.5 flex flex-col gap-2 bg-primary/[0.02] border border-primary/15 p-2.5">
-                            <input autoFocus value={addTitleText} disabled={addBusy}
-                              onChange={(e) => setAddTitleText(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") submitAddTitle(theme);
-                                if (e.key === "Escape") onCancelAdd();
-                              }}
-                              placeholder={t("themes.sermonTitlePlaceholder")}
-                              className="text-[12.5px] text-ink font-medium bg-white border border-line/60 px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
-                            <div className="flex items-center gap-1.5">
-                              <span className="material-symbols-outlined text-[14px] text-mute/50 shrink-0">event</span>
-                              <select value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
-                                className="flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none focus:border-primary transition-all duration-200">
-                                {dateOpts.length === 0 && <option value="">{t("themes.noOpenFridays")}</option>}
-                                {dateOpts.map((iso) => (
-                                  <option key={iso} value={iso}>{isAr ? t("type.friday") : "Fri"} {formatFriday(iso, isAr)}</option>
-                                ))}
-                              </select>
-                              <button onClick={() => submitAddTitle(theme)} disabled={!addTitleText.trim() || addBusy}
-                                className={`text-[11px] font-bold px-3 py-1.5 transition-all duration-200 ${
-                                  addTitleText.trim() && !addBusy ? "bg-primary text-white hover:bg-secondary" : "bg-ink/[0.06] text-mute cursor-not-allowed"
-                                }`}>{addBusy ? "…" : t("themes.add")}</button>
-                              <button onClick={onCancelAdd} className="text-[11px] font-medium text-mute/60 hover:text-ink px-1.5 py-1.5 transition-colors duration-200">{t("sermons.cancel")}</button>
-                            </div>
-                          </div>
-                        ) : emptySlots > 0 ? (
-                          <button onClick={() => onStartAdd(theme, key, sub.id)}
-                            className="mt-0.5 self-start text-[11px] font-medium text-mute/50 hover:text-primary transition-all duration-200 flex items-center gap-0.5 py-1">
-                            <span className="material-symbols-outlined text-[13px]">add</span> {t("themes.addTitle")}
-                            <span className="text-mute/30 ml-1">({emptySlots} {t("themes.remaining")})</span>
+            return (
+              <div className="divide-y divide-line/30">
+                {subSlots.map((sub, si) => {
+                  const fridaysInSub = sub ? (fridaysBySubId.get(sub.id) ?? []) : [];
+                  const occasionsInSub = occasionBuckets.get(si) ?? [];
+                  const merged = [...fridaysInSub, ...occasionsInSub].sort(
+                    (a, b) => (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? "")
+                  );
+                  const slotCount = merged.length;
+                  const key = `${theme.id}:${si}`;
+                  const isAdding = addingKey === key;
+                  const isAddingOccasion = addingKey === `occasion:${season.n}:${si}`;
+                  const dateOpts = isAdding ? dateOptionsFor(theme) : [];
+                  const hasSubTopic = sub !== null;
+
+                  const isHeavy = slotCount >= 6;
+                  const suggestedSlots = Math.max(3, Math.round(SLOTS_PER_SEASON / 4));
+                  const openSlotCount = hasSubTopic ? Math.max(0, Math.min(suggestedSlots - slotCount, seasonRemaining)) : 0;
+
+                  return (
+                    <div key={si} className={`grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)] ${isHeavy ? "bg-accent-gold/[0.02]" : ""}`}>
+                      <div className="px-5 sm:px-4 pt-2.5 sm:py-3 sm:border-r border-line/30 flex items-center gap-2">
+                        <span className="w-[18px] h-[18px] text-[9px] font-bold grid place-items-center shrink-0 text-white"
+                          style={{ backgroundColor: hasSubTopic ? color : "#ccc" }}>
+                          {si + 1}
+                        </span>
+                        <span className={`text-[12.5px] font-semibold ${hasSubTopic ? "text-ink" : "text-mute/35 italic"} flex-1 min-w-0 truncate`}>
+                          {sub?.name ?? t("themes.emptySlot")}
+                        </span>
+                        {isHeavy && (
+                          <span className="text-[8px] font-bold px-1 py-[1px] bg-accent-gold/15 text-accent-gold shrink-0">{t("themes.heavySub")}</span>
+                        )}
+                        {hasSubTopic && slotCount > 0 && (
+                          <span className="text-[9px] text-mute/40 font-medium tabular-nums shrink-0">{slotCount}</span>
+                        )}
+                      </div>
+
+                      <div className="px-5 sm:px-4 pb-2.5 sm:py-2 flex flex-col">
+                        {!hasSubTopic ? (
+                          <button onClick={() => onEditTheme(theme)}
+                            className="text-[11px] text-mute/40 hover:text-primary py-2 flex items-center gap-1 transition-colors duration-200">
+                            <span className="material-symbols-outlined text-[13px]">edit</span>
+                            {t("themes.editTheme")}
                           </button>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                        ) : (
+                          <>
+                            {merged.map((sr, idx) => {
+                              const isOccasion = sr.type && sr.type !== "friday";
+                              const st = STATUS_MAP[sr.status] ?? STATUS_MAP.draft;
+                              const srDate = sr.scheduled_date?.slice(0, 10) ?? "";
 
-          </div>
+                              const eidOnFridayPair = isOccasion && (sr.type === "eid") && merged.some(
+                                (other) => other.id !== sr.id && (!other.type || other.type === "friday") && other.scheduled_date?.slice(0, 10) === srDate
+                              );
+                              const fridayWithEid = !isOccasion && merged.some(
+                                (other) => other.id !== sr.id && other.type === "eid" && other.scheduled_date?.slice(0, 10) === srDate
+                              );
+
+                              return (
+                                <div key={sr.id} className={`group ${eidOnFridayPair ? "border-l-2 border-accent-gold/40 ml-1" : ""} ${fridayWithEid ? "border-l-2 border-primary/40 ml-1" : ""}`}>
+                                  <Link href={`/sermons/${sr.id}/edit`}
+                                    className="flex items-center gap-2.5 py-[7px] -mx-2 px-2 hover:bg-ink/[0.03] transition-all duration-200">
+                                    <span className={`w-[5px] h-[5px] rounded-full shrink-0 ${isOccasion ? "bg-accent-gold/60" : ""}`}
+                                      style={isOccasion ? {} : { backgroundColor: st.dot }} />
+                                    <span className="text-[11px] text-mute/70 font-medium tabular-nums w-[42px] shrink-0">
+                                      {sr.scheduled_date ? formatFriday(sr.scheduled_date.slice(0, 10), isAr) : "—"}
+                                    </span>
+                                    <span className="text-[13px] text-ink font-medium truncate min-w-0 flex-1 group-hover:text-primary transition-colors duration-200">
+                                      {sr.title}
+                                    </span>
+                                    {eidOnFridayPair && (
+                                      <span className="text-[8px] font-semibold px-1 py-[1px] bg-accent-gold/15 text-accent-gold whitespace-nowrap hidden sm:inline" title={t("themes.eidOnFriday")}>
+                                        {t("themes.morningEid")}
+                                      </span>
+                                    )}
+                                    {fridayWithEid && (
+                                      <span className="text-[8px] font-semibold px-1 py-[1px] bg-primary/10 text-primary whitespace-nowrap hidden sm:inline" title={t("themes.eidOnFriday")}>
+                                        {t("themes.afternoonJumuah")}
+                                      </span>
+                                    )}
+                                    {isOccasion && !eidOnFridayPair ? (
+                                      <span className="text-[9px] font-semibold px-1.5 py-[2px] bg-accent-gold/10 text-accent-gold whitespace-nowrap">
+                                        {sr.type === "eid" ? t("themes.eid") : t("themes.occasion")}
+                                      </span>
+                                    ) : !isOccasion && !fridayWithEid ? (
+                                      <span className="text-[9.5px] font-semibold px-1.5 py-[3px] whitespace-nowrap"
+                                        style={{ backgroundColor: st.bg, color: st.text }}>{st.label}</span>
+                                    ) : null}
+                                    {!isOccasion && (deliveryCounts[sr.id] ?? 1) > 1 && (
+                                      <span className="text-[8px] font-bold px-1 py-[1px] bg-primary/10 text-primary tabular-nums whitespace-nowrap">
+                                        ×{deliveryCounts[sr.id]} {t("themes.multiDelivery")}
+                                      </span>
+                                    )}
+                                  </Link>
+                                  <div className="flex items-center gap-1 -mt-1 mb-0.5 px-2">
+                                    {isOccasion && (
+                                      <span className="text-[8px] text-mute/40 italic" title={t("themes.moonSighting")}>
+                                        {t("themes.moonSighting")}
+                                      </span>
+                                    )}
+                                    {(eidOnFridayPair || fridayWithEid) && (
+                                      <span className="text-[8px] text-accent-gold/50">2 {t("themes.slotsConsumed")}</span>
+                                    )}
+                                    {!isOccasion && (
+                                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCycleDelivery(sr.id); }}
+                                        className="text-[8px] text-mute/30 hover:text-primary transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-0.5"
+                                        title={t("themes.addDelivery")}>
+                                        <span className="material-symbols-outlined text-[10px]">content_copy</span>
+                                        {(deliveryCounts[sr.id] ?? 1) > 1 ? `×${deliveryCounts[sr.id]}` : t("themes.addDelivery")}
+                                      </button>
+                                    )}
+                                    {(isOccasion || eidOnFridayPair || fridayWithEid) && (
+                                      <button onClick={(e) => { e.preventDefault(); onToggleType(sr); }}
+                                        className="text-[8px] text-mute/30 hover:text-primary transition-colors ml-auto opacity-0 group-hover:opacity-100"
+                                        title={isOccasion ? t("themes.switchToFriday") : t("themes.switchToOccasion")}>
+                                        {isOccasion ? t("themes.switchToFriday") : t("themes.switchToOccasion")}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {isAdding ? (
+                              <div className="mt-1.5 flex flex-col gap-2 bg-primary/[0.02] border border-primary/15 p-2.5">
+                                <input autoFocus value={addTitleText} disabled={addBusy}
+                                  onChange={(e) => setAddTitleText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") submitAddTitle(theme);
+                                    if (e.key === "Escape") onCancelAdd();
+                                  }}
+                                  placeholder={t("themes.sermonTitlePlaceholder")}
+                                  className="text-[12.5px] text-ink font-medium bg-white border border-line/60 px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
+                                <div className="flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[14px] text-mute/50 shrink-0">event</span>
+                                  <select value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
+                                    className="flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none focus:border-primary transition-all duration-200">
+                                    {dateOpts.length === 0 && <option value="">{t("themes.noOpenFridays")}</option>}
+                                    {dateOpts.map((iso) => (
+                                      <option key={iso} value={iso}>{isAr ? t("type.friday") : "Fri"} {formatFriday(iso, isAr)}</option>
+                                    ))}
+                                  </select>
+                                  <button onClick={() => submitAddTitle(theme)} disabled={!addTitleText.trim() || addBusy}
+                                    className={`text-[11px] font-bold px-3 py-1.5 transition-all duration-200 ${
+                                      addTitleText.trim() && !addBusy ? "bg-primary text-white hover:bg-secondary" : "bg-ink/[0.06] text-mute cursor-not-allowed"
+                                    }`}>{addBusy ? "…" : t("themes.add")}</button>
+                                  <button onClick={onCancelAdd} className="text-[11px] font-medium text-mute/60 hover:text-ink px-1.5 py-1.5 transition-colors duration-200">{t("sermons.cancel")}</button>
+                                </div>
+                              </div>
+                            ) : isAddingOccasion ? (
+                              <div className="mt-1.5 flex flex-col gap-2 bg-accent-gold/[0.04] border border-accent-gold/20 p-2.5">
+                                <input autoFocus value={addTitleText} disabled={addBusy}
+                                  onChange={(e) => setAddTitleText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") submitAddTitle(theme);
+                                    if (e.key === "Escape") onCancelAdd();
+                                  }}
+                                  placeholder={t("themes.occasionPlaceholder")}
+                                  className="text-[12.5px] text-ink font-medium bg-white border border-line/60 px-3 py-2 outline-none focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/10 transition-all duration-200 placeholder:text-mute/40" />
+                                <div className="flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[14px] text-mute/50 shrink-0">event</span>
+                                  <input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
+                                    className="flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none focus:border-accent-gold transition-all duration-200" />
+                                  <button onClick={() => submitAddTitle(theme)} disabled={!addTitleText.trim() || addBusy}
+                                    className={`text-[11px] font-bold px-3 py-1.5 transition-all duration-200 ${
+                                      addTitleText.trim() && !addBusy ? "bg-accent-gold text-white hover:bg-accent-gold/80" : "bg-ink/[0.06] text-mute cursor-not-allowed"
+                                    }`}>{addBusy ? "…" : t("themes.add")}</button>
+                                  <button onClick={onCancelAdd} className="text-[11px] font-medium text-mute/60 hover:text-ink px-1.5 py-1.5 transition-colors duration-200">{t("sermons.cancel")}</button>
+                                </div>
+                              </div>
+                            ) : seasonFull ? (
+                              <button onClick={() => onSeasonFull(theme)}
+                                className="text-[10px] text-red-400/70 mt-1 py-1 flex items-center gap-1 hover:text-red-500 transition-colors cursor-pointer">
+                                <span className="material-symbols-outlined text-[12px]">block</span>
+                                {t("themes.seasonFull")} — {t("themes.overwriteSlot")}
+                              </button>
+                            ) : (
+                              <>
+                                {openSlotCount > 0 && (
+                                  <div className="flex flex-col">
+                                    {Array.from({ length: Math.min(openSlotCount, 3) }).map((_, oi) => (
+                                      <span key={oi} className="text-[10px] text-mute/25 italic py-[4px] -mx-2 px-2 border-b border-dashed border-line/15 last:border-b-0">
+                                        {t("themes.openGuestSlot")}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <button onClick={() => onStartAdd(theme, key, sub.id)}
+                                    className="self-start text-[11px] font-medium text-mute/50 hover:text-primary transition-all duration-200 flex items-center gap-0.5 py-1">
+                                    <span className="material-symbols-outlined text-[13px]">add</span> {t("themes.addTitle")}
+                                  </button>
+                                  <button onClick={() => onStartAdd(theme, `occasion:${season.n}:${si}`, null, "eid")}
+                                    className="self-start text-[11px] font-medium text-accent-gold/50 hover:text-accent-gold transition-all duration-200 flex items-center gap-0.5 py-1">
+                                    <span className="material-symbols-outlined text-[13px]">star</span> {t("themes.addOccasion")}
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Season total indicator */}
+                <div className="px-5 py-2 flex items-center justify-between text-[10px] text-mute/50">
+                  <span>{totalUsed}/{SLOTS_PER_SEASON} {t("themes.slots")} · {fridayCount} {t("themes.fridayShort")} · {occasionCount} {t("themes.occasionShort")}</span>
+                  {seasonFull && <span className="text-[9px] font-semibold text-red-400">{t("themes.seasonFull")}</span>}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
   );
 }
 
-/* ── 52-Friday master grid ── */
+/* ── Year grid ── */
 function YearGrid({
   fridays, taken, year,
   gridAddIso, gridAddText, setGridAddText, onStartGridAdd, onCancelGridAdd, onSubmitGridAdd, gridBusy,
@@ -902,6 +1282,124 @@ function EmptyWizard({ year, onStart }: { year: number; onStart: () => void }) {
         className="px-7 py-3 bg-primary text-white text-sm font-bold rounded-full hover:bg-secondary transition-all active:scale-95 shadow-sm">
         {t("themes.startSeason1")}
       </button>
+    </div>
+  );
+}
+
+/* ── Hijri Events tab ── */
+function HijriEventsTab({ year }: { year: number }) {
+  const { t, isAr } = useI18n();
+  const events = useMemo(() => hijriEventsForYear(year), [year]);
+  const [prepState, setPrepState] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`jp_hijri_prep_${year}`);
+      if (saved) setPrepState(JSON.parse(saved));
+    } catch {}
+  }, [year]);
+
+  function cyclePrepStatus(eventKey: string) {
+    setPrepState((prev) => {
+      const cur = prev[eventKey] ?? "not_started";
+      const next = cur === "not_started" ? "in_prep" : cur === "in_prep" ? "prepared" : "not_started";
+      const updated = { ...prev, [eventKey]: next };
+      try { localStorage.setItem(`jp_hijri_prep_${year}`, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  }
+
+  const PREP_STATUS: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+    not_started: { bg: "#f0eeeb", text: "#6d797a", dot: "#bcc9ca", label: t("themes.notStarted") },
+    in_prep: { bg: "#FBF6EC", text: "#B8860B", dot: "#C4A35A", label: t("themes.inPrep") },
+    prepared: { bg: "#e8f5ee", text: "#1f7a4d", dot: "#2f9e5f", label: t("themes.prepared") },
+  };
+
+  const HIJRI_MONTHS = [
+    "Muharram", "Safar", "Rabi al-Awwal", "Rabi al-Thani",
+    "Jumada al-Ula", "Jumada al-Thani", "Rajab", "Sha'ban",
+    "Ramadan", "Shawwal", "Dhul Qi'dah", "Dhul Hijjah",
+  ];
+  const HIJRI_MONTHS_AR = [
+    "محرم", "صفر", "ربيع الأول", "ربيع الثاني",
+    "جمادى الأولى", "جمادى الثانية", "رجب", "شعبان",
+    "رمضان", "شوال", "ذو القعدة", "ذو الحجة",
+  ];
+
+  const prepared = events.filter((e) => (prepState[`${e.key}:${e.hijriYear}`] ?? "not_started") === "prepared").length;
+
+  return (
+    <div className="max-w-3xl">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <p className="text-[13px] text-mute">
+            {t("themes.hijriEventsDesc")} <span className="font-bold text-ink">{year}</span>
+          </p>
+          <p className="text-[10px] text-mute/50 italic mt-1">{t("themes.hijriEventsNote")}</p>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-mute/70 font-medium tabular-nums">
+          <span>{prepared}/{events.length} {t("themes.prepared")}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {events.map((ev) => {
+          const stateKey = `${ev.key}:${ev.hijriYear}`;
+          const status = prepState[stateKey] ?? "not_started";
+          const st = PREP_STATUS[status];
+          const hijriDate = `${ev.hDay} ${isAr ? HIJRI_MONTHS_AR[ev.hMonth - 1] : HIJRI_MONTHS[ev.hMonth - 1]} ${ev.hijriYear}`;
+          const gregDate = ev.date.toLocaleDateString(isAr ? "ar-SA" : "en-US", { weekday: "short", month: "short", day: "numeric" });
+          const dayOfWeek = ev.date.getDay();
+          const isFriday = dayOfWeek === 5;
+          const isPast = ev.date < new Date();
+
+          return (
+            <div key={stateKey}
+              className={`bg-white border border-line/50 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:shadow-md ${isPast ? "opacity-60" : ""}`}>
+              <div className="flex items-center gap-4 px-5 py-3.5">
+                <div className="w-10 h-10 grid place-items-center shrink-0" style={{ backgroundColor: ev.color + "15", color: ev.color }}>
+                  <span className="material-symbols-outlined text-xl">{ev.icon}</span>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[14px] font-bold text-ink leading-tight truncate">{t(ev.key)}</p>
+                    {isFriday && (
+                      <span className="text-[8px] font-bold px-1.5 py-[2px] bg-primary/10 text-primary whitespace-nowrap">
+                        {isAr ? "يوافق جمعة" : "Falls on Friday"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-mute/70 font-medium">{gregDate}</span>
+                    <span className="text-mute/30">·</span>
+                    <span className="text-[11px] text-accent-gold/70 font-medium" dir={isAr ? "rtl" : "ltr"}>{hijriDate}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[8px] text-mute/40 italic hidden sm:inline">
+                    {isAr ? "±١ يوم" : "±1 day"}
+                  </span>
+                  <button onClick={() => cyclePrepStatus(stateKey)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 transition-all duration-200 hover:opacity-80"
+                    style={{ backgroundColor: st.bg }}
+                    title={t("themes.prepStatus")}>
+                    <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: st.dot }} />
+                    <span className="text-[10px] font-semibold" style={{ color: st.text }}>{st.label}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {events.length === 0 && (
+          <div className="text-center py-12 text-mute/50 text-[13px]">
+            {isAr ? "لا توجد مناسبات هجرية لهذا العام" : "No Hijri events found for this year"}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

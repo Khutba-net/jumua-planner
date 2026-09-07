@@ -14,18 +14,18 @@ const t = {
     signIn: "Sign in",
 
     greeting: "O, Friday Khatibs",
-    salam: "Assalamu Alaykum Wa Rahmatullahi Wa Barakatuhu",
-    heroTitle: "You Own",
-    heroAccent: "64 Opportunities",
-    heroSub: <>By subscribing to this application, you will own <strong>64</strong> opportunities to build your annual plan to easily cover <strong>52</strong> Fridays <u>and</u> the accompanied repeated Higri events like Eid sermons, Hijrah, Isra{"'"}a and others.</>,
+    salam: "السلام عليكم ورحمة الله وبركاته",
+    heroTitle: "A year of khutbahs that hold together.",
+    heroAccent: "",
+    heroSub: <>JumuaPlanner is a planning tool for Friday khatibs. It won{"'"}t let you drift into a topic a week: you set the year{"'"}s main themes first, break each into sub-bouquets, and only then name the sermons underneath. The result is a plan your congregation can actually follow, one coherent line of thought from January to December, written and rehearsed before each Friday arrives.</>,
     heroCta: "Start Planning Your Year",
 
     twoObjectives: "Two Objectives",
     whatHelps: "What JumuaPlanner helps you achieve",
 
-    obj1Title: "Plan the Entire Year",
-    obj1Text: <>The software directed you to divide the year into <strong>4</strong> <u>seasons</u>/ semesters/ chapters, 3 months or 13 weeks per season, each season with its own named <strong>main theme</strong>. Then, you have to choose <strong>4</strong> <u>sub-bouquets</u> for each season, and finally, titles are going to be selected for <strong>4</strong> <u>sermons</u> within each sub-bouquet.</>,
-    obj1Result: "= 64 sermons/year for full implementation.",
+    obj1Title: "Plan the entire year in one sitting.",
+    obj1Text: <>The software divides your year into <strong>4</strong> seasons, 3 months or 13 weeks each. You name a main theme per season, choose <strong>4</strong> sub-bouquets under it, then title <strong>4</strong> sermons under every sub-bouquet. Eid and the other Hijri occasions rarely land on a Friday; those khutbahs sit in the plan on whatever weekday or weekend they fall.</>,
+    obj1Result: "= 64 sermons a year, about 13 Fridays per main theme, plus occasion khutbahs on any day.",
     obj1Summary: <>This is the <u>1<sup>st</sup></u> objective of our software system.</>,
     obj1Link: "Build your annual plan",
     annualStructure: "Annual Structure",
@@ -37,7 +37,7 @@ const t = {
     labelSubBouquet: "sub-bouquet",
     fullYear: "Full Year",
     sermonsCount: "64 sermons",
-    semester: "Semester",
+    semester: "Season",
     mainThemeLabel: "MAIN THEME",
     subBouquetLabel: "SUB-BOUQUET",
     sermonsLabel: "SERMONS",
@@ -51,27 +51,27 @@ const t = {
     exampleSermon3: "Purifying intentions",
     exampleSermon4: "Living with Tawheed",
 
-    obj2Title: "Write and Prepare",
-    obj2Text: <>The <u>2<sup>nd</sup></u> objective aims to encourage the Khatib to document the contents of his sermons, using the text window page, for a period no more than 15-20 minutes, and practice delivering it to be <u>improvised</u>.</>,
+    obj2Title: "Write it down. Then deliver it without the page.",
+    obj2Text: <>The sermon window encourages you to document each khutbah{"'"}s content and hold it to 15–20 minutes, a real constraint where Friday is a working day and employees get a fixed window to leave and return. Then rehearse it and speak without notes. Prepared in substance, free of the script: that is what empowers khatibs and makes a khutbah land.</>,
     obj2Link: "Try the editor",
-    editorWrite: "Write the full sermon content",
-    editorWriteSub: "Draft in Arabic and English",
+    editorWrite: "Write the full content",
+    editorWriteSub: "Draft each khutbah in Arabic and English.",
     editorTarget: "Target 15–20 minutes",
     editorTargetSub: "Word count tracks your delivery time",
-    editorRef: "Add Quran & Hadith references",
-    editorRefSub: "Cite sources inline",
-    editorDeliver: "Deliver extemporaneously",
-    editorDeliverSub: "Prepared, not memorized",
+    editorRef: "Quran & hadith references",
+    editorRefSub: "Cite your sources inline as you write.",
+    editorDeliver: "Deliver without notes",
+    editorDeliverSub: "Prepared, not memorized, and not read.",
 
-    smartTitle: "Smart System",
-    smartText: "The system is smart in its processing, monitoring and reporting. Subscribers can choose the level of usages: individual, organization and institution, and sometimes level switching and transitions between levels are facilitated.",
+    smartTitle: "It doesn't just organize. It processes, monitors, and reports.",
+    smartText: "And it keeps your plan on track all year, with level switching between individual, organization, and institution when your needs grow.",
 
     pricingTitle: "Simple, honest pricing.",
-    pricingSub: "Choose the plan that fits your mosque's size and mission.",
+    pricingSub: "Choose the plan that fits your mosque's size and mission. Moving between levels is facilitated.",
     individual: "Individual",
     indPrice: "$10",
     indPeriod: "/month",
-    indDesc: "For solo khatibs planning their year",
+    indDesc: "For solo khatibs planning their year.",
     indF1: "Full annual planning",
     indF2: "Arabic + English editor",
     indF3: "Friday calendar",
@@ -79,14 +79,14 @@ const t = {
     organization: "Organization",
     orgPrice: "$50",
     orgPeriod: "/month",
-    orgDesc: "For mosques with multiple khatibs",
+    orgDesc: "For mosques with multiple khatibs.",
     orgF1: "Everything in Individual",
     orgF2: "Up to 10 khatib accounts",
     orgF3: "Moderator review tools",
     orgF4: "Shared khutbah bank",
     institution: "Institution",
     instPrice: "Custom",
-    instDesc: "For Awqaf and multi-mosque networks",
+    instDesc: "For Awqaf and multi-mosque networks.",
     instF1: "Everything in Organization",
     instF2: "Up to 50 khatib accounts",
     instF3: "Multiple mosque groups",
@@ -95,10 +95,56 @@ const t = {
     contactSales: "Contact sales",
 
     ctaTitle: "Your Year Starts Here",
-    ctaSub: "Plan 64 sermons across 4 semesters. Write, prepare, and deliver every khutbah with purpose.",
-    ctaButton: "Get Started Free",
+    ctaSub: "Plan 64 sermons across 4 seasons. Write, prepare, and deliver every khutbah with purpose.",
+    ctaButton: "Get started free",
 
-    footerTagline: "Built for mosque administration",
+    math1Unit: "main themes",
+    math1Per: "per year",
+    math1Note: "One named theme for each season of 13 weeks.",
+    math2Unit: "sub-bouquets",
+    math2Per: "per main theme",
+    math2Note: "Sixteen across the year, each a strand of its season.",
+    math3Unit: "sermons",
+    math3Per: "per sub-bouquet",
+    math3Note: "Every Friday titled before the year begins, occasions included.",
+    mathFormula: "4 × 4 × 4",
+
+    why64Label: "Why 64, not 52",
+    why64Title: "You own 64 opportunities, not 52.",
+    why64Text1: "52 weeks, 52 Friday khutbahs, plus 12 more for the Hijri occasions: Eid al-Fitr, Eid al-Adha, Hijrah, Isra' and Mi'raj, Ramadan. They arrive on their own dates and don't always belong under one of your themes or sub-bouquets. 52 + 12 = 64.",
+    why64Text2: "So the four seasons stay coherent, and the occasions get planned khutbahs of their own instead of displacing a theme mid-stream.",
+    stat52Label: "Weekly khutbahs",
+    stat52Note: "One for every Friday of the year.",
+    stat12Label: "Occasion khutbahs",
+    stat12Note: "Eid, Hijrah, Isra' and Mi'raj, Ramadan.",
+    stat64Label: "Sermons you own",
+    stat64Note: "The full annual plan, 52 plus 12.",
+    stat0Label: "Fridays improvised",
+    stat0Note: "Nothing chosen the night before.",
+
+    smartProcess: "Processes",
+    smartProcessBody: "Themes, sub-bouquets and titles resolve into a balanced year with no Friday left unnamed.",
+    smartMonitor: "Monitors",
+    smartMonitorBody: "See what is written, rehearsed and delivered, and where the year is drifting.",
+    smartReport: "Reports",
+    smartReportBody: "Season-by-season reporting for you, your board, or your Awqaf network.",
+
+    termMonthly: "Monthly",
+    term1yr: "1 year",
+    term2yr: "2 years",
+    term3yr: "3 years",
+    save10: "Save 10%",
+    save20: "Save 20%",
+    save30: "Save 30%",
+    termNoteMonthly: "Prices shown per month, billed monthly. Longer commitments cost less.",
+    termNoteUpfront: "Prices shown per month, billed as one upfront payment.",
+    cancelAnytime: "Cancel any time",
+    billedOnce: "billed once",
+    indBadge: "Solo khatib",
+    orgBadge: "For mosques",
+    instBadge: "Awqaf",
+
+    footerTagline: "Built for mosque administration and khatibs",
     privacy: "Privacy",
     terms: "Terms",
     support: "Support",
@@ -110,19 +156,19 @@ const t = {
     navPricing: "الأسعار",
     signIn: "تسجيل الدخول",
 
-    greeting: "عزيزي خطيب الجمعة",
+    greeting: "إلى خطباء الجمعة",
     salam: "السلام عليكم ورحمة الله وبركاته",
-    heroTitle: "ستمتلك",
-    heroAccent: "٦٤ فرصة",
-    heroSub: <>{"باستخدامك هذا التطبيق ستمتلك "}<strong>64</strong>{" فرصة لبناء خطتك السنوية لتغطي "}<strong>52</strong>{" جمعة وما يصحبها من مناسبات السنة الهجرية المتكررة كخطب العيدين والهجرة والاسراء والمعراج وغيرها."}</>,
+    heroTitle: "عامٌ من الخطب المتماسكة.",
+    heroAccent: "",
+    heroSub: <>{"مخطِّط الجمعة أداة تخطيط لخطباء الجمعة. لا يدعك تنجرف إلى موضوع كل أسبوع: تضع عناوين السنة الرئيسية أولاً، تفرّعها إلى باقات فرعية، ثم تسمّي الخطب تحتها. النتيجة خطة يستطيع مسجدك أن يتابعها، خط فكري واحد متماسك من يناير إلى ديسمبر، مكتوب ومتمرّن عليه قبل أن يحلّ كل يوم جمعة."}</>,
     heroCta: "ابدأ تخطيط عامك",
 
-    twoObjectives: "غرضان",
-    whatHelps: "ما يساعدك جمعة بلانر على تحقيقه",
+    twoObjectives: "٢ هدفان",
+    whatHelps: "ما يساعدك منظم الجمعة (جمعة بلانر) على تحقيقه",
 
-    obj1Title: "خطط لعامك بالكامل",
-    obj1Text: <>{"يقودك البرنامج بتقسيم السنة الى ٤ فصول، ٣ شهور أو ١٣ أسبوعا لكل فصل. تختار لكل فصل من الفصول الأربعة عنواناً رئيسيا "}<strong>main theme</strong>{". ثم تختار لكل عنوان رئيسي باقة من أربعة عناوين فرعية لتحصل على 4 × 4 = 16 باقة "}<strong>sub-bouquet</strong>{". وتختار لكل باقة أربعة عناوين خطب تغطي موضوعاتها 16 × 4 = 64 خطبة "}<strong>sermon</strong>{"."}</>,
-    obj1Result: "4 عنوان رئيسي × 4 باقة × 4 خطبة = 64 خطبة / سنة",
+    obj1Title: "خطّط للعام كله في جلسة واحدة.",
+    obj1Text: <>{"يقسم البرنامج سنتك إلى ٤ فصول، ٣ أشهر أو ١٣ أسبوعاً لكل فصل. تسمّي عنواناً رئيسياً لكل فصل، تختار ٤ باقات فرعية تحته، ثم تعنون ٤ خطب تحت كل باقة. العيدان وبقية المناسبات الهجرية نادراً ما تصادف الجمعة؛ تلك الخطب تقع في الخطة أياً كان اليوم."}</>,
+    obj1Result: "= ٦٤ خطبة في السنة، نحو ١٣ جمعة لكل عنوان رئيسي، بالإضافة إلى خطب المناسبات في أي يوم.",
     obj1Summary: <>{"هذا هو الغرض "}<strong><u>{"الأول"}</u></strong>{" من النظام وإعداد الخطة السنوية."}</>,
     obj1Link: "ابنِ خطتك السنوية",
     annualStructure: "الهيكل السنوي",
@@ -148,23 +194,23 @@ const t = {
     exampleSermon3: "تزكية النيات",
     exampleSermon4: "العيش مع التوحيد",
 
-    obj2Title: "اكتب وأعدّ",
-    obj2Text: <>{"أما الغرض الثاني فالمقصد منه تشجيع الخطيب، باستخدام نافذة كتابة الخطبة، على توثيق محتوى خطبه لتكون كل واحدة بحدود 15-20 دقيقة، بخاصة في البلدان التي لا تعطل الدوام والعمل الرسمي أيام الجمع وتحدد فسحة خروج العاملين بوقت معين، وعلى التدرب على إلقاء الخطبة "}<u>{"ارتجالياً"}</u>{" لتمكين الخطباء ولزيادة فاعلية خطبهم."}</>,
+    obj2Title: "اكتُبها، ثم ألقِها بغير ورقة",
+    obj2Text: <>{"نافذة الخطبة تشجّعك على توثيق محتوى كل خطبة وإبقائها في حدود ١٥–٢٠ دقيقة، قيد حقيقي حيث الجمعة يوم عمل ويُمنح الموظفون نافذة محددة للخروج والعودة. ثم تدرّب عليها وألقِها بلا ورقة. معدٌّ في المعنى، حرٌّ من النص: ذلك ما يمكّن الخطباء ويجعل الخطبة تصل."}</>,
     obj2Link: "جرّب المحرر",
-    editorWrite: "اكتب محتوى الخطبة كاملاً",
-    editorWriteSub: "مسودة بالعربية والإنجليزية",
+    editorWrite: "اكتب المحتوى كاملاً",
+    editorWriteSub: "سوّد كل خطبة بالعربية والإنجليزية.",
     editorTarget: "استهدف ١٥–٢٠ دقيقة",
     editorTargetSub: "عدد الكلمات يتتبع وقت الإلقاء",
-    editorRef: "أضف مراجع القرآن والحديث",
-    editorRefSub: "وثّق المصادر",
-    editorDeliver: "ألقِ ارتجالاً",
-    editorDeliverSub: "مُعدّ، لا محفوظ",
+    editorRef: "أضف الشواهد",
+    editorRefSub: "من القرآن والسنة، موثّقة في موضعها.",
+    editorDeliver: "ألقِ بغير ورقة",
+    editorDeliverSub: "معدٌّ في المعنى، لا محفوظاً ولا مقروءاً.",
 
-    smartTitle: "نظام ذكي",
-    smartText: "يتميز النظام بالذكاء في المعالجة والمراقبة واعداد التقارير. للمشترك حرية الاختيار بين المستويات: الفردي، والمنظمي، ودوائر الأوقاف وربما يتيح النظام تبديل المستويات والانتقال بينها بضوابط.",
+    smartTitle: "لا ينظّم فحسب؛ بل يعالج، ويراقب، ويرفع التقارير",
+    smartText: "ويبقي خطتك على المسار طوال العام، مع إمكانية التبديل بين المستوى الفردي والمنظمي والمؤسسي حين تكبر احتياجاتك.",
 
-    pricingTitle: "أسعار بسيطة وشفافة.",
-    pricingSub: "اختر الخطة المناسبة لحجم مسجدك ورسالته.",
+    pricingTitle: "أسعارٌ واضحة بلا تعقيد",
+    pricingSub: "اختر الخطة المناسبة لحجم مسجدك ورسالته. والانتقال بين المستويات ميسّر.",
     individual: "فردي",
     indPrice: "$١٠",
     indPeriod: "/شهر",
@@ -192,10 +238,56 @@ const t = {
     contactSales: "تواصل معنا",
 
     ctaTitle: "عامك يبدأ من هنا",
-    ctaSub: "خطط لـ ٦٤ خطبة عبر ٤ فصول. اكتب وأعدّ وألقِ كل خطبة بهدف.",
+    ctaSub: "خطّط لـ ٦٤ خطبة عبر ٤ فصول. اكتب وأعدّ وألقِ كل خطبة بهدف.",
     ctaButton: "ابدأ مجاناً",
 
-    footerTagline: "مبني لإدارة شؤون المسجد",
+    math1Unit: "عناوين رئيسية",
+    math1Per: "في السنة",
+    math1Note: "عنوان مسمّى لكل فصل من فصول السنة الثلاثة عشر أسبوعاً.",
+    math2Unit: "باقات فرعية",
+    math2Per: "لكل عنوان رئيسي",
+    math2Note: "ست عشرة على مدار العام، كلٌّ منها خيط في نسيج فصله.",
+    math3Unit: "خطب",
+    math3Per: "لكل باقة",
+    math3Note: "كل جمعة معنونة قبل أن يبدأ العام، والمناسبات مشمولة.",
+    mathFormula: "٤ × ٤ × ٤",
+
+    why64Label: "لماذا ٦٤ لا ٥٢؟",
+    why64Title: "تملك ٦٤ فرصة، لا ٥٢.",
+    why64Text1: "اثنان وخمسون أسبوعاً، واثنتان وخمسون خطبة جمعة، وتُزاد عليها اثنتا عشرة خطبة للمناسبات الهجرية: عيد الفطر، وعيد الأضحى، والهجرة، والإسراء والمعراج، ورمضان. تأتي هذه في تواريخها، ولا تندرج بالضرورة تحت عنوانٍ من عناوينك أو باقةٍ من باقاتك. ٥٢ + ١٢ = ٦٤.",
+    why64Text2: "فتبقى الفصول الأربعة على نظامها، وتنال المناسبات خطباً مخطَّطة لها، من غير أن تزحم عنواناً في منتصف الطريق.",
+    stat52Label: "خطبة أسبوعية",
+    stat52Note: "خطبة لكل جمعة من جمع العام.",
+    stat12Label: "خطبة مناسبة",
+    stat12Note: "العيدان، والهجرة، والإسراء والمعراج، ورمضان.",
+    stat64Label: "خطبة تملكها",
+    stat64Note: "الخطة السنوية كاملة: ٥٢ و١٢.",
+    stat0Label: "جمعة مرتجلة",
+    stat0Note: "لا موضوع يُختار ليلة الخطبة.",
+
+    smartProcess: "المعالجة",
+    smartProcessBody: "تنتظم عناوينك وباقاتك وخطبك في عامٍ متوازن بين الفصول، لا تبقى فيه جمعة بلا عنوان.",
+    smartMonitor: "المراقبة",
+    smartMonitorBody: "ترى ما كُتب وما تُدرّب عليه وما أُلقي، وتدرك انحراف الخطة قبل أن يستقر.",
+    smartReport: "التقارير",
+    smartReportBody: "تقارير فصلية لك، أو لمجلس مسجدك، أو لدائرة الأوقاف؛ تقدّمٌ يمكن تسليمه.",
+
+    termMonthly: "شهرياً",
+    term1yr: "سنة",
+    term2yr: "سنتان",
+    term3yr: "ثلاث سنوات",
+    save10: "وفّر ١٠٪",
+    save20: "وفّر ٢٠٪",
+    save30: "وفّر ٣٠٪",
+    termNoteMonthly: "الأسعار معروضة شهرياً وتُسدَّد شهرياً؛ والاشتراك الأطول أقل كلفة.",
+    termNoteUpfront: "الأسعار معروضة شهرياً، وتُسدَّد دفعةً واحدة مقدّماً.",
+    cancelAnytime: "الإلغاء متاح في أي وقت",
+    billedOnce: "دفعةً واحدة",
+    indBadge: "خطيب منفرد",
+    orgBadge: "للمسجد",
+    instBadge: "الأوقاف",
+
+    footerTagline: "أُعدّ لإدارة شؤون المساجد والخطباء",
     privacy: "الخصوصية",
     terms: "الشروط",
     support: "الدعم",
@@ -205,8 +297,17 @@ const t = {
 
 export default function LandingPage() {
   const [lang, setLang] = useState<"en" | "ar">("en");
+  const [term, setTerm] = useState(0);
   const c = t[lang];
   const isAr = lang === "ar";
+
+  const terms = [
+    { individual: 10, org: 50, years: 0 },
+    { individual: 9, org: 45, years: 1 },
+  ];
+  const activeTerm = terms[term];
+
+  const toAr = (n: string | number) => String(n).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[+d]);
 
   useEffect(() => {
     const saved = localStorage.getItem("jp_lang");
@@ -274,10 +375,7 @@ export default function LandingPage() {
           >
             <p className="text-lg md:text-xl text-secondary font-extrabold mb-2 tracking-wide">{c.greeting}</p>
             <p className={`text-sm md:text-base text-ink/60 font-bold mb-6 ${isAr ? "font-arabic" : ""}`}>{c.salam}</p>
-            <h2 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-primary mb-6 leading-tight">
-              {c.heroTitle}<br />
-              <span className="text-accent-gold">{c.heroAccent}</span>
-            </h2>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-ink tracking-[-0.02em] leading-[1.08] mb-8">{c.heroTitle}</h2>
             <p className="text-lg md:text-xl text-ink/90 font-bold mb-10 max-w-2xl mx-auto leading-relaxed">
               {c.heroSub}
             </p>
@@ -285,6 +383,33 @@ export default function LandingPage() {
               <Link href="/auth/signup" className="bg-primary text-white px-10 py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95">
                 {c.heroCta}
               </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* You own 64, not 52 */}
+        <section className="py-16 md:py-24 bg-surface border-b border-line/30">
+          <div className="max-w-6xl mx-auto px-5 md:px-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-center">
+              <div>
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-ink tracking-[-0.02em] leading-[1.08] mb-5">{c.why64Title}</h2>
+                <p className="text-ink/60 text-base md:text-lg leading-relaxed mb-4">{c.why64Text1}</p>
+                <p className="text-ink/60 text-base md:text-lg leading-relaxed">{c.why64Text2}</p>
+              </div>
+              <div className="grid grid-cols-2">
+                {[
+                  { value: "52", label: c.stat52Label, note: c.stat52Note },
+                  { value: "12", label: c.stat12Label, note: c.stat12Note },
+                  { value: "64", label: c.stat64Label, note: c.stat64Note },
+                  { value: "0", label: c.stat0Label, note: c.stat0Note },
+                ].map((s, i) => (
+                  <div key={i} className={`p-5 md:p-6 ${i % 2 === 0 ? (isAr ? "border-s border-line/40" : "border-e border-line/40") : ""} ${i < 2 ? "border-b border-line/40" : ""}`}>
+                    <p className="text-4xl font-bold text-primary mb-2">{isAr ? toAr(s.value) : s.value}</p>
+                    <p className="text-sm font-bold text-ink mb-1">{s.label}</p>
+                    <p className="text-xs text-ink/50 leading-relaxed">{s.note}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -306,45 +431,35 @@ export default function LandingPage() {
                   {c.obj1Text}
                 </p>
 
-                {/* Formula */}
-                <div className="mb-8" dir="ltr">
-                  <div className="flex flex-wrap items-center gap-3 md:gap-5 text-center">
-                    <div className="flex flex-col items-center">
-                      <span className="relative inline-block text-ink text-sm md:text-base font-bold px-1">
-                        {c.mainThemes}
-                        <span className="absolute inset-0 pointer-events-none" aria-hidden="true"><span className="absolute top-1/2 left-0 w-full h-[1.5px] bg-primary/60 -rotate-12 origin-center" /></span>
-                      </span>
-                      <div className="w-full h-px bg-ink/25 my-1" />
-                      <span className="text-ink/50 text-sm md:text-base px-1">{c.labelYear}</span>
-                    </div>
-                    <span className="text-ink/25 text-lg font-light">&times;</span>
-                    <div className="flex flex-col items-center">
-                      <span className="relative inline-block text-ink text-sm md:text-base font-bold px-1">
-                        {c.subBouquets}
-                        <span className="absolute inset-0 pointer-events-none" aria-hidden="true"><span className="absolute top-1/2 left-0 w-full h-[1.5px] bg-primary/60 -rotate-12 origin-center" /></span>
-                      </span>
-                      <div className="w-full h-px bg-ink/25 my-1" />
-                      <span className="relative inline-block text-ink/50 text-sm md:text-base px-1">
-                        {c.labelMainTheme}
-                        <span className="absolute inset-0 pointer-events-none" aria-hidden="true"><span className="absolute top-1/2 left-0 w-full h-[1.5px] bg-primary/60 -rotate-12 origin-center" /></span>
-                      </span>
-                    </div>
-                    <span className="text-ink/25 text-lg font-light">&times;</span>
-                    <div className="flex flex-col items-center">
-                      <span className="text-ink text-sm md:text-base font-bold px-1">{c.sermons4}</span>
-                      <div className="w-full h-px bg-ink/25 my-1" />
-                      <span className="relative inline-block text-ink/50 text-sm md:text-base px-1">
-                        {c.labelSubBouquet}
-                        <span className="absolute inset-0 pointer-events-none" aria-hidden="true"><span className="absolute top-1/2 left-0 w-full h-[1.5px] bg-primary/60 -rotate-12 origin-center" /></span>
-                      </span>
-                    </div>
+                {/* Formula — horizontal step flow */}
+                <div className="mb-8" dir={isAr ? "rtl" : "ltr"}>
+                  <div className="flex items-start gap-0">
+                    {[
+                      { unit: c.math1Unit, per: c.math1Per, note: c.math1Note },
+                      { unit: c.math2Unit, per: c.math2Per, note: c.math2Note },
+                      { unit: c.math3Unit, per: c.math3Per, note: c.math3Note },
+                    ].map((m, i) => (
+                      <div key={i} className="flex items-start flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 text-center">
+                          <p className="text-3xl md:text-4xl font-bold text-primary leading-none">{isAr ? "٤" : "4"}</p>
+                          <p className="text-xs md:text-sm font-bold text-ink mt-1.5 leading-tight">{m.unit}</p>
+                          <p className="text-[9px] md:text-[10px] font-bold text-primary/50 uppercase tracking-widest mt-1">{m.per}</p>
+                          <p className="text-[10px] md:text-xs text-ink/40 leading-snug mt-2 px-1">{m.note}</p>
+                        </div>
+                        {i < 2 && (
+                          <div className="flex items-center pt-3 px-1 shrink-0">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className={`text-primary/30 ${isAr ? "rotate-180" : ""}`}>
+                              <path d="M7 4l6 6-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-ink/60 text-sm md:text-base mt-4">
-                    <strong className="text-ink">{c.obj1Result}</strong>
-                  </p>
-                  {c.obj1Summary && (
-                    <p className="text-ink/60 text-sm md:text-base mt-2">{c.obj1Summary}</p>
-                  )}
+                  <div className="bg-secondary text-white p-4 md:p-5 mt-4 flex flex-wrap items-baseline justify-between gap-3 rounded-sm">
+                    <span className="text-xs font-bold text-accent-gold tracking-widest">{c.mathFormula}</span>
+                    <span className="text-sm md:text-base">{c.obj1Result}</span>
+                  </div>
                 </div>
 
                 <Link href="/themes" className="inline-flex items-center gap-2 text-primary font-semibold text-sm hover:gap-3 transition-all group">
@@ -352,93 +467,80 @@ export default function LandingPage() {
                 </Link>
               </div>
 
-              {/* Hierarchy tree — always LTR */}
+              {/* Hierarchy tree */}
               <div dir="ltr">
                 <p className="text-xs font-bold text-primary/50 uppercase tracking-widest mb-5">{c.annualStructure}</p>
-                <div className="text-sm">
+                <div className="text-sm space-y-3">
                   {/* Full Year */}
-                  <div className="flex items-center gap-2.5 mb-1">
-                    <span className="text-primary/25 font-mono text-xs">{"──"}</span>
-                    <span className="font-bold text-primary">{c.fullYear}</span>
-                    <span className="text-[10px] font-medium text-primary/60 bg-primary/8 rounded px-1.5 py-0.5 ml-auto">{c.sermonsCount}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-primary shrink-0">{c.fullYear}</span>
+                    <span className="flex-1 border-b border-dotted border-primary/20 mx-1" />
+                    <span className="text-[10px] font-medium text-primary/60 bg-primary/8 rounded px-1.5 py-0.5 shrink-0">{c.sermonsCount}</span>
                   </div>
 
-                  {/* Semester — expanded */}
-                  <div className="pl-5 border-l border-primary/15 ml-[7px]">
-                    <div className="flex items-center gap-2 py-1.5">
-                      <span className="text-primary/25 font-mono text-xs">{"├──"}</span>
-                      <span className="font-semibold text-primary">{c.semester}</span>
-                      <span className="text-[10px] text-primary/30 ml-auto">{isAr ? "يناير–مارس" : "Jan–Mar"}</span>
+                  {/* Season — expanded */}
+                  <div className="pl-6">
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold text-primary shrink-0">{c.semester}</span>
+                      <span className="flex-1 border-b border-dotted border-primary/20 mx-1" />
+                      <span className="text-[10px] text-primary/40 shrink-0">{isAr ? "يناير–مارس" : "Jan–Mar"}</span>
                     </div>
 
                     {/* Main Theme */}
-                    <div className="pl-5 border-l border-primary/12 ml-[10px]">
-                      <div className="flex items-center gap-2 py-1">
-                        <span className="text-primary/25 font-mono text-xs">{"├──"}</span>
-                        <span className="font-medium text-primary/70 text-xs">{c.exampleTheme}</span>
-                        <span className="text-[9px] text-primary/30 ml-auto">{c.mainThemeLabel}</span>
+                    <div className="pl-6 mt-2">
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium text-primary/70 text-xs shrink-0">{c.exampleTheme}</span>
+                        <span className="flex-1 border-b border-dotted border-primary/15 mx-1" />
+                        <span className="text-[9px] text-primary/35 shrink-0">{c.mainThemeLabel}</span>
                       </div>
 
-                      {/* Sub-bouquets */}
-                      <div className="pl-4 border-l border-primary/10 ml-[10px]">
-                        <div className="flex items-center gap-2 py-1">
-                          <span className="text-primary/20 font-mono text-xs">{"├──"}</span>
-                          <span className="text-primary/55 text-xs">{c.exampleSub1}</span>
-                          <span className="text-[9px] text-primary/25 ml-auto">{c.subBouquetLabel}</span>
+                      {/* Sub-bouquet */}
+                      <div className="pl-6 mt-2">
+                        <div className="flex items-center gap-1">
+                          <span className="text-primary/55 text-xs shrink-0">{c.exampleSub1}</span>
+                          <span className="flex-1 border-b border-dotted border-primary/12 mx-1" />
+                          <span className="text-[9px] text-primary/30 shrink-0">{c.subBouquetLabel}</span>
                         </div>
 
                         {/* Sermons */}
-                        <div className="pl-4 border-l border-primary/8 ml-[10px] mb-1">
-                          {[c.exampleSermon1, c.exampleSermon2, c.exampleSermon3].map((sermon, i) => (
-                            <div key={i} className="flex items-center gap-1.5 py-0.5">
-                              <span className="text-primary/15 font-mono text-[10px]">{"├──"}</span>
-                              <span className="text-primary/40 text-[11px]">{sermon}</span>
+                        <div className="pl-6 mt-1.5 space-y-0.5">
+                          {[c.exampleSermon1, c.exampleSermon2, c.exampleSermon3, c.exampleSermon4].map((sermon, i) => (
+                            <div key={i} className="flex items-center gap-1">
+                              <span className="text-primary/40 text-[11px] shrink-0">{sermon}</span>
+                              <span className="flex-1 border-b border-dotted border-primary/8 mx-1" />
+                              {i === 0 && <span className="text-[9px] text-primary/20 shrink-0">{c.sermonsLabel}</span>}
                             </div>
                           ))}
-                          <div className="flex items-center gap-1.5 py-0.5">
-                            <span className="text-primary/15 font-mono text-[10px]">{"└──"}</span>
-                            <span className="text-primary/40 text-[11px]">{c.exampleSermon4}</span>
-                          </div>
-                          <span className="text-[9px] text-primary/20 pl-5">{c.sermonsLabel}</span>
                         </div>
 
                         {/* Other sub-bouquets */}
-                        {[c.exampleSub2, c.exampleSub3].map((sb, i) => (
-                          <div key={i} className="flex items-center gap-2 py-0.5">
-                            <span className="text-primary/15 font-mono text-[10px]">{"├──"}</span>
-                            <span className="text-primary/35 text-xs">{sb}</span>
-                            <span className="text-primary/15 text-[10px] ml-auto">4</span>
-                          </div>
-                        ))}
-                        <div className="flex items-center gap-2 py-0.5">
-                          <span className="text-primary/15 font-mono text-[10px]">{"└──"}</span>
-                          <span className="text-primary/35 text-xs">{c.exampleSub4}</span>
-                          <span className="text-primary/15 text-[10px] ml-auto">4</span>
+                        <div className="mt-2 space-y-1">
+                          {[c.exampleSub2, c.exampleSub3, c.exampleSub4].map((sb, i) => (
+                            <div key={i} className="flex items-center gap-1">
+                              <span className="text-primary/35 text-xs shrink-0">{sb}</span>
+                              <span className="flex-1 border-b border-dotted border-primary/10 mx-1" />
+                              <span className="text-primary/20 text-[10px] shrink-0">4</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Other semesters collapsed */}
+                  {/* Other seasons */}
                   {[
                     isAr ? "أبريل–يونيو" : "Apr–Jun",
                     isAr ? "يوليو–سبتمبر" : "Jul–Sep",
+                    isAr ? "أكتوبر–ديسمبر" : "Oct–Dec",
                   ].map((period, i) => (
-                    <div key={i} className="pl-5 border-l border-primary/10 ml-[7px]">
-                      <div className="flex items-center gap-2 py-1.5">
-                        <span className="text-primary/15 font-mono text-xs">{"├──"}</span>
-                        <span className="font-semibold text-primary/35 text-sm">{c.semester}</span>
-                        <span className="text-[10px] text-primary/20 ml-auto">{period}</span>
+                    <div key={i} className="pl-6">
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold text-primary/35 text-sm shrink-0">{c.semester}</span>
+                        <span className="flex-1 border-b border-dotted border-primary/12 mx-1" />
+                        <span className="text-[10px] text-primary/20 shrink-0">{period}</span>
                       </div>
                     </div>
                   ))}
-                  <div className="pl-5 ml-[7px]">
-                    <div className="flex items-center gap-2 py-1.5">
-                      <span className="text-primary/15 font-mono text-xs">{"└──"}</span>
-                      <span className="font-semibold text-primary/35 text-sm">{c.semester}</span>
-                      <span className="text-[10px] text-primary/20 ml-auto">{isAr ? "أكتوبر–ديسمبر" : "Oct–Dec"}</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -496,64 +598,121 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Smart system note */}
-          <div className="max-w-4xl mx-auto mt-16 md:mt-24 px-5 md:px-12 text-center">
-            <span className="material-symbols-outlined text-primary text-3xl mb-4 block">insights</span>
-            <h3 className="text-xl md:text-2xl font-extrabold text-ink mb-3">{c.smartTitle}</h3>
-            <p className="text-ink/60 text-base md:text-lg leading-relaxed max-w-2xl mx-auto font-bold">
-              {c.smartText}
-            </p>
-          </div>
         </section>
 
         {/* Interface Preview */}
         <WorkspacePreview lang={lang} />
 
+        {/* Smart System */}
+        <section className="bg-secondary px-5 md:px-12 py-16 md:py-20">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[0.9fr_1.1fr] gap-10 md:gap-16 items-center">
+            <div>
+              <p className="text-sm font-bold text-white/50 uppercase tracking-widest mb-4">{isAr ? "نظامٌ ذكي" : "Smart system"}</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-white mb-4 leading-snug">{c.smartTitle}</h3>
+              <p className="text-white/70 text-base md:text-lg leading-relaxed">{c.smartText}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-px bg-white/15">
+              {[
+                { title: c.smartProcess, body: c.smartProcessBody },
+                { title: c.smartMonitor, body: c.smartMonitorBody },
+                { title: c.smartReport, body: c.smartReportBody },
+              ].map((card, i) => (
+                <div key={i} className="bg-secondary p-5 md:p-6">
+                  <p className="text-lg md:text-xl font-bold text-accent-gold mb-2">{card.title}</p>
+                  <p className="text-sm text-white/75 leading-relaxed">{card.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Pricing */}
-        <section id="pricing" className="py-16 md:py-40 px-5 md:px-8 bg-white scroll-mt-20 overflow-hidden">
-          <div className="max-w-4xl mx-auto text-center mb-10 md:mb-20">
+        <section id="pricing" className="py-16 md:py-28 px-5 md:px-8 bg-white scroll-mt-20 overflow-hidden">
+          <div className="max-w-4xl mx-auto text-center mb-10 md:mb-14">
             <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold text-ink tracking-[-0.02em] leading-[1.08] mb-5">
               {c.pricingTitle}
             </h2>
-            <p className="text-lg text-ink/50">{c.pricingSub}</p>
+            <p className="text-lg text-ink/50 mb-6">{c.pricingSub}</p>
+            <div className="inline-flex gap-px bg-line/40 rounded-full overflow-hidden border border-line/40">
+              {[
+                { label: c.termMonthly, save: "" },
+                { label: c.term1yr, save: c.save10 },
+              ].map((t, i) => (
+                <button
+                  key={i}
+                  onClick={() => setTerm(i)}
+                  className={`flex flex-col items-center gap-0.5 px-6 py-2.5 text-sm font-bold transition-all ${term === i ? "bg-primary text-white" : "bg-surface text-ink/60 hover:bg-surface/80"}`}
+                >
+                  <span>{t.label}</span>
+                  {t.save && <span className={`text-[10px] ${term === i ? "text-accent-gold" : "text-primary/60"}`}>{t.save}</span>}
+                </button>
+              ))}
+            </div>
+            <p className="text-sm text-ink/40 mt-3">
+              {activeTerm.years ? c.termNoteUpfront : c.termNoteMonthly}
+            </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-line/40 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-line/40 max-w-4xl mx-auto border border-line/40">
             {/* Individual */}
             <div className="bg-surface p-8 md:p-10 flex flex-col">
-              <p className="text-xs font-bold text-ink/40 uppercase tracking-widest mb-4">{c.individual}</p>
-              <p className="text-4xl font-bold text-ink mb-1">{c.indPrice} <span className="text-base font-normal text-ink/40">{c.indPeriod}</span></p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-bold text-ink/40 uppercase tracking-widest">{c.individual}</p>
+                <span className="text-[10px] font-bold text-ink/50 bg-ink/5 px-2 py-1">{c.indBadge}</span>
+              </div>
+              <p className="text-4xl font-bold text-ink mb-1">${activeTerm.individual} <span className="text-base font-normal text-ink/40">{c.indPeriod}</span></p>
+              <p className="text-xs text-ink/40 mb-2">
+                {activeTerm.years
+                  ? `$${activeTerm.individual * 12 * activeTerm.years} ${c.billedOnce} · ${c.save10}`
+                  : c.cancelAnytime}
+              </p>
               <p className="text-sm text-ink/50 mb-8">{c.indDesc}</p>
               <ul className="space-y-3 mb-10 flex-1 text-sm text-ink/70">
-                <li>{c.indF1}</li>
-                <li>{c.indF2}</li>
-                <li>{c.indF3}</li>
-                <li>{c.indF4}</li>
+                <li className="flex gap-2"><span className="text-ink/30">—</span>{c.indF1}</li>
+                <li className="flex gap-2"><span className="text-ink/30">—</span>{c.indF2}</li>
+                <li className="flex gap-2"><span className="text-ink/30">—</span>{c.indF3}</li>
+                <li className="flex gap-2"><span className="text-ink/30">—</span>{c.indF4}</li>
               </ul>
               <Link href="/auth/signup" className="w-full py-3 rounded-full border border-ink/15 text-ink font-semibold hover:border-ink/30 transition-all text-center text-sm">{c.getStarted}</Link>
             </div>
             {/* Organization */}
-            <div className="bg-white p-8 md:p-10 flex flex-col relative">
-              <p className="text-xs font-bold text-primary uppercase tracking-widest mb-4">{c.organization}</p>
-              <p className="text-4xl font-bold text-ink mb-1">{c.orgPrice} <span className="text-base font-normal text-ink/40">{c.orgPeriod}</span></p>
-              <p className="text-sm text-ink/50 mb-8">{c.orgDesc}</p>
-              <ul className="space-y-3 mb-10 flex-1 text-sm text-ink/70">
-                <li>{c.orgF1}</li>
-                <li>{c.orgF2}</li>
-                <li>{c.orgF3}</li>
-                <li>{c.orgF4}</li>
+            <div className="bg-secondary text-white p-8 md:p-10 flex flex-col relative">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-bold text-white/60 uppercase tracking-widest">{c.organization}</p>
+                <span className="text-[10px] font-bold text-secondary bg-accent-gold px-2 py-1">{c.orgBadge}</span>
+              </div>
+              <p className="text-4xl font-bold text-white mb-1">${activeTerm.org} <span className="text-base font-normal text-white/50">{c.orgPeriod}</span></p>
+              <p className="text-xs text-white/50 mb-2">
+                {activeTerm.years
+                  ? `$${activeTerm.org * 12 * activeTerm.years} ${c.billedOnce} · ${c.save10}`
+                  : c.cancelAnytime}
+              </p>
+              <p className="text-sm text-white/60 mb-8">{c.orgDesc}</p>
+              <ul className="space-y-3 mb-10 flex-1 text-sm text-white/80">
+                <li className="flex gap-2"><span className="text-white/30">—</span>{c.orgF1}</li>
+                <li className="flex gap-2"><span className="text-white/30">—</span>{c.orgF2}</li>
+                <li className="flex gap-2"><span className="text-white/30">—</span>{c.orgF3}</li>
+                <li className="flex gap-2"><span className="text-white/30">—</span>{c.orgF4}</li>
               </ul>
-              <Link href="/auth/signup" className="w-full py-3 rounded-full bg-primary text-white font-semibold hover:bg-secondary transition-all text-center text-sm">{c.getStarted}</Link>
+              <Link href="/auth/signup" className="w-full py-3 rounded-full bg-accent-gold text-secondary font-semibold hover:bg-accent-gold/90 transition-all text-center text-sm">{c.getStarted}</Link>
             </div>
             {/* Institution */}
             <div className="bg-surface p-8 md:p-10 flex flex-col">
-              <p className="text-xs font-bold text-ink/40 uppercase tracking-widest mb-4">{c.institution}</p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-bold text-ink/40 uppercase tracking-widest">{c.institution}</p>
+                <span className="text-[10px] font-bold text-ink/50 bg-ink/5 px-2 py-1">{c.instBadge}</span>
+              </div>
               <p className="text-4xl font-bold text-ink mb-1">{c.instPrice}</p>
+              <p className="text-xs text-ink/40 mb-2">
+                {activeTerm.years
+                  ? (isAr ? "تُسعَّر المدد الطويلة على حجم الاشتراك" : "Multi-year terms priced on volume")
+                  : (isAr ? "اتفاقات سنوية أو متعددة السنوات" : "Annual or multi-year agreements")}
+              </p>
               <p className="text-sm text-ink/50 mb-8">{c.instDesc}</p>
               <ul className="space-y-3 mb-10 flex-1 text-sm text-ink/70">
-                <li>{c.instF1}</li>
-                <li>{c.instF2}</li>
-                <li>{c.instF3}</li>
-                <li>{c.instF4}</li>
+                <li className="flex gap-2"><span className="text-ink/30">—</span>{c.instF1}</li>
+                <li className="flex gap-2"><span className="text-ink/30">—</span>{c.instF2}</li>
+                <li className="flex gap-2"><span className="text-ink/30">—</span>{c.instF3}</li>
+                <li className="flex gap-2"><span className="text-ink/30">—</span>{c.instF4}</li>
               </ul>
               <button className="w-full py-3 rounded-full border border-ink/15 text-ink font-semibold hover:border-ink/30 transition-all text-sm">{c.contactSales}</button>
             </div>
