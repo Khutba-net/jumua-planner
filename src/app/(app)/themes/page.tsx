@@ -1118,6 +1118,11 @@ function SeasonBlock({
                                 <span className="material-symbols-outlined text-[12px]">block</span>
                                 {t("themes.seasonFull")} — {t("themes.overwriteSlot")}
                               </button>
+                            ) : slotCount >= 4 ? (
+                              <span className="text-[10px] text-mute/30 mt-1 py-1 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                                {t("themes.slotFull")}
+                              </span>
                             ) : (
                               <>
                                 <div className="flex items-center gap-2 mt-0.5">
