@@ -960,8 +960,6 @@ function SeasonBlock({
                   const hasSubTopic = sub !== null;
 
                   const isHeavy = slotCount >= 6;
-                  const suggestedSlots = Math.max(3, Math.round(SLOTS_PER_SEASON / 4));
-                  const openSlotCount = hasSubTopic ? Math.max(0, Math.min(suggestedSlots - slotCount, seasonRemaining)) : 0;
 
                   return (
                     <div key={si} className={`grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)] ${isHeavy ? "bg-accent-gold/[0.02]" : ""}`}>
@@ -1122,15 +1120,6 @@ function SeasonBlock({
                               </button>
                             ) : (
                               <>
-                                {openSlotCount > 0 && (
-                                  <div className="flex flex-col">
-                                    {Array.from({ length: Math.min(openSlotCount, 3) }).map((_, oi) => (
-                                      <span key={oi} className="text-[10px] text-mute/25 italic py-[4px] -mx-2 px-2 border-b border-dashed border-line/15 last:border-b-0">
-                                        {t("themes.openGuestSlot")}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <button onClick={() => onStartAdd(theme, key, sub.id)}
                                     className="self-start text-[11px] font-medium text-mute/50 hover:text-primary transition-all duration-200 flex items-center gap-0.5 py-1">
