@@ -575,7 +575,7 @@ export default function AnnualPlanPage() {
           {loading ? (
             <SkeletonSeasons />
           ) : view === "hijri" ? (
-            <HijriEventsTab year={year} />
+            <HijriEventsTab year={year} onSermonCreated={fetchAll} />
           ) : view === "grid" ? (
             <YearGrid fridays={fridays} taken={takenDates} year={year}
               gridAddIso={gridAddIso} gridAddText={gridAddText} setGridAddText={setGridAddText}
@@ -904,7 +904,7 @@ function SeasonBlock({
           </div>
 
           {/* Column labels */}
-          <div className="hidden sm:grid grid-cols-[170px_minmax(0,1fr)] px-5 pt-3 pb-1.5 text-[10px] font-semibold text-mute/60 uppercase tracking-wide">
+          <div className="hidden sm:grid grid-cols-[170px_minmax(0,1fr)] px-5 pt-3 pb-1.5 text-[10px] font-semibold text-mute/60 uppercase tracking-wide border-b border-line/40">
             <span>{t("themes.subBouquet")}</span><span>{t("themes.sermonTitles")}</span>
           </div>
 
@@ -945,7 +945,7 @@ function SeasonBlock({
             }
 
             return (
-              <div className="divide-y divide-line/30">
+              <div className="divide-y divide-line/60">
                 {subSlots.map((sub, si) => {
                   const fridaysInSub = sub ? (fridaysBySubId.get(sub.id) ?? []) : [];
                   const occasionsInSub = occasionBuckets.get(si) ?? [];
@@ -963,7 +963,7 @@ function SeasonBlock({
 
                   return (
                     <div key={si} className={`grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)] ${isHeavy ? "bg-accent-gold/[0.02]" : ""}`}>
-                      <div className="px-5 sm:px-4 pt-2.5 sm:py-3 sm:border-r border-line/30 flex items-center gap-2">
+                      <div className="px-5 sm:px-4 pt-2.5 sm:py-3 sm:border-r border-line/60 flex items-center gap-2">
                         <span className="w-[18px] h-[18px] text-[9px] font-bold grid place-items-center shrink-0 text-white"
                           style={{ backgroundColor: hasSubTopic ? color : "#ccc" }}>
                           {si + 1}
@@ -1281,10 +1281,12 @@ function EmptyWizard({ year, onStart }: { year: number; onStart: () => void }) {
 }
 
 /* ── Hijri Events tab ── */
-function HijriEventsTab({ year }: { year: number }) {
+function HijriEventsTab({ year, onSermonCreated }: { year: number; onSermonCreated: () => void }) {
+  const router = useRouter();
   const { t, isAr } = useI18n();
   const events = useMemo(() => hijriEventsForYear(year), [year]);
   const [prepState, setPrepState] = useState<Record<string, string>>({});
+  const [creatingKey, setCreatingKey] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -1301,6 +1303,28 @@ function HijriEventsTab({ year }: { year: number }) {
       try { localStorage.setItem(`jp_hijri_prep_${year}`, JSON.stringify(updated)); } catch {}
       return updated;
     });
+  }
+
+  async function startKhutbah(ev: { key: string; date: Date; hijriYear: number }) {
+    const stateKey = `${ev.key}:${ev.hijriYear}`;
+    if (creatingKey) return;
+    setCreatingKey(stateKey);
+    try {
+      const title = t(ev.key);
+      const isoDate = toISODate(ev.date);
+      const res = await fetch("/api/sermons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, type: "eid", status: "draft", scheduledDate: isoDate }),
+      });
+      if (res.ok) {
+        const sermon = await res.json();
+        onSermonCreated();
+        router.push(`/sermons/${sermon.id}/edit`);
+      }
+    } catch {} finally {
+      setCreatingKey(null);
+    }
   }
 
   const PREP_STATUS: Record<string, { bg: string; text: string; dot: string; label: string }> = {
@@ -1381,6 +1405,12 @@ function HijriEventsTab({ year }: { year: number }) {
                     title={t("themes.prepStatus")}>
                     <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: st.dot }} />
                     <span className="text-[10px] font-semibold" style={{ color: st.text }}>{st.label}</span>
+                  </button>
+                  <button onClick={() => startKhutbah(ev)}
+                    disabled={creatingKey === stateKey}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all duration-200 text-[10px] font-semibold">
+                    <span className="material-symbols-outlined text-[13px]">{creatingKey === stateKey ? "hourglass_top" : "edit_note"}</span>
+                    {isAr ? "ابدأ الخطبة" : "Start khutbah"}
                   </button>
                 </div>
               </div>
