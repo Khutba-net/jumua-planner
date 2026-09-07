@@ -106,7 +106,7 @@ const HIJRI_EVENTS: HijriEvent[] = [
   { key: "hijri.mawlid", hMonth: 3, hDay: 12, icon: "star", color: "#4a7c59" },
   { key: "hijri.israMiraj", hMonth: 7, hDay: 27, icon: "nights_stay", color: "#8a5c6e" },
   { key: "hijri.shaabanMid", hMonth: 8, hDay: 15, icon: "dark_mode", color: "#5b7fa6" },
-  { key: "hijri.ramadanStart", hMonth: 9, hDay: 1, icon: "crescent_moon", color: "#00666d" },
+  { key: "hijri.ramadanStart", hMonth: 9, hDay: 1, icon: "brightness_2", color: "#00666d" },
   { key: "hijri.laylatAlQadr", hMonth: 9, hDay: 27, icon: "auto_awesome", color: "#C4A35A" },
   { key: "hijri.eidAlFitr", hMonth: 10, hDay: 1, icon: "mosque", color: "#C4A35A" },
   { key: "hijri.dhulHijjahStart", hMonth: 12, hDay: 1, icon: "landscape", color: "#4a7c59" },
@@ -521,7 +521,7 @@ export default function AnnualPlanPage() {
                     className={`text-[12px] font-medium px-3 py-[7px] rounded-[9px] transition-all duration-200 flex items-center gap-1.5 ${
                       view === v ? (v === "hijri" ? "bg-accent-gold text-white shadow-[0_1px_3px_rgba(196,163,90,0.3)]" : "bg-primary text-white shadow-[0_1px_3px_rgba(0,102,109,0.3)]") : "text-mute hover:text-ink"
                     }`}>
-                    <span className="material-symbols-outlined text-[15px]">{v === "seasons" ? "table_rows" : v === "grid" ? "grid_view" : "crescent_moon"}</span>
+                    <span className="material-symbols-outlined text-[15px]">{v === "seasons" ? "table_rows" : v === "grid" ? "grid_view" : "star_rate"}</span>
                     {v === "seasons" ? t("themes.seasons") : v === "grid" ? t("themes.52fridays") : t("themes.hijriEvents")}
                   </button>
                 ))}
