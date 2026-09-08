@@ -10,10 +10,6 @@ export async function getUserId(): Promise<string> {
     if (userId) return userId;
   }
 
-  // Legacy fallback — remove after all users have re-logged
-  const legacyId = cookieStore.get("user_id")?.value;
-  if (legacyId) return legacyId;
-
   throw new AuthError("Not authenticated");
 }
 

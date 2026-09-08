@@ -31,10 +31,7 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("session")?.value;
   const userId = token ? verifySessionToken(token) : null;
 
-  // Also check legacy cookie for backwards compatibility during migration
-  const legacyUserId = request.cookies.get("user_id")?.value;
-
-  if (!userId && !legacyUserId) {
+  if (!userId) {
     if (pathname.startsWith("/api/")) {
       return addSecurityHeaders(
         NextResponse.json({ error: "Not authenticated" }, { status: 401 })
