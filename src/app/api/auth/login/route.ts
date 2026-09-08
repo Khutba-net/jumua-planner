@@ -18,10 +18,11 @@ export async function POST(req: Request) {
   if ("error" in parsed) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const { email, password } = parsed.data;
+  const { password } = parsed.data;
+  const email = parsed.data.email.toLowerCase().trim();
 
   const user = await queryOne<{ id: string; password_hash: string | null }>(
-    "SELECT id, email, name, password_hash, account_type, onboarding_complete FROM users WHERE email = $1",
+    "SELECT id, email, name, password_hash, account_type, onboarding_complete FROM users WHERE LOWER(email) = $1",
     [email]
   );
 
@@ -29,23 +30,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  // Block deactivated org members from logging in
-  const membership = await queryOne<{ status: string }>(
-    "SELECT status FROM org_members WHERE user_id = $1 AND status = 'deactivated' LIMIT 1",
+  // Block login only if user has org memberships and ALL are deactivated
+  const activeMembership = await queryOne(
+    "SELECT id FROM org_members WHERE user_id = $1 AND status != 'deactivated' LIMIT 1",
     [user.id]
   );
-  if (membership) {
+  const anyMembership = await queryOne(
+    "SELECT id FROM org_members WHERE user_id = $1 LIMIT 1",
+    [user.id]
+  );
+  if (anyMembership && !activeMembership) {
     return NextResponse.json({ error: "Your account has been deactivated. Contact your organization admin." }, { status: 403 });
   }
 
   const { invite_code } = parsed.data as { invite_code?: string };
   if (invite_code) {
-    const member = await queryOne<{ id: string; organization_id: string; status: string }>(
-      "SELECT id, organization_id, status FROM org_members WHERE invite_code = $1 AND status = 'invited'",
+    const member = await queryOne<{ id: string; organization_id: string; status: string; invite_expires_at: string | null }>(
+      "SELECT id, organization_id, status, invite_expires_at FROM org_members WHERE invite_code = $1 AND status = 'invited'",
       [invite_code]
     );
 
-    if (member) {
+    if (member && (!member.invite_expires_at || new Date(member.invite_expires_at) >= new Date())) {
       await withTransaction(async (client) => {
         await client.query(
           "UPDATE org_members SET user_id = $1, email = $2, status = 'active', updated_at = NOW() WHERE id = $3",

@@ -37,14 +37,14 @@ export async function PUT(req: NextRequest) {
   }
   const { section } = parsed.data;
 
-  if (section === "profile") {
-    const { name, email, bio, phone } = body;
+  const d = parsed.data;
+
+  if (section === "profile" && "name" in d) {
     await exec("UPDATE users SET name = $1, email = $2, bio = $3, phone = $4, updated_at = NOW() WHERE id = $5",
-      [name || "", email || "", bio || null, phone || null, userId]);
+      [d.name || "", d.email || "", d.bio || null, d.phone || null, userId]);
   }
 
-  if (section === "sermon") {
-    const { default_language, word_target } = body;
+  if (section === "sermon" && "default_language" in d) {
     await query(`
       INSERT INTO user_settings (user_id, default_language, word_target, updated_at)
       VALUES ($1, $2, $3, NOW())
@@ -52,11 +52,10 @@ export async function PUT(req: NextRequest) {
         default_language = EXCLUDED.default_language,
         word_target = EXCLUDED.word_target,
         updated_at = EXCLUDED.updated_at
-    `, [userId, default_language || "ar-first", word_target || 2500]);
+    `, [userId, d.default_language || "ar-first", d.word_target || 2500]);
   }
 
-  if (section === "notifications") {
-    const { friday_reminder, email_assigned, weekly_digest } = body;
+  if (section === "notifications" && "friday_reminder" in d) {
     await query(`
       INSERT INTO user_settings (user_id, friday_reminder, email_assigned, weekly_digest, updated_at)
       VALUES ($1, $2, $3, $4, NOW())
@@ -65,11 +64,10 @@ export async function PUT(req: NextRequest) {
         email_assigned = EXCLUDED.email_assigned,
         weekly_digest = EXCLUDED.weekly_digest,
         updated_at = EXCLUDED.updated_at
-    `, [userId, friday_reminder || "3", email_assigned ? 1 : 0, weekly_digest ? 1 : 0]);
+    `, [userId, d.friday_reminder || "3", d.email_assigned ? 1 : 0, d.weekly_digest ? 1 : 0]);
   }
 
-  if (section === "appearance") {
-    const { theme_mode, editor_font_size } = body;
+  if (section === "appearance" && "theme_mode" in d) {
     await query(`
       INSERT INTO user_settings (user_id, theme_mode, editor_font_size, updated_at)
       VALUES ($1, $2, $3, NOW())
@@ -77,7 +75,7 @@ export async function PUT(req: NextRequest) {
         theme_mode = EXCLUDED.theme_mode,
         editor_font_size = EXCLUDED.editor_font_size,
         updated_at = EXCLUDED.updated_at
-    `, [userId, theme_mode || "light", editor_font_size || 16]);
+    `, [userId, d.theme_mode || "light", d.editor_font_size || 16]);
   }
 
   return NextResponse.json({ success: true });

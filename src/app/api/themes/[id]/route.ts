@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, exec, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { themeUpdateSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -47,15 +48,20 @@ export async function PUT(
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
+  const parsed = parseBody(themeUpdateSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+  const d = parsed.data;
 
   const fields: string[] = [];
   const values: unknown[] = [];
   let paramIdx = 1;
 
-  if (body.name !== undefined) { fields.push(`name = $${paramIdx++}`); values.push(body.name); }
-  if (body.description !== undefined) { fields.push(`description = $${paramIdx++}`); values.push(body.description); }
-  if (body.month !== undefined) { fields.push(`month = $${paramIdx++}`); values.push(body.month); }
-  if (body.color !== undefined) { fields.push(`color = $${paramIdx++}`); values.push(body.color); }
+  if (d.name !== undefined) { fields.push(`name = $${paramIdx++}`); values.push(d.name); }
+  if (d.description !== undefined) { fields.push(`description = $${paramIdx++}`); values.push(d.description); }
+  if (d.month !== undefined) { fields.push(`month = $${paramIdx++}`); values.push(d.month); }
+  if (d.color !== undefined) { fields.push(`color = $${paramIdx++}`); values.push(d.color); }
 
   if (fields.length > 0) {
     fields.push("updated_at = NOW()");
@@ -64,11 +70,11 @@ export async function PUT(
     await exec(`UPDATE themes SET ${fields.join(", ")} WHERE id = $${paramIdx++} AND owner_id = $${paramIdx++}`, values);
   }
 
-  if (body.subTopics && Array.isArray(body.subTopics)) {
+  if (d.subTopics && Array.isArray(d.subTopics)) {
     await exec("UPDATE sermons SET sub_topic_id = NULL WHERE sub_topic_id IN (SELECT id FROM sub_topics WHERE theme_id = $1)", [id]);
     await exec("DELETE FROM sub_topics WHERE theme_id = $1", [id]);
     const newSubIds: string[] = [];
-    for (const st of body.subTopics) {
+    for (const st of d.subTopics) {
       const subId = cuid();
       await query(
         "INSERT INTO sub_topics (id, name, week_number, theme_id) VALUES ($1, $2, $3, $4)",
@@ -112,7 +118,7 @@ export async function DELETE(
   const existing = await queryOne("SELECT id FROM themes WHERE id = $1 AND owner_id = $2", [id, userId]);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await exec("UPDATE sermons SET theme_id = NULL WHERE theme_id = $1", [id]);
+  await exec("UPDATE sermons SET theme_id = NULL, sub_topic_id = NULL WHERE theme_id = $1", [id]);
   await exec("DELETE FROM sub_topics WHERE theme_id = $1", [id]);
   await exec("DELETE FROM themes WHERE id = $1 AND owner_id = $2", [id, userId]);
   return NextResponse.json({ ok: true });

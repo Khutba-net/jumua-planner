@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, exec, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { sermonUpdateSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -52,23 +53,26 @@ export async function PUT(
   }
 
   const body = await req.json();
+  const parsed = parseBody(sermonUpdateSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+  const d = parsed.data;
+
   const fields: string[] = [];
   const values: unknown[] = [];
   let paramIdx = 1;
 
-  const validStatuses = ["draft", "ready", "delivered", "archived"];
-  const validTypes = ["friday", "eid", "talk", "other"];
-
-  if (body.title !== undefined) { fields.push(`title = $${paramIdx++}`); values.push(body.title); }
-  if (body.content !== undefined) { fields.push(`content = $${paramIdx++}`); values.push(body.content); }
-  if (body.outline !== undefined) { fields.push(`outline = $${paramIdx++}`); values.push(body.outline); }
-  if (body.status !== undefined) { fields.push(`status = $${paramIdx++}`); values.push(validStatuses.includes(body.status) ? body.status : "draft"); }
-  if (body.notes !== undefined) { fields.push(`notes = $${paramIdx++}`); values.push(body.notes); }
-  if (body.type !== undefined) { fields.push(`type = $${paramIdx++}`); values.push(validTypes.includes(body.type) ? body.type : "friday"); }
-  if (body.scheduledDate !== undefined) { fields.push(`scheduled_date = $${paramIdx++}`); values.push(body.scheduledDate || null); }
-  if (body.themeId !== undefined) { fields.push(`theme_id = $${paramIdx++}`); values.push(body.themeId || null); }
-  if (body.subTopicId !== undefined) { fields.push(`sub_topic_id = $${paramIdx++}`); values.push(body.subTopicId || null); }
-  if (body.mosqueId !== undefined) { fields.push(`mosque_id = $${paramIdx++}`); values.push(body.mosqueId || null); }
+  if (d.title !== undefined) { fields.push(`title = $${paramIdx++}`); values.push(d.title); }
+  if (d.content !== undefined) { fields.push(`content = $${paramIdx++}`); values.push(d.content); }
+  if (d.outline !== undefined) { fields.push(`outline = $${paramIdx++}`); values.push(d.outline); }
+  if (d.status !== undefined) { fields.push(`status = $${paramIdx++}`); values.push(d.status); }
+  if (d.notes !== undefined) { fields.push(`notes = $${paramIdx++}`); values.push(d.notes); }
+  if (d.type !== undefined) { fields.push(`type = $${paramIdx++}`); values.push(d.type); }
+  if (d.scheduledDate !== undefined) { fields.push(`scheduled_date = $${paramIdx++}`); values.push(d.scheduledDate || null); }
+  if (d.themeId !== undefined) { fields.push(`theme_id = $${paramIdx++}`); values.push(d.themeId || null); }
+  if (d.subTopicId !== undefined) { fields.push(`sub_topic_id = $${paramIdx++}`); values.push(d.subTopicId || null); }
+  if (d.mosqueId !== undefined) { fields.push(`mosque_id = $${paramIdx++}`); values.push(d.mosqueId || null); }
 
   if (fields.length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });

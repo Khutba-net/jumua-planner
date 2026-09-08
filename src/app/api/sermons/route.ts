@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { sermonCreateSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +48,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
+  const parsed = parseBody(sermonCreateSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+  const d = parsed.data;
   const id = cuid();
-
-  const validTypes = ["friday", "eid", "talk", "other"];
-  const sermonType = validTypes.includes(body.type) ? body.type : "friday";
 
   try {
     await query(
@@ -58,17 +61,17 @@ export async function POST(req: NextRequest) {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         id,
-        body.title || "Untitled Sermon",
-        body.content ?? "",
-        body.outline ?? "",
-        body.status ?? "draft",
-        sermonType,
-        body.scheduledDate ?? null,
-        body.notes ?? "",
+        d.title || "Untitled Sermon",
+        d.content ?? "",
+        d.outline ?? "",
+        d.status ?? "draft",
+        d.type ?? "friday",
+        d.scheduledDate ?? null,
+        d.notes ?? "",
         userId,
-        body.mosqueId ?? null,
-        body.themeId ?? null,
-        body.subTopicId ?? null,
+        d.mosqueId ?? null,
+        d.themeId ?? null,
+        d.subTopicId ?? null,
       ]
     );
   } catch (err) {

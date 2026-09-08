@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   }
 
   const user = await queryOne<{ id: string }>(
-    "SELECT id FROM users WHERE email = $1", [email.toLowerCase().trim()]
+    "SELECT id FROM users WHERE LOWER(email) = $1", [email.toLowerCase().trim()]
   );
 
   // Always return success to prevent email enumeration

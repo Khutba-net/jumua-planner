@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { themeCreateSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,11 @@ export async function POST(req: Request) {
   );
 
   const body = await req.json();
-  const { name, description, month, year, color } = body;
+  const parsed = parseBody(themeCreateSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+  const { name, description, month, year, color } = parsed.data;
 
   const isOrgAdmin = admin?.role === "admin" && admin?.organization_id;
   const id = cuid();
@@ -63,8 +68,8 @@ export async function POST(req: Request) {
     [id, name, description ?? "", month, year, color ?? "#00666d", userId, isOrgAdmin ? admin.organization_id : null]
   );
 
-  if (body.subTopics && Array.isArray(body.subTopics)) {
-    for (const st of body.subTopics) {
+  if (parsed.data.subTopics && Array.isArray(parsed.data.subTopics)) {
+    for (const st of parsed.data.subTopics) {
       await query(
         "INSERT INTO sub_topics (id, name, week_number, theme_id) VALUES ($1, $2, $3, $4)",
         [cuid(), st.name, st.week, id]

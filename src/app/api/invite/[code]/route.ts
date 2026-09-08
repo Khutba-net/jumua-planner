@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, cuid, toJSON, hashPassword, withTransaction } from "@/lib/db";
 import { createSession, sessionCookieOptions } from "@/lib/session";
+import { signupSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +36,12 @@ export async function GET(_req: Request, { params }: Params) {
 export async function POST(req: Request, { params }: Params) {
   const { code } = await params;
   const body = await req.json();
-  const { name, email, password } = body;
-
-  if (!email || !password || !name) {
-    return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
+  const parsed = parseBody(signupSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
+  const { name, password } = parsed.data;
+  const email = parsed.data.email.toLowerCase().trim();
 
   const member = await queryOne<{ id: string; name: string; status: string; organization_id: string; invite_expires_at: string }>(
     "SELECT m.id, m.name, m.status, m.organization_id, m.invite_expires_at FROM org_members m WHERE m.invite_code = $1",
@@ -58,7 +60,7 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "This invite has expired" }, { status: 410 });
   }
 
-  const existing = await queryOne("SELECT id FROM users WHERE email = $1", [email]);
+  const existing = await queryOne("SELECT id FROM users WHERE LOWER(email) = $1", [email]);
   if (existing) {
     return NextResponse.json({ error: "An account with this email already exists. Log in and use the invite link." }, { status: 409 });
   }

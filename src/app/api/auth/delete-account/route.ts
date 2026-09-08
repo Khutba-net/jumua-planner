@@ -38,6 +38,8 @@ export async function DELETE() {
   }
 
   await withTransaction(async (client) => {
+    await client.query("DELETE FROM friday_assignments WHERE member_id IN (SELECT id FROM org_members WHERE user_id = $1)", [userId]);
+    await client.query("DELETE FROM org_members WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM references_ WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = $1)", [userId]);
     await client.query("DELETE FROM feedback WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = $1)", [userId]);
     await client.query("UPDATE sermons SET sub_topic_id = NULL WHERE author_id = $1", [userId]);

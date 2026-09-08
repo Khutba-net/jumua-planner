@@ -101,6 +101,10 @@ export default function SermonsPage() {
     });
     const sermon = await res.json();
     setCreating(false);
+    if (!res.ok || !sermon.id) {
+      alert(sermon.error || "Failed to create sermon");
+      return;
+    }
     setShowNewForm(false);
     setNewTitle("");
     setNewType("friday");

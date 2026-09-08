@@ -2,10 +2,17 @@ import { NextResponse } from "next/server";
 import { queryOne, hashPassword, verifyPassword } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { deleteAllUserSessions, createSession, sessionCookieOptions } from "@/lib/session";
+import { rateLimitByIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const { allowed } = rateLimitByIp(ip, "change-password", 5, 60_000);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many attempts. Try again in a minute." }, { status: 429 });
+  }
+
   let userId: string;
   try { userId = await getUserId(); } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

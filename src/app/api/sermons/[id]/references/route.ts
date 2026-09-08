@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, exec, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { referenceSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +26,11 @@ export async function POST(
   }
 
   const body = await req.json();
-  const { type, title, source, content } = body;
-
-  if (!type || !title) {
-    return NextResponse.json({ error: "Type and title are required" }, { status: 400 });
+  const parsed = parseBody(referenceSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
+  const { type, title, source, content } = parsed.data;
 
   const refId = cuid();
   await query(

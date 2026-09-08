@@ -18,9 +18,10 @@ export async function POST(req: Request) {
   if ("error" in parsed) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const { name, email, password } = parsed.data;
+  const { name, password } = parsed.data;
+  const email = parsed.data.email.toLowerCase().trim();
 
-  const existing = await queryOne("SELECT id FROM users WHERE email = $1", [email]);
+  const existing = await queryOne("SELECT id FROM users WHERE LOWER(email) = $1", [email]);
   if (existing) {
     return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
   }
