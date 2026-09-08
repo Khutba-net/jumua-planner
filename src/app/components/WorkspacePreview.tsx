@@ -533,7 +533,7 @@ export default function WorkspacePreview({ lang = "en" }: { lang?: "en" | "ar" }
           {lang === "ar" ? "كل ما تحتاجه لتخطيط عامك" : "Everything you need to plan your year"}
         </h2>
         <p className="text-lg md:text-xl text-ink/50 max-w-2xl mx-auto">
-          {lang === "ar" ? "أربع واجهات متصلة، من الخطة السنوية إلى إلقاء الجمعة." : "Four connected surfaces, from the annual plan down to Friday’s delivery."}
+          {lang === "ar" ? "أربع واجهات متصلة، من الخطة السنوية إلى خطبة الجمعة. والمعروض هنا نماذج تخطيطية؛ تفاصيل النظام تُرى بعد الدخول." : "Four connected surfaces, from the annual plan down to Friday’s delivery."}
         </p>
         <div className="flex justify-center gap-1 mt-8 bg-surface p-1 w-fit mx-auto flex-wrap">
           {tabs.map((tab) => (
