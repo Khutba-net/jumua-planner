@@ -203,7 +203,12 @@ export default function SettingsPage() {
     const sidebarAvatar = document.querySelector("[data-sidebar-avatar]");
     if (sidebarAvatar) {
       if (url) {
-        sidebarAvatar.innerHTML = `<img src="${url}" alt="${userName}" class="w-8 h-8 object-cover rounded-full" />`;
+        sidebarAvatar.textContent = "";
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = userName;
+        img.className = "w-8 h-8 object-cover rounded-full";
+        sidebarAvatar.appendChild(img);
       } else {
         sidebarAvatar.textContent = userName?.[0] ?? "?";
       }
