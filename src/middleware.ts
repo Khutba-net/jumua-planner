@@ -1,23 +1,52 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifySessionToken } from "@/lib/session";
 
-const PUBLIC_PATHS = ["/", "/api/auth/login", "/api/auth/signup", "/api/auth/logout", "/api/seed"];
-const PUBLIC_PREFIXES = ["/api/invite/"];
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/auth/login",
+  "/auth/signup",
+  "/api/auth/login",
+  "/api/auth/signup",
+  "/api/auth/logout",
+]);
+
+const PUBLIC_PREFIXES = ["/api/invite/", "/invite/"];
+
+function isPublicRoute(pathname: string): boolean {
+  if (PUBLIC_PATHS.has(pathname)) return true;
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return true;
+  if (pathname.startsWith("/_next/") || pathname.startsWith("/favicon") || pathname.startsWith("/avatars/")) return true;
+  return false;
+}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Block unauthenticated access to API routes (except public ones)
-  if (pathname.startsWith("/api/") && !PUBLIC_PATHS.includes(pathname) && !PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
-    const userId = request.cookies.get("user_id")?.value;
-    if (!userId) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+  if (isPublicRoute(pathname)) {
+    return addSecurityHeaders(NextResponse.next());
   }
 
-  const response = NextResponse.next();
+  const token = request.cookies.get("session")?.value;
+  const userId = token ? verifySessionToken(token) : null;
 
-  // Security headers
+  // Also check legacy cookie for backwards compatibility during migration
+  const legacyUserId = request.cookies.get("user_id")?.value;
+
+  if (!userId && !legacyUserId) {
+    if (pathname.startsWith("/api/")) {
+      return addSecurityHeaders(
+        NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+      );
+    }
+    const loginUrl = new URL("/auth/login", request.url);
+    return addSecurityHeaders(NextResponse.redirect(loginUrl));
+  }
+
+  return addSecurityHeaders(NextResponse.next());
+}
+
+function addSecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-XSS-Protection", "1; mode=block");
@@ -46,8 +75,10 @@ export function middleware(request: NextRequest) {
   return response;
 }
 
+export const runtime = "nodejs";
+
 export const config = {
   matcher: [
-    "/((?!_next/|favicon.ico|avatars/).*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

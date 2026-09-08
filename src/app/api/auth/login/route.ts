@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, exec, toJSON, verifyPassword, withTransaction } from "@/lib/db";
 import { rateLimitByIp } from "@/lib/rate-limit";
 import { loginSchema, parseBody } from "@/lib/validations";
+import { createSessionToken, sessionCookieOptions } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -55,12 +56,7 @@ export async function POST(req: Request) {
   );
 
   const res = NextResponse.json({ user: toJSON(freshUser) });
-  res.cookies.set("user_id", user.id, {
-    path: "/",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  res.cookies.set("session", createSessionToken(user.id), sessionCookieOptions());
+  res.cookies.delete("user_id");
   return res;
 }

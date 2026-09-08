@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, cuid, toJSON, hashPassword, withTransaction } from "@/lib/db";
+import { createSessionToken, sessionCookieOptions } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -80,12 +81,7 @@ export async function POST(req: Request, { params }: Params) {
   const user = await queryOne("SELECT id, email, name, onboarding_complete FROM users WHERE id = $1", [userId]);
 
   const res = NextResponse.json({ user: toJSON(user) });
-  res.cookies.set("user_id", userId, {
-    path: "/",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  res.cookies.set("session", createSessionToken(userId), sessionCookieOptions());
+  res.cookies.delete("user_id");
   return res;
 }
