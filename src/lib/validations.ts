@@ -6,10 +6,21 @@ export const loginSchema = z.object({
   invite_code: z.string().max(20).optional(),
 });
 
+const strongPassword = z.string().min(8, "Password must be at least 8 characters").max(128)
+  .refine(p => /[A-Z]/.test(p), "Password must include an uppercase letter")
+  .refine(p => /[a-z]/.test(p), "Password must include a lowercase letter")
+  .refine(p => /[0-9]/.test(p), "Password must include a number")
+  .refine(p => /[^A-Za-z0-9]/.test(p), "Password must include a special character (!@#$...)");
+
 export const signupSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   email: z.string().email("Invalid email format").max(255),
-  password: z.string().min(8, "Password must be at least 8 characters").max(128),
+  password: strongPassword,
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().length(64, "Invalid reset token"),
+  password: strongPassword,
 });
 
 export const sermonCreateSchema = z.object({

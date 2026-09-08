@@ -129,6 +129,11 @@ export default function SettingsPage() {
   const [masjidName, setMasjidName] = useState("");
   const [masjidCity, setMasjidCity] = useState("");
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
   const [nameError, setNameError] = useState("");
   const [emailError, setEmailError] = useState("");
 
@@ -744,48 +749,23 @@ export default function SettingsPage() {
             <h2 className="text-xl font-bold text-ink mb-1">{t("settings.organization")}</h2>
             <p className="text-sm text-mute mb-6">{t("settings.manageMasjid")}</p>
 
-            <div className="space-y-5 mb-8">
-              <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.masjidName")}</label>
-                <input type="text" value={masjidName} onChange={(e) => setMasjidName(e.target.value)} placeholder={isAr ? "مثال: المركز الإسلامي" : "e.g. Islamic Centre of Calgary"} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.city")}</label>
-                <input type="text" value={masjidCity} onChange={(e) => setMasjidCity(e.target.value)} placeholder={isAr ? "مثال: كالغاري" : "e.g. Calgary, AB"} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase">{t("settings.teamMembers")}</p>
-                <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="px-4 py-1.5 bg-primary text-white text-xs font-semibold hover:bg-secondary transition-colors">{t("settings.inviteKhatib")}</button>
-              </div>
-              <div className="border border-line divide-y divide-line">
-                {[
-                  { name: "Ahmed Hassan", role: "Admin", email: "ahmed@example.com" },
-                  { name: "Yusuf Ali", role: "Khatib", email: "yusuf@example.com" },
-                  { name: "Omar Farooq", role: "Khatib", email: "omar@example.com" },
-                ].map((member) => (
-                  <div key={member.email} className="flex items-center justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-primary/20 flex items-center justify-center text-primary text-sm font-bold">{member.name[0]}</div>
-                      <div>
-                        <p className="text-sm font-medium text-ink">{member.name}</p>
-                        <p className="text-xs text-mute">{member.email}</p>
-                      </div>
-                    </div>
-                    <span className={`text-[10px] font-bold px-2.5 py-1 ${member.role === "Admin" ? "bg-primary/10 text-primary" : "bg-surface text-mute"}`}>{member.role.toUpperCase()}</span>
-                  </div>
-                ))}
+            <div className="bg-surface border border-line p-6 text-center">
+              <span className="material-symbols-outlined text-primary text-4xl mb-3 block">group</span>
+              <p className="text-sm text-ink font-medium mb-2">
+                {isAr ? "إدارة الخطباء والجدول الزمني" : "Manage khatibs and schedule"}
+              </p>
+              <p className="text-xs text-mute mb-4">
+                {isAr ? "أضف خطباء، أرسل دعوات، وأدر جدول الجمعة من لوحة المؤسسة." : "Add khatibs, send invites, and manage the Friday schedule from the organization dashboard."}
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <a href="/org/khatibs" className="px-5 py-2 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">
+                  {isAr ? "إدارة الخطباء" : "Manage Khatibs"}
+                </a>
+                <a href="/org/schedule" className="px-5 py-2 border border-line bg-white text-ink text-sm font-medium hover:bg-surface transition-colors">
+                  {isAr ? "جدول الجمعة" : "Friday Schedule"}
+                </a>
               </div>
             </div>
-
-            <button
-              onClick={() => showToast(t("settings.comingSoon"), "error")}
-              className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors flex items-center gap-2"
-            >
-              {t("settings.saveChanges")}
-            </button>
           </div>
         )}
 
@@ -799,11 +779,30 @@ export default function SettingsPage() {
               <div>
                 <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.changePassword")}</p>
                 <div className="space-y-3">
-                  <input type="password" placeholder={t("settings.currentPassword")} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
-                  <input type="password" placeholder={t("settings.newPassword")} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
-                  <input type="password" placeholder={t("settings.confirmPassword")} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
+                  <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder={t("settings.currentPassword")} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
+                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("settings.newPassword")} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
+                  <input type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder={t("settings.confirmPassword")} className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary" />
                 </div>
-                <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="mt-3 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">{t("settings.updatePassword")}</button>
+                <button
+                  disabled={changingPassword}
+                  onClick={async () => {
+                    if (!currentPassword || !newPassword) { showToast(isAr ? "يرجى ملء جميع الحقول" : "Please fill all fields", "error"); return; }
+                    if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+                      showToast(isAr ? "كلمة المرور يجب أن تحتوي على حرف كبير وصغير ورقم ورمز خاص" : "Password needs uppercase, lowercase, number, and special character", "error"); return;
+                    }
+                    if (newPassword !== confirmNewPassword) { showToast(isAr ? "كلمتا المرور غير متطابقتين" : "Passwords don't match", "error"); return; }
+                    setChangingPassword(true);
+                    try {
+                      const res = await fetch("/api/auth/change-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ currentPassword, newPassword }) });
+                      const data = await res.json();
+                      if (!res.ok) { showToast(data.error || "Failed", "error"); return; }
+                      showToast(isAr ? "تم تحديث كلمة المرور" : "Password updated");
+                      setCurrentPassword(""); setNewPassword(""); setConfirmNewPassword("");
+                    } catch { showToast(isAr ? "فشل تحديث كلمة المرور" : "Failed to update password", "error"); }
+                    finally { setChangingPassword(false); }
+                  }}
+                  className="mt-3 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50"
+                >{changingPassword ? (isAr ? "جاري التحديث..." : "Updating...") : t("settings.updatePassword")}</button>
               </div>
 
               <div className="border-t border-line pt-6">

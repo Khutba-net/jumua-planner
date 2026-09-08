@@ -5,9 +5,13 @@ const PUBLIC_PATHS = new Set([
   "/",
   "/auth/login",
   "/auth/signup",
+  "/auth/forgot-password",
+  "/auth/reset-password",
   "/api/auth/login",
   "/api/auth/signup",
   "/api/auth/logout",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
 ]);
 
 const PUBLIC_PREFIXES = ["/api/invite/", "/invite/"];

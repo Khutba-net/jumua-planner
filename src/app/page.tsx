@@ -307,8 +307,6 @@ export default function LandingPage() {
   ];
   const activeTerm = terms[term];
 
-  const toAr = (n: string | number) => String(n).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[+d]);
-
   useEffect(() => {
     const saved = localStorage.getItem("jp_lang");
     if (saved === "ar") setLang("ar");

@@ -11,9 +11,30 @@ export async function DELETE() {
     throw e;
   }
 
-  const user = await queryOne("SELECT id FROM users WHERE id = $1", [userId]);
+  const user = await queryOne<{ id: string; role: string; organization_id: string | null }>(
+    "SELECT id, role, organization_id FROM users WHERE id = $1", [userId]
+  );
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  if (user.role === "admin" && user.organization_id) {
+    const otherAdmins = await queryOne(
+      "SELECT id FROM users WHERE organization_id = $1 AND role = 'admin' AND id != $2 LIMIT 1",
+      [user.organization_id, userId]
+    );
+    if (!otherAdmins) {
+      const activeMembers = await queryOne(
+        "SELECT id FROM org_members WHERE organization_id = $1 AND status = 'active' AND user_id != $2 LIMIT 1",
+        [user.organization_id, userId]
+      );
+      if (activeMembers) {
+        return NextResponse.json(
+          { error: "You are the only admin of this organization. Transfer admin role to another member before deleting your account." },
+          { status: 400 }
+        );
+      }
+    }
   }
 
   await withTransaction(async (client) => {

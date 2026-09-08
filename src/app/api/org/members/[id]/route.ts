@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { queryOne, exec, toJSON } from "@/lib/db";
+import { deleteAllUserSessions } from "@/lib/session";
 import { getUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,9 @@ export async function PUT(req: Request, { params }: Params) {
     const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     await exec("UPDATE org_members SET invite_code = $1, invite_expires_at = $2, updated_at = NOW() WHERE id = $3", [newCode, newExpiry, id]);
   } else if (action === "deactivate") {
+    if (member.user_id) {
+      await deleteAllUserSessions(member.user_id as string);
+    }
     await exec("UPDATE org_members SET status = 'deactivated', updated_at = NOW() WHERE id = $1", [id]);
   } else if (action === "reactivate") {
     await exec("UPDATE org_members SET status = 'active', updated_at = NOW() WHERE id = $1", [id]);

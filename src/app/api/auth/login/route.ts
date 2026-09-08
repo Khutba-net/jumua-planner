@@ -29,6 +29,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
+  // Block deactivated org members from logging in
+  const membership = await queryOne<{ status: string }>(
+    "SELECT status FROM org_members WHERE user_id = $1 AND status = 'deactivated' LIMIT 1",
+    [user.id]
+  );
+  if (membership) {
+    return NextResponse.json({ error: "Your account has been deactivated. Contact your organization admin." }, { status: 403 });
+  }
+
   const { invite_code } = parsed.data as { invite_code?: string };
   if (invite_code) {
     const member = await queryOne<{ id: string; organization_id: string; status: string }>(

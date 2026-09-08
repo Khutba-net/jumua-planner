@@ -220,6 +220,15 @@ async function initTables() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS friday_assignments (
         id TEXT PRIMARY KEY,
         organization_id TEXT NOT NULL REFERENCES organizations(id),
@@ -252,6 +261,8 @@ async function initTables() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_org_members_invite_code ON org_members(invite_code)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_friday_assignments_org_date ON friday_assignments(organization_id, friday_date)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_friday_assignments_member ON friday_assignments(member_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`);
 
     // Seed demo user if not exists
     const demoPasswordHash = hashPassword("demo1234");
