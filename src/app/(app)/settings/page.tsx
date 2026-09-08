@@ -223,14 +223,19 @@ export default function SettingsPage() {
   }
 
   async function handleDeleteAccount() {
-    if (!confirm(isAr
-      ? "هل أنت متأكد أنك تريد حذف حسابك؟ سيتم حذف جميع خطبك ومواضيعك وبياناتك نهائياً. لا يمكن التراجع عن هذا الإجراء."
-      : "Are you sure you want to delete your account? All your sermons, themes, and data will be permanently deleted. This cannot be undone."
-    )) return;
+    const typed = prompt(isAr
+      ? "هل أنت متأكد؟ سيتم حذف جميع بياناتك نهائياً.\n\nاكتب DELETE للتأكيد:"
+      : "Are you sure? All your data will be permanently deleted.\n\nType DELETE to confirm:"
+    );
+    if (typed !== "DELETE") {
+      if (typed !== null) showToast(isAr ? "اكتب DELETE للتأكيد" : "Type DELETE to confirm", "error");
+      return;
+    }
     setDeleting(true);
     try {
       const res = await fetch("/api/auth/delete-account", { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || (isAr ? "فشل حذف الحساب" : "Failed to delete account"), "error"); setDeleting(false); return; }
       router.push("/");
     } catch {
       showToast(isAr ? "فشل حذف الحساب" : "Failed to delete account", "error");
