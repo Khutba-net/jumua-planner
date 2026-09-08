@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { queryOne, exec, toJSON } from "@/lib/db";
 import { deleteAllUserSessions } from "@/lib/session";
-import { getUserId } from "@/lib/auth";
+import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,11 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(req: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
@@ -37,12 +41,26 @@ export async function PUT(req: Request, { params }: Params) {
     const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     await exec("UPDATE org_members SET invite_code = $1, invite_expires_at = $2, updated_at = NOW() WHERE id = $3", [newCode, newExpiry, id]);
   } else if (action === "deactivate") {
+    if (member.user_id === userId) {
+      return NextResponse.json({ error: "You cannot deactivate yourself" }, { status: 400 });
+    }
     if (member.user_id) {
       await deleteAllUserSessions(member.user_id as string);
     }
     await exec("UPDATE org_members SET status = 'deactivated', updated_at = NOW() WHERE id = $1", [id]);
   } else if (action === "reactivate") {
     await exec("UPDATE org_members SET status = 'active', updated_at = NOW() WHERE id = $1", [id]);
+  } else if (action === "transfer_admin") {
+    if (member.status !== "active" || !member.user_id) {
+      return NextResponse.json({ error: "Can only transfer admin to an active member with an account" }, { status: 400 });
+    }
+    await exec("UPDATE org_members SET role = 'admin', updated_at = NOW() WHERE id = $1", [id]);
+    await exec("UPDATE users SET role = 'admin', updated_at = NOW() WHERE id = $1", [member.user_id]);
+    const adminMember = await queryOne("SELECT id FROM org_members WHERE user_id = $1 AND organization_id = $2", [userId, user.organization_id]);
+    if (adminMember) {
+      await exec("UPDATE org_members SET role = 'khatib', updated_at = NOW() WHERE id = $1", [adminMember.id]);
+    }
+    await exec("UPDATE users SET role = 'khatib', updated_at = NOW() WHERE id = $1", [userId]);
   } else {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
@@ -53,7 +71,11 @@ export async function PUT(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
@@ -69,10 +91,15 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
-  if (member.status !== "invited") {
-    return NextResponse.json({ error: "Can only remove pending invites" }, { status: 400 });
+  if (member.role === "admin") {
+    return NextResponse.json({ error: "Cannot remove an admin member" }, { status: 400 });
   }
 
+  if (member.status !== "invited" && member.status !== "deactivated") {
+    return NextResponse.json({ error: "Deactivate the member before removing them" }, { status: 400 });
+  }
+
+  await exec("DELETE FROM friday_assignments WHERE member_id = $1", [id]);
   await exec("DELETE FROM org_members WHERE id = $1", [id]);
   return NextResponse.json({ ok: true });
 }

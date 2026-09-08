@@ -1,23 +1,31 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { query, queryOne, cuid, toJSON, withTransaction } from "@/lib/db";
-import { getUserId } from "@/lib/auth";
+import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne("SELECT id, name, account_type, role, organization_id, onboarding_complete, planning_year FROM users WHERE id = $1", [userId]);
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   return NextResponse.json(toJSON(user));
 }
 
 export async function POST(req: Request) {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; name: string; organization_id: string | null; role: string }>(
     "SELECT id, name, organization_id, role FROM users WHERE id = $1", [userId]
   );
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   const body = await req.json();
   const { account_type, org_name, city, country, planning_year, khatib_names } = body;

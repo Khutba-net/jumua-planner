@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, exec, cuid, toJSON } from "@/lib/db";
-import { getUserId } from "@/lib/auth";
+import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
@@ -16,7 +20,7 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const from = url.searchParams.get("from") || new Date().toISOString().split("T")[0];
-  const weeks = parseInt(url.searchParams.get("weeks") || "12");
+  const weeks = Math.min(Math.max(parseInt(url.searchParams.get("weeks") || "12") || 12, 1), 52);
 
   const assignments = await query(`
     SELECT fa.id, fa.friday_date, fa.member_id, fa.guest_name, fa.status, fa.swap_reason, fa.notes,
@@ -41,8 +45,14 @@ export async function GET(req: Request) {
   return NextResponse.json(toJSON({ assignments, members, isAdmin: user.role === "admin", myMemberId: myMember?.id || null }));
 }
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 export async function POST(req: Request) {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
@@ -54,12 +64,20 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { friday_date, member_id, guest_name, notes } = body;
 
-  if (!friday_date) {
-    return NextResponse.json({ error: "Friday date is required" }, { status: 400 });
+  if (!friday_date || typeof friday_date !== "string" || !DATE_REGEX.test(friday_date)) {
+    return NextResponse.json({ error: "Valid Friday date is required (YYYY-MM-DD)" }, { status: 400 });
   }
 
   if (!member_id && !guest_name) {
     return NextResponse.json({ error: "Select a khatib or enter a guest name" }, { status: 400 });
+  }
+
+  if (guest_name && typeof guest_name === "string" && guest_name.length > 200) {
+    return NextResponse.json({ error: "Guest name is too long" }, { status: 400 });
+  }
+
+  if (notes && typeof notes === "string" && notes.length > 1000) {
+    return NextResponse.json({ error: "Notes are too long" }, { status: 400 });
   }
 
   const existing = await queryOne(
@@ -84,7 +102,7 @@ export async function POST(req: Request) {
   const id = cuid();
   await query(
     "INSERT INTO friday_assignments (id, organization_id, member_id, friday_date, guest_name, notes) VALUES ($1, $2, $3, $4, $5, $6)",
-    [id, user.organization_id, member_id || null, friday_date, guest_name || null, notes || null]
+    [id, user.organization_id, member_id || null, friday_date, guest_name?.slice(0, 200) || null, notes?.slice(0, 1000) || null]
   );
 
   const assignment = await queryOne("SELECT * FROM friday_assignments WHERE id = $1", [id]);
@@ -92,7 +110,11 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
@@ -117,9 +139,23 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
   }
 
+  if (member_id) {
+    const member = await queryOne(
+      "SELECT id FROM org_members WHERE id = $1 AND organization_id = $2 AND status = 'active'",
+      [member_id, user.organization_id]
+    );
+    if (!member) {
+      return NextResponse.json({ error: "Khatib not found or not active" }, { status: 400 });
+    }
+  }
+
+  if (swap_reason && typeof swap_reason === "string" && swap_reason.length > 500) {
+    return NextResponse.json({ error: "Swap reason is too long" }, { status: 400 });
+  }
+
   await exec(
     "UPDATE friday_assignments SET member_id = $1, guest_name = $2, swap_reason = $3, notes = $4, updated_at = NOW() WHERE id = $5",
-    [member_id || null, guest_name || null, swap_reason || null, notes || null, id]
+    [member_id || null, guest_name?.slice(0, 200) || null, swap_reason?.slice(0, 500) || null, notes?.slice(0, 1000) || null, id]
   );
 
   const updated = await queryOne("SELECT * FROM friday_assignments WHERE id = $1", [id]);
@@ -127,7 +163,11 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );

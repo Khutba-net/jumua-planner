@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, toJSON } from "@/lib/db";
-import { getUserId } from "@/lib/auth";
+import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,11 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );

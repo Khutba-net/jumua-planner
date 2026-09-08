@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { query, queryOne, cuid, toJSON } from "@/lib/db";
-import { getUserId } from "@/lib/auth";
+import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
@@ -24,7 +28,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
@@ -42,8 +50,11 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const { name } = body;
-  if (!name?.trim()) {
+  if (!name?.trim() || typeof name !== "string") {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+  if (name.trim().length > 100) {
+    return NextResponse.json({ error: "Name is too long" }, { status: 400 });
   }
 
   const inviteCode = randomBytes(4).toString("hex");
@@ -52,7 +63,7 @@ export async function POST(req: Request) {
 
   await query(
     "INSERT INTO org_members (id, organization_id, name, role, status, invite_code, invite_expires_at) VALUES ($1, $2, $3, 'khatib', 'invited', $4, $5)",
-    [id, user.organization_id, name.trim(), inviteCode, expiresAt]
+    [id, user.organization_id, name.trim().slice(0, 100), inviteCode, expiresAt]
   );
 
   const member = await queryOne("SELECT * FROM org_members WHERE id = $1", [id]);

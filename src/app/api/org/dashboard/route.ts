@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, toJSON } from "@/lib/db";
-import { getUserId } from "@/lib/auth";
+import { getUserId, AuthError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const userId = await getUserId();
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string; planning_year: number }>(
     "SELECT id, organization_id, role, planning_year FROM users WHERE id = $1", [userId]
   );
@@ -21,15 +25,12 @@ export async function GET() {
     [user.organization_id]
   );
 
-  const today = new Date().toISOString().split("T")[0];
-
   const khatibStats = [];
   for (const m of members.filter((m) => m.role === "khatib" && m.user_id)) {
     const totalRow = await queryOne<{ c: string }>("SELECT COUNT(*) as c FROM sermons WHERE author_id = $1", [m.user_id]);
     const readyRow = await queryOne<{ c: string }>("SELECT COUNT(*) as c FROM sermons WHERE author_id = $1 AND status = 'ready'", [m.user_id]);
     const deliveredRow = await queryOne<{ c: string }>("SELECT COUNT(*) as c FROM sermons WHERE author_id = $1 AND status = 'delivered'", [m.user_id]);
 
-    // Get this week's Friday sermon (calculate in JS like the main dashboard)
     const now = new Date();
     const day = now.getDay();
     const diff = (5 - day + 7) % 7;
