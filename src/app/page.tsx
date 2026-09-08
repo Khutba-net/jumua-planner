@@ -404,7 +404,7 @@ export default function LandingPage() {
                   { value: "0", label: c.stat0Label, note: c.stat0Note },
                 ].map((s, i) => (
                   <div key={i} className={`p-5 md:p-6 ${i % 2 === 0 ? (isAr ? "border-s border-line/40" : "border-e border-line/40") : ""} ${i < 2 ? "border-b border-line/40" : ""}`}>
-                    <p className="text-4xl font-bold text-primary mb-2">{isAr ? toAr(s.value) : s.value}</p>
+                    <p className="text-4xl font-bold text-primary mb-2">{s.value}</p>
                     <p className="text-sm font-bold text-ink mb-1">{s.label}</p>
                     <p className="text-xs text-ink/50 leading-relaxed">{s.note}</p>
                   </div>
@@ -441,7 +441,7 @@ export default function LandingPage() {
                     ].map((m, i) => (
                       <div key={i} className="flex items-start flex-1 min-w-0">
                         <div className="flex-1 min-w-0 text-center">
-                          <p className="text-3xl md:text-4xl font-bold text-primary leading-none">{isAr ? "٤" : "4"}</p>
+                          <p className="text-3xl md:text-4xl font-bold text-primary leading-none">4</p>
                           <p className="text-xs md:text-sm font-bold text-ink mt-1.5 leading-tight">{m.unit}</p>
                           <p className="text-[9px] md:text-[10px] font-bold text-primary/50 uppercase tracking-widest mt-1">{m.per}</p>
                           <p className="text-[10px] md:text-xs text-ink/40 leading-snug mt-2 px-1">{m.note}</p>
