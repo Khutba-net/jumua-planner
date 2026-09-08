@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifySessionToken } from "@/lib/session";
 
 const PUBLIC_PATHS = new Set([
   "/",
@@ -29,9 +28,8 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get("session")?.value;
-  const userId = token ? verifySessionToken(token) : null;
 
-  if (!userId) {
+  if (!token || token.length !== 64) {
     if (pathname.startsWith("/api/")) {
       return addSecurityHeaders(
         NextResponse.json({ error: "Not authenticated" }, { status: 401 })
@@ -72,8 +70,6 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 
   return response;
 }
-
-export const runtime = "nodejs";
 
 export const config = {
   matcher: [

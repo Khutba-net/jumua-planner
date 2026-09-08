@@ -1,38 +1,46 @@
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { randomBytes } from "crypto";
+import { queryOne, exec, cuid } from "@/lib/db";
 
-const SESSION_SECRET = process.env.SESSION_SECRET || randomBytes(32).toString("hex");
-const TOKEN_VERSION = "v1";
+const SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-export function createSessionToken(userId: string): string {
-  const timestamp = Date.now().toString(36);
-  const nonce = randomBytes(8).toString("hex");
-  const payload = `${TOKEN_VERSION}.${userId}.${timestamp}.${nonce}`;
-  const sig = createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
-  return `${payload}.${sig}`;
+export async function createSession(userId: string): Promise<string> {
+  const token = randomBytes(32).toString("hex");
+  const id = cuid();
+  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE);
+
+  await exec(
+    "INSERT INTO sessions (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)",
+    [id, userId, token, expiresAt.toISOString()]
+  );
+
+  return token;
 }
 
-export function verifySessionToken(token: string): string | null {
-  if (!token || typeof token !== "string") return null;
+export async function verifySession(token: string): Promise<string | null> {
+  if (!token || typeof token !== "string" || token.length !== 64) return null;
 
-  const parts = token.split(".");
-  if (parts.length !== 5) return null;
+  const session = await queryOne<{ user_id: string; expires_at: Date }>(
+    "SELECT user_id, expires_at FROM sessions WHERE token = $1",
+    [token]
+  );
 
-  const [version, userId, timestamp, nonce, sig] = parts;
-  if (version !== TOKEN_VERSION || !userId || !timestamp || !nonce || !sig) return null;
+  if (!session) return null;
 
-  const payload = `${version}.${userId}.${timestamp}.${nonce}`;
-  const expected = createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
+  if (new Date(session.expires_at) < new Date()) {
+    await exec("DELETE FROM sessions WHERE token = $1", [token]);
+    return null;
+  }
 
-  const sigBuf = Buffer.from(sig, "hex");
-  const expectedBuf = Buffer.from(expected, "hex");
-  if (sigBuf.length !== expectedBuf.length) return null;
-  if (!timingSafeEqual(sigBuf, expectedBuf)) return null;
+  return session.user_id;
+}
 
-  const created = parseInt(timestamp, 36);
-  const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
-  if (Date.now() - created > maxAge) return null;
+export async function deleteSession(token: string): Promise<void> {
+  if (!token) return;
+  await exec("DELETE FROM sessions WHERE token = $1", [token]);
+}
 
-  return userId;
+export async function deleteAllUserSessions(userId: string): Promise<void> {
+  await exec("DELETE FROM sessions WHERE user_id = $1", [userId]);
 }
 
 export function sessionCookieOptions() {

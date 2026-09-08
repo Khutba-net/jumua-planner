@@ -212,6 +212,14 @@ async function initTables() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS friday_assignments (
         id TEXT PRIMARY KEY,
         organization_id TEXT NOT NULL REFERENCES organizations(id),
@@ -227,6 +235,8 @@ async function initTables() {
       );
     `);
 
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sermons_author_id ON sermons(author_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sermons_theme_id ON sermons(theme_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sermons_sub_topic_id ON sermons(sub_topic_id)`);

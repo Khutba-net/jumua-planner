@@ -1,12 +1,12 @@
 import { cookies } from "next/headers";
-import { verifySessionToken } from "@/lib/session";
+import { verifySession } from "@/lib/session";
 
 export async function getUserId(): Promise<string> {
   const cookieStore = await cookies();
 
-  const sessionToken = cookieStore.get("session")?.value;
-  if (sessionToken) {
-    const userId = verifySessionToken(sessionToken);
+  const token = cookieStore.get("session")?.value;
+  if (token) {
+    const userId = await verifySession(token);
     if (userId) return userId;
   }
 

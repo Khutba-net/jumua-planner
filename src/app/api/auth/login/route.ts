@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, exec, toJSON, verifyPassword, withTransaction } from "@/lib/db";
 import { rateLimitByIp } from "@/lib/rate-limit";
 import { loginSchema, parseBody } from "@/lib/validations";
-import { createSessionToken, sessionCookieOptions } from "@/lib/session";
+import { createSession, sessionCookieOptions } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -55,8 +55,9 @@ export async function POST(req: Request) {
     [user.id]
   );
 
+  const token = await createSession(user.id);
   const res = NextResponse.json({ user: toJSON(freshUser) });
-  res.cookies.set("session", createSessionToken(user.id), sessionCookieOptions());
+  res.cookies.set("session", token, sessionCookieOptions());
   res.cookies.delete("user_id");
   return res;
 }
