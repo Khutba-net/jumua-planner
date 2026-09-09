@@ -81,6 +81,7 @@ const statusDot: Record<string, string> = {
   ready: "bg-green-500",
   delivered: "bg-primary",
   archived: "bg-mute/30",
+  skipped: "bg-amber-400",
 };
 
 function wordCount(text: string | null) {
@@ -106,6 +107,11 @@ export default function DashboardPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState<"friday" | "eid" | "talk" | "other">("friday");
   const [creating, setCreating] = useState(false);
+  const [feedbackSermonId, setFeedbackSermonId] = useState<string | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackAttendance, setFeedbackAttendance] = useState("");
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
   const hijriEvents = useMemo(() => getUpcomingHijriEvents(5), []);
 
   const statusLabel: Record<string, string> = {
@@ -113,6 +119,7 @@ export default function DashboardPage() {
     ready: t("status.ready"),
     delivered: t("status.delivered"),
     archived: t("status.archived"),
+    skipped: t("status.skipped"),
   };
 
   useEffect(() => {
@@ -146,6 +153,15 @@ export default function DashboardPage() {
     if (diffDays === 0) return t("dash.today");
     if (diffDays === 1) return t("dash.tomorrow");
     return t("dash.thisFriday");
+  }
+
+  function getDayContext(): string | null {
+    const day = new Date().getDay();
+    if (day === 5) return t("dash.ctxFriday");
+    if (day === 4) return t("dash.ctxThursday");
+    if (day === 6) return t("dash.ctxSaturday");
+    const daysUntil = (5 - day + 7) % 7;
+    return `${daysUntil} ${t("dash.ctxMidWeek")}`;
   }
 
   function formatDate(iso: string) {
@@ -185,7 +201,7 @@ export default function DashboardPage() {
     setNewType("friday");
   }
 
-  async function handleQuickLog(sermonId: string, status: "delivered" | "archived") {
+  async function handleQuickLog(sermonId: string, status: "delivered" | "archived" | "skipped") {
     setLoggingId(sermonId);
     await fetch(`/api/sermons/${sermonId}`, {
       method: "PUT",
@@ -209,6 +225,28 @@ export default function DashboardPage() {
       return updated;
     });
     setLoggingId(null);
+    if (status === "delivered") {
+      setFeedbackSermonId(sermonId);
+      setFeedbackRating(0);
+      setFeedbackAttendance("");
+      setFeedbackComment("");
+    }
+  }
+
+  async function handleFeedbackSubmit() {
+    if (!feedbackSermonId) return;
+    setFeedbackSaving(true);
+    await fetch(`/api/sermons/${feedbackSermonId}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rating: feedbackRating || null,
+        attendance: feedbackAttendance ? Number(feedbackAttendance) : null,
+        comment: feedbackComment || null,
+      }),
+    });
+    setFeedbackSaving(false);
+    setFeedbackSermonId(null);
   }
 
   if (loading) {
@@ -254,6 +292,12 @@ export default function DashboardPage() {
             <p className="text-sm text-mute mt-0.5">
               {new Date().toLocaleDateString(isAr ? "ar-SA" : "en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
             </p>
+            {getDayContext() && (
+              <p className="text-xs text-accent-gold font-medium mt-1 flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">mosque</span>
+                {getDayContext()}
+              </p>
+            )}
           </div>
           {!isOrgAdmin && (
             <div className="flex gap-2">
@@ -476,7 +520,7 @@ export default function DashboardPage() {
                 {t("dash.delivered")}
               </button>
               <button
-                onClick={() => handleQuickLog(lastFriday.sermon.id, "archived")}
+                onClick={() => handleQuickLog(lastFriday.sermon.id, "skipped")}
                 disabled={loggingId === lastFriday.sermon.id}
                 className="px-3 py-1.5 border border-line text-mute text-xs font-medium hover:bg-surface transition-colors disabled:opacity-50"
               >
@@ -536,7 +580,7 @@ export default function DashboardPage() {
                         {t("dash.delivered")}
                       </button>
                       <button
-                        onClick={() => handleQuickLog(sermon.id, "archived")}
+                        onClick={() => handleQuickLog(sermon.id, "skipped")}
                         disabled={loggingId === sermon.id}
                         className="px-2.5 py-1 border border-line bg-white text-mute text-[11px] font-medium hover:bg-surface transition-colors disabled:opacity-50"
                       >
@@ -831,6 +875,69 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      )}
+
+      {feedbackSermonId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-lg font-bold text-ink mb-1">{t("dash.feedbackTitle")}</h3>
+            <p className="text-xs text-mute mb-5">{t("dash.feedbackDesc")}</p>
+
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-ink/50 block mb-2">{t("dash.rating")}</label>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setFeedbackRating(star)}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${feedbackRating >= star ? "bg-accent-gold text-white" : "bg-surface text-mute hover:bg-accent-gold/20"}`}
+                  >
+                    <span className="material-symbols-outlined text-lg">star</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-ink/50 block mb-2">{t("dash.attendance")}</label>
+              <input
+                type="number"
+                min="0"
+                value={feedbackAttendance}
+                onChange={(e) => setFeedbackAttendance(e.target.value)}
+                placeholder={t("dash.attendancePlaceholder")}
+                className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
+              />
+            </div>
+
+            <div className="mb-5">
+              <label className="text-xs font-semibold text-ink/50 block mb-2">{t("dash.feedbackNote")}</label>
+              <textarea
+                value={feedbackComment}
+                onChange={(e) => setFeedbackComment(e.target.value)}
+                placeholder={t("dash.feedbackNotePlaceholder")}
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm resize-none"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleFeedbackSubmit}
+                disabled={feedbackSaving}
+                className="flex-1 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50"
+              >
+                {feedbackSaving ? "..." : t("dash.saveFeedback")}
+              </button>
+              <button
+                onClick={() => setFeedbackSermonId(null)}
+                className="px-4 py-2.5 rounded-lg text-sm text-mute hover:text-ink transition-colors"
+              >
+                {t("dash.skipFeedback")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

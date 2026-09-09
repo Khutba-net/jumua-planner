@@ -30,13 +30,14 @@ function wordCount(text: string | null) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-const allStatuses = ["draft", "ready", "delivered", "archived"];
+const allStatuses = ["draft", "ready", "delivered", "archived", "skipped"];
 
 const statusStyle: Record<string, string> = {
   draft: "bg-[#f3f0ea] text-[#8a7968]",
   ready: "bg-green-50 text-green-700",
   delivered: "bg-[#f0eef8] text-[#6b5fa0]",
   archived: "bg-surface text-mute",
+  skipped: "bg-amber-50 text-amber-700",
 };
 
 const statusIcon: Record<string, string> = {
@@ -44,6 +45,7 @@ const statusIcon: Record<string, string> = {
   ready: "check_circle",
   delivered: "event_available",
   archived: "inventory_2",
+  skipped: "event_busy",
 };
 
 interface CheckItem {

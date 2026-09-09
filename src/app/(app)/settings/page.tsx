@@ -136,6 +136,9 @@ export default function SettingsPage() {
 
   const [nameError, setNameError] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [switchingType, setSwitchingType] = useState(false);
+  const [selectedType, setSelectedType] = useState("");
+  const [switchOrgName, setSwitchOrgName] = useState("");
 
   useEffect(() => {
     fetch("/api/settings")
@@ -158,6 +161,7 @@ export default function SettingsPage() {
         setWeeklyDigest(!!s.weekly_digest);
         setThemeMode(s.theme_mode);
         setEditorFontSize(String(s.editor_font_size));
+        setSelectedType(u.account_type);
         setLoading(false);
       })
       .catch(() => {
@@ -456,18 +460,90 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.accountType")}</label>
-                <p className="text-sm text-ink capitalize px-4 py-2.5 bg-surface border border-line">{user?.account_type ?? "—"}</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: "individual", label: t("settings.typeIndividual"), desc: t("settings.typeIndividualDesc"), icon: "person" },
+                    { value: "organization", label: t("settings.typeOrganization"), desc: t("settings.typeOrganizationDesc"), icon: "mosque" },
+                    { value: "institution", label: t("settings.typeInstitution"), desc: t("settings.typeInstitutionDesc"), icon: "domain" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setSelectedType(opt.value)}
+                      className={`flex flex-col items-center gap-1.5 p-3 border text-center transition-colors ${
+                        selectedType === opt.value
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-line bg-white text-mute hover:text-ink"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-xl">{opt.icon}</span>
+                      <span className="text-xs font-semibold">{opt.label}</span>
+                      <span className="text-[10px] leading-tight">{opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+                {selectedType !== user?.account_type && selectedType !== "individual" && !isOrg && (
+                  <div className="mt-3">
+                    <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">
+                      {isAr ? "اسم المؤسسة" : "Organization Name"}
+                    </label>
+                    <input
+                      type="text"
+                      value={switchOrgName}
+                      onChange={(e) => setSwitchOrgName(e.target.value)}
+                      placeholder={isAr ? "مثال: مسجد النور" : "e.g. Masjid Al-Noor"}
+                      className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                )}
+                {selectedType !== user?.account_type && (
+                  <div className="mt-3 bg-amber-50 border border-amber-200 p-3 flex items-start gap-2">
+                    <span className="material-symbols-outlined text-amber-600 text-base mt-0.5">info</span>
+                    <p className="text-xs text-amber-800">{t("settings.switchWarning")}</p>
+                  </div>
+                )}
               </div>
             </div>
 
-            <button
-              onClick={handleProfileSave}
-              disabled={saving}
-              className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-              {saving ? t("settings.saving") : t("settings.saveChanges")}
-            </button>
+            <div className="flex items-center gap-3 mt-6">
+              <button
+                onClick={handleProfileSave}
+                disabled={saving}
+                className="px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+                {saving ? t("settings.saving") : t("settings.saveChanges")}
+              </button>
+              {selectedType !== user?.account_type && (
+                <button
+                  onClick={async () => {
+                    if (selectedType !== "individual" && !isOrg && !switchOrgName.trim()) {
+                      showToast(t("settings.orgNameRequired"), "error");
+                      return;
+                    }
+                    setSwitchingType(true);
+                    try {
+                      const res = await fetch("/api/settings", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ section: "account_type", account_type: selectedType, org_name: switchOrgName.trim() || undefined }),
+                      });
+                      if (!res.ok) { const d = await res.json(); showToast(d.error || "Failed", "error"); return; }
+                      showToast(isAr ? "تم تغيير نوع الحساب" : "Account type updated");
+                      setTimeout(() => window.location.reload(), 800);
+                    } catch {
+                      showToast(isAr ? "فشل تغيير نوع الحساب" : "Failed to switch account type", "error");
+                    } finally {
+                      setSwitchingType(false);
+                    }
+                  }}
+                  disabled={switchingType}
+                  className="px-6 py-2.5 bg-accent-gold text-white text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {switchingType && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+                  {t("settings.switchConfirm")} {selectedType === "individual" ? t("settings.typeIndividual") : selectedType === "organization" ? t("settings.typeOrganization") : t("settings.typeInstitution")}
+                </button>
+              )}
+            </div>
           </div>
         )}
 

@@ -13,6 +13,17 @@ function getThisFriday(): string {
   return friday.toISOString().split("T")[0];
 }
 
+function countFridaysInYear(year: number): number {
+  let count = 0;
+  const d = new Date(year, 0, 1);
+  while (d.getDay() !== 5) d.setDate(d.getDate() + 1);
+  while (d.getFullYear() === year) {
+    count++;
+    d.setDate(d.getDate() + 7);
+  }
+  return count;
+}
+
 function getLastFriday(): string {
   const now = new Date();
   const day = now.getDay();
@@ -73,7 +84,7 @@ export async function GET() {
            t.name as theme_name
     FROM sermons s
     LEFT JOIN themes t ON s.theme_id = t.id
-    WHERE s.author_id = $1 AND s.scheduled_date >= $2 AND s.status != 'delivered'
+    WHERE s.author_id = $1 AND s.scheduled_date >= $2 AND s.status NOT IN ('delivered', 'skipped')
     ORDER BY s.scheduled_date ASC
     LIMIT 4
   `, [userId, today]);
@@ -96,14 +107,14 @@ export async function GET() {
     LIMIT 1
   `, [userId, lastFriday]);
 
-  const needsLastFridayLog = lastFridaySermon && lastFridaySermon.status !== "delivered" && lastFridaySermon.status !== "archived";
+  const needsLastFridayLog = lastFridaySermon && lastFridaySermon.status !== "delivered" && lastFridaySermon.status !== "archived" && lastFridaySermon.status !== "skipped";
 
   const backlogSermons = await query<{ id: string; title: string; status: string; scheduled_date: string; theme_name: string | null }>(`
     SELECT s.id, s.title, s.status, s.scheduled_date,
            t.name as theme_name
     FROM sermons s
     LEFT JOIN themes t ON s.theme_id = t.id
-    WHERE s.author_id = $1 AND s.scheduled_date < $2 AND s.status NOT IN ('delivered', 'archived')
+    WHERE s.author_id = $1 AND s.scheduled_date < $2 AND s.status NOT IN ('delivered', 'archived', 'skipped')
       AND (s.type = 'friday' OR s.type IS NULL)
     ORDER BY s.scheduled_date DESC
   `, [userId, today]);
@@ -223,8 +234,8 @@ export async function GET() {
     checklist: {
       themes: { done: seasonsWithThemes, total: 4 },
       subTopics: { done: subTopicsSet, total: 16 },
-      titles: { done: Number(planSermonStats?.titled ?? 0), total: 52 },
-      delivered: { done: deliveredThisYear, total: 52 },
+      titles: { done: Number(planSermonStats?.titled ?? 0), total: countFridaysInYear(planningYear) },
+      delivered: { done: deliveredThisYear, total: countFridaysInYear(planningYear) },
       reviewed: { done: feedbackCount, total: deliveredThisYear || 1 },
     },
     planningYear,

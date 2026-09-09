@@ -27,7 +27,7 @@ export const sermonCreateSchema = z.object({
   title: z.string().max(500).optional(),
   content: z.string().max(100_000).optional(),
   outline: z.string().max(50_000).optional(),
-  status: z.enum(["draft", "ready", "delivered", "archived"]).optional(),
+  status: z.enum(["draft", "ready", "delivered", "archived", "skipped"]).optional(),
   type: z.enum(["friday", "eid", "talk", "other"]).optional(),
   scheduledDate: z.string().max(20).nullable().optional(),
   notes: z.string().max(10_000).optional(),
@@ -88,11 +88,18 @@ export const settingsAppearanceSchema = z.object({
   editor_font_size: z.number().int().min(12).max(32).optional(),
 });
 
+export const settingsAccountTypeSchema = z.object({
+  section: z.literal("account_type"),
+  account_type: z.enum(["individual", "organization", "institution"]),
+  org_name: z.string().max(200).optional(),
+});
+
 export const settingsUpdateSchema = z.discriminatedUnion("section", [
   settingsProfileSchema,
   settingsSermonSchema,
   settingsNotificationsSchema,
   settingsAppearanceSchema,
+  settingsAccountTypeSchema,
 ]);
 
 export const referenceSchema = z.object({
