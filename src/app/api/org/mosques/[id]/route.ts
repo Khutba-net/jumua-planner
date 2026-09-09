@@ -88,6 +88,33 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   return NextResponse.json(toJSON(updated));
 }
 
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  let user;
+  try { user = await getInstAdmin(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
+  if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
+
+  const { id } = await params;
+  const existing = await queryOne(
+    "SELECT id FROM mosques WHERE id = $1 AND organization_id = $2",
+    [id, user.organization_id]
+  );
+  if (!existing) return NextResponse.json({ error: "Mosque not found" }, { status: 404 });
+
+  const body = await req.json();
+  if (body.action === "unlink") {
+    await exec("UPDATE org_members SET mosque_id = NULL WHERE mosque_id = $1", [id]);
+    await exec("UPDATE friday_assignments SET mosque_id = NULL WHERE mosque_id = $1", [id]);
+    await exec("UPDATE themes SET mosque_id = NULL WHERE mosque_id = $1", [id]);
+    await exec("UPDATE mosques SET organization_id = NULL, updated_at = NOW() WHERE id = $1", [id]);
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+}
+
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await getInstAdmin(); } catch (e) {

@@ -27,7 +27,7 @@ export const sermonCreateSchema = z.object({
   title: z.string().max(500).optional(),
   content: z.string().max(100_000).optional(),
   outline: z.string().max(50_000).optional(),
-  status: z.enum(["draft", "ready", "delivered", "archived", "skipped"]).optional(),
+  status: z.enum(["draft", "ready", "delivered", "archived", "skipped", "submitted", "in_review", "approved", "rejected"]).optional(),
   type: z.enum(["friday", "eid", "talk", "other"]).optional(),
   scheduledDate: z.string().max(20).nullable().optional(),
   notes: z.string().max(10_000).optional(),
@@ -35,6 +35,9 @@ export const sermonCreateSchema = z.object({
   themeId: z.string().max(50).nullable().optional(),
   subTopicId: z.string().max(50).nullable().optional(),
   isOverride: z.boolean().optional(),
+  language: z.enum(["ar", "en", "ur", "other"]).optional(),
+  translationOf: z.string().max(50).nullable().optional(),
+  lastUpdated: z.string().max(50).optional(),
 });
 
 export const sermonUpdateSchema = sermonCreateSchema;
@@ -45,6 +48,7 @@ export const themeCreateSchema = z.object({
   month: z.number().int().min(1).max(12),
   year: z.number().int().min(2020).max(2100),
   color: z.string().max(20).optional(),
+  mosqueId: z.string().max(50).nullable().optional(),
   subTopics: z.array(z.object({
     name: z.string().min(1).max(200),
     week: z.number().int().min(1).max(52),
@@ -95,12 +99,18 @@ export const settingsAccountTypeSchema = z.object({
   org_name: z.string().max(200).optional(),
 });
 
+export const settingsOrgSwitchSchema = z.object({
+  section: z.literal("org_switch"),
+  org_id: z.string().max(50),
+});
+
 export const settingsUpdateSchema = z.discriminatedUnion("section", [
   settingsProfileSchema,
   settingsSermonSchema,
   settingsNotificationsSchema,
   settingsAppearanceSchema,
   settingsAccountTypeSchema,
+  settingsOrgSwitchSchema,
 ]);
 
 export const referenceSchema = z.object({

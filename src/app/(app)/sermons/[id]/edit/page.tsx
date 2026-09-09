@@ -24,6 +24,9 @@ interface Sermon {
   theme_name: string | null;
   original_theme_id: string | null;
   is_override: number;
+  language: string;
+  translation_of: string | null;
+  updated_at: string;
   references: Reference[];
 }
 
@@ -100,6 +103,7 @@ export default function SermonEditorPage({
   const [status, setStatus] = useState("draft");
   const [scheduledDate, setScheduledDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [sermonLang, setSermonLang] = useState("ar");
   const [mobilePanel, setMobilePanel] = useState<"editor" | "info" | "checklist">("editor");
   const [userWordTarget, setUserWordTarget] = useState(2500);
   const [editorFontSize, setEditorFontSize] = useState(16);
@@ -119,6 +123,8 @@ export default function SermonEditorPage({
   const [userRole, setUserRole] = useState<string>("member");
   const [hasOrg, setHasOrg] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [conflictDetected, setConflictDetected] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [recoveredDraft, setRecoveredDraft] = useState<{ title: string; content: string; notes: string } | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
@@ -172,6 +178,8 @@ export default function SermonEditorPage({
             : ""
         );
         setNotes(data.notes ?? "");
+        setSermonLang(data.language || "ar");
+        setLastUpdatedAt(data.updated_at || null);
         setReferences(data.references ?? []);
         setLoading(false);
         try {
@@ -202,8 +210,15 @@ export default function SermonEditorPage({
           status: overrides?.status ?? status,
           scheduledDate: scheduledDate || null,
           notes,
+          language: sermonLang,
+          lastUpdated: lastUpdatedAt,
         }),
       });
+      if (res.status === 409) {
+        setConflictDetected(true);
+        setSaving(false);
+        return;
+      }
       if (res.status === 401) {
         try {
           localStorage.setItem(`jp_draft_${id}`, JSON.stringify({ title, content, notes, savedAt: Date.now() }));
@@ -213,6 +228,8 @@ export default function SermonEditorPage({
         return;
       }
       setLastSaved(new Date());
+      setLastUpdatedAt(new Date().toISOString());
+      setConflictDetected(false);
       try { localStorage.removeItem(`jp_draft_${id}`); } catch {}
     } catch {
       try {
@@ -220,7 +237,7 @@ export default function SermonEditorPage({
       } catch {}
     }
     setSaving(false);
-  }, [id, title, content, status, scheduledDate, notes]);
+  }, [id, title, content, status, scheduledDate, notes, sermonLang, lastUpdatedAt]);
 
   const changeStatus = useCallback((newStatus: string) => {
     setStatus(newStatus);
@@ -515,6 +532,47 @@ export default function SermonEditorPage({
           )}
 
           <div className="mb-2.5">
+            <p className="text-[10px] text-mute/60">{t("editor.language")}</p>
+            <select
+              value={sermonLang}
+              onChange={(e) => setSermonLang(e.target.value)}
+              className="text-xs font-medium text-ink bg-transparent border-none outline-none w-full"
+            >
+              <option value="ar">{t("editor.langAr")}</option>
+              <option value="en">{t("editor.langEn")}</option>
+              <option value="ur">{t("editor.langUrdu")}</option>
+              <option value="other">{t("editor.langOther")}</option>
+            </select>
+          </div>
+          {!sermon?.translation_of && (
+            <button
+              onClick={async () => {
+                const targetLang = sermonLang === "ar" ? "en" : "ar";
+                const res = await fetch(`/api/sermons/${id}/duplicate`, { method: "POST" });
+                if (res.ok) {
+                  const newSermon = await res.json();
+                  await fetch(`/api/sermons/${newSermon.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ language: targetLang, translationOf: id }),
+                  });
+                  router.push(`/sermons/${newSermon.id}/edit`);
+                }
+              }}
+              className="w-full mb-2.5 px-3 py-2 text-[11px] font-medium text-primary bg-primary/5 border border-primary/20 rounded hover:bg-primary/10 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[14px]">translate</span>
+              {t("editor.addTranslation")}
+            </button>
+          )}
+          {sermon?.translation_of && (
+            <div className="mb-2.5 px-3 py-2 bg-blue-50 border border-blue-200 rounded text-[11px] text-blue-700 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px]">translate</span>
+              {t("editor.translationOf")}
+            </div>
+          )}
+
+          <div className="mb-2.5">
             <p className="text-[10px] text-mute/60">{t("editor.words")}</p>
             <p className="text-xs font-medium text-ink">{words}</p>
           </div>
@@ -634,6 +692,16 @@ export default function SermonEditorPage({
               <div className="mx-5 sm:mx-8 mt-4 flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-800">
                 <span className="material-symbols-outlined text-amber-500 text-lg">warning</span>
                 {t("editor.sessionExpired")}
+              </div>
+            )}
+            {conflictDetected && (
+              <div className="mx-5 sm:mx-8 mt-4 flex items-center gap-2 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg text-[13px] text-orange-800">
+                <span className="material-symbols-outlined text-orange-500 text-lg">sync_problem</span>
+                <span className="flex-1">{t("editor.conflict")}</span>
+                <button onClick={() => window.location.reload()}
+                  className="px-3 py-1 bg-orange-600 text-white text-[11px] font-medium rounded hover:bg-orange-700 transition-colors">
+                  {t("editor.reloadLatest")}
+                </button>
               </div>
             )}
             {recoveredDraft && (

@@ -62,6 +62,10 @@ export default function SchedulePage() {
   const [swapIsGuest, setSwapIsGuest] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [myMemberId, setMyMemberId] = useState<string | null>(null);
+  const [showBulkReassign, setShowBulkReassign] = useState(false);
+  const [bulkFrom, setBulkFrom] = useState("");
+  const [bulkTo, setBulkTo] = useState("");
+  const [bulkReassigning, setBulkReassigning] = useState(false);
 
   const thisFriday = getThisFriday();
   const fridays = getFridays(new Date(), 16);
@@ -125,6 +129,24 @@ export default function SchedulePage() {
     fetchSchedule();
   };
 
+  const handleBulkReassign = async () => {
+    if (!bulkFrom || !bulkTo || bulkFrom === bulkTo) return;
+    setBulkReassigning(true);
+    try {
+      await fetch("/api/org/schedule", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_member_id: bulkFrom, to_member_id: bulkTo }),
+      });
+      setShowBulkReassign(false);
+      setBulkFrom("");
+      setBulkTo("");
+      fetchSchedule();
+    } finally {
+      setBulkReassigning(false);
+    }
+  };
+
   const handleRemove = async (assignmentId: string) => {
     await fetch(`/api/org/schedule?id=${assignmentId}`, { method: "DELETE" });
     fetchSchedule();
@@ -148,10 +170,70 @@ export default function SchedulePage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-ink">{t("org.schedule")}</h1>
-        <p className="text-sm text-mute mt-0.5">{isAdmin ? t("org.scheduleSub") : t("org.scheduleView")}</p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-ink">{t("org.schedule")}</h1>
+          <p className="text-sm text-mute mt-0.5">{isAdmin ? t("org.scheduleSub") : t("org.scheduleView")}</p>
+        </div>
+        {isAdmin && members.length >= 2 && (
+          <button
+            onClick={() => setShowBulkReassign(!showBulkReassign)}
+            className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-base">swap_calls</span>
+            {t("org.bulkReassign")}
+          </button>
+        )}
       </div>
+
+      {showBulkReassign && (
+        <div className="mb-4 bg-white border border-line rounded-xl p-4">
+          <p className="text-sm font-semibold text-ink mb-1">{t("org.bulkReassign")}</p>
+          <p className="text-xs text-mute mb-3">{t("org.bulkReassignDesc")}</p>
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-[10px] font-semibold text-mute uppercase mb-1 block">{t("org.fromKhatib")}</label>
+              <select
+                value={bulkFrom}
+                onChange={(e) => setBulkFrom(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              >
+                <option value="">{t("org.selectKhatib")}</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+            <span className="material-symbols-outlined text-mute text-lg pb-2">arrow_forward</span>
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-[10px] font-semibold text-mute uppercase mb-1 block">{t("org.toKhatib")}</label>
+              <select
+                value={bulkTo}
+                onChange={(e) => setBulkTo(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              >
+                <option value="">{t("org.selectKhatib")}</option>
+                {members.filter((m) => m.id !== bulkFrom).map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleBulkReassign}
+              disabled={!bulkFrom || !bulkTo || bulkFrom === bulkTo || bulkReassigning}
+              className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50"
+            >
+              {bulkReassigning ? t("org.reassigning") : t("org.bulkReassign")}
+            </button>
+            <button
+              onClick={() => { setShowBulkReassign(false); setBulkFrom(""); setBulkTo(""); }}
+              className="px-3 py-2 rounded-lg text-sm text-mute hover:text-ink transition-colors"
+            >
+              {t("btn.cancel")}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {fridays.map((friday) => {

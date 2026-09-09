@@ -376,6 +376,19 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {checklist.themes.done === 0 && !isOrgAdmin && (
+          <Link href="/themes" className="block mb-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-5 hover:border-primary/30 transition-colors">
+            <div className="flex items-center gap-4">
+              <span className="material-symbols-outlined text-3xl text-primary">auto_fix_high</span>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-ink">{t("dash.setupPlan")}</p>
+                <p className="text-xs text-mute mt-0.5">{t("dash.setupPlanDesc")}</p>
+              </div>
+              <span className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-full">{t("dash.startPlanning")}</span>
+            </div>
+          </Link>
+        )}
+
         {isOrgAdmin && (
           <div className="bg-white border border-line p-6 mb-4">
             <div className="flex items-center gap-3 mb-4">

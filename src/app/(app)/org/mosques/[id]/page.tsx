@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 
 type MosqueData = {
@@ -73,6 +73,7 @@ function getThisFriday(): string {
 export default function MosqueDetailPage() {
   const { t, lang } = useI18n();
   const isAr = lang === "ar";
+  const router = useRouter();
   const params = useParams();
   const mosqueId = params.id as string;
 
@@ -91,6 +92,22 @@ export default function MosqueDetailPage() {
   const [selectedMember, setSelectedMember] = useState("");
   const [guestName, setGuestName] = useState("");
   const [isGuest, setIsGuest] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+
+  const handleUnlink = async () => {
+    if (!confirm(t("mosques.unlinkDesc"))) return;
+    setUnlinking(true);
+    try {
+      await fetch(`/api/org/mosques/${mosqueId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unlink" }),
+      });
+      router.push("/org/mosques");
+    } finally {
+      setUnlinking(false);
+    }
+  };
 
   const thisFriday = getThisFriday();
   const fridays = getFridays(new Date(), 12);
@@ -463,6 +480,23 @@ export default function MosqueDetailPage() {
           })}
         </div>
       )}
+
+      {/* Unlink section */}
+      <div className="mt-6 bg-white border border-red-200 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-red-600">{t("mosques.unlink")}</p>
+            <p className="text-xs text-mute mt-0.5">{t("mosques.unlinkDesc")}</p>
+          </div>
+          <button
+            onClick={handleUnlink}
+            disabled={unlinking}
+            className="px-4 py-2 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50"
+          >
+            {unlinking ? t("mosques.unlinking") : t("mosques.unlinkConfirm")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

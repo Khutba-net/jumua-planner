@@ -12,7 +12,7 @@ export async function GET() {
     throw e;
   }
 
-  const user = await queryOne("SELECT id, name, email, account_type, avatar_url, bio, phone FROM users WHERE id = $1", [userId]);
+  const user = await queryOne("SELECT id, name, email, account_type, role, organization_id, avatar_url, bio, phone FROM users WHERE id = $1", [userId]);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   let settings = await queryOne("SELECT * FROM user_settings WHERE user_id = $1", [userId]);
@@ -21,7 +21,15 @@ export async function GET() {
     settings = await queryOne("SELECT * FROM user_settings WHERE user_id = $1", [userId]);
   }
 
-  return NextResponse.json(toJSON({ user, settings }));
+  const orgMemberships = await query<{ org_id: string; org_name: string; role: string }>(
+    `SELECT o.id as org_id, o.name as org_name, om.role
+     FROM org_members om
+     JOIN organizations o ON om.organization_id = o.id
+     WHERE om.user_id = $1 AND om.status = 'active'`,
+    [userId]
+  );
+
+  return NextResponse.json(toJSON({ user, settings, orgMemberships }));
 }
 
 export async function PUT(req: NextRequest) {
@@ -108,6 +116,24 @@ export async function PUT(req: NextRequest) {
     await exec(
       "UPDATE users SET account_type = $1, role = $2, organization_id = $3, updated_at = NOW() WHERE id = $4",
       [newType, role, newType === "individual" ? null : orgId, userId]
+    );
+  }
+
+  if (section === "org_switch" && "org_id" in d) {
+    const membership = await queryOne(
+      "SELECT id FROM org_members WHERE user_id = $1 AND organization_id = $2 AND status = 'active'",
+      [userId, d.org_id]
+    );
+    if (!membership) return NextResponse.json({ error: "Not a member of this organization" }, { status: 403 });
+
+    const orgRole = await queryOne<{ role: string }>(
+      "SELECT role FROM org_members WHERE user_id = $1 AND organization_id = $2",
+      [userId, d.org_id]
+    );
+
+    await exec(
+      "UPDATE users SET organization_id = $1, role = $2, updated_at = NOW() WHERE id = $3",
+      [d.org_id, orgRole?.role || "khatib", userId]
     );
   }
 

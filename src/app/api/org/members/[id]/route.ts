@@ -48,6 +48,11 @@ export async function PUT(req: Request, { params }: Params) {
       await deleteAllUserSessions(member.user_id as string);
     }
     await exec("UPDATE org_members SET status = 'deactivated', updated_at = NOW() WHERE id = $1", [id]);
+    const today = new Date().toISOString().split("T")[0];
+    await exec(
+      "UPDATE friday_assignments SET member_id = NULL, swap_reason = 'Khatib deactivated', updated_at = NOW() WHERE member_id = $1 AND friday_date >= $2",
+      [id, today]
+    );
   } else if (action === "reactivate") {
     await exec("UPDATE org_members SET status = 'active', updated_at = NOW() WHERE id = $1", [id]);
   } else if (action === "transfer_admin") {

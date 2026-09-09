@@ -59,13 +59,13 @@ export async function POST(req: Request) {
   if ("error" in parsed) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const { name, description, month, year, color } = parsed.data;
+  const { name, description, month, year, color, mosqueId } = parsed.data;
 
   const isOrgAdmin = admin?.role === "admin" && admin?.organization_id;
   const id = cuid();
   await query(
-    "INSERT INTO themes (id, name, description, month, year, color, owner_id, organization_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-    [id, name, description ?? "", month, year, color ?? "#00666d", userId, isOrgAdmin ? admin.organization_id : null]
+    "INSERT INTO themes (id, name, description, month, year, color, owner_id, organization_id, mosque_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+    [id, name, description ?? "", month, year, color ?? "#00666d", userId, isOrgAdmin ? admin.organization_id : null, mosqueId || null]
   );
 
   if (parsed.data.subTopics && Array.isArray(parsed.data.subTopics)) {

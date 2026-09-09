@@ -21,6 +21,7 @@ interface Theme {
   sub_topic_count: number;
   sermon_count: number;
   sub_topics: SubTopic[];
+  mosque_id: string | null;
 }
 
 interface Sermon {
@@ -342,6 +343,9 @@ export default function AnnualPlanPage() {
   }
 
   async function handleSave() {
+    if (editingTheme && Number(editingTheme.sermon_count) > 0) {
+      if (!confirm(t("themes.midYearWarning"))) return;
+    }
     setSaving(true);
     const subTopics = formTopics
       .map((name, i) => ({ name: name.trim(), week: i + 1 }))
@@ -905,6 +909,9 @@ function SeasonBlock({
                 className="text-left text-[14px] font-bold text-ink hover:text-primary transition-all duration-200 leading-snug">
                 {theme.name}
               </button>
+              {theme.mosque_id && (
+                <span className="text-[9px] font-bold text-accent-gold bg-accent-gold/10 px-1.5 py-0.5 rounded-full">{t("themes.mosqueOverride")}</span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {continuesFromPrev && prevSeason && (

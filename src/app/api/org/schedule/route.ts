@@ -190,6 +190,48 @@ export async function PUT(req: Request) {
   return NextResponse.json(toJSON(updated));
 }
 
+export async function PATCH(req: Request) {
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    throw e;
+  }
+  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
+    "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
+  );
+
+  if (!user?.organization_id || user.role !== "admin") {
+    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const { from_member_id, to_member_id } = body;
+
+  if (!from_member_id || !to_member_id || from_member_id === to_member_id) {
+    return NextResponse.json({ error: "Select two different khatibs" }, { status: 400 });
+  }
+
+  const fromMember = await queryOne(
+    "SELECT id FROM org_members WHERE id = $1 AND organization_id = $2",
+    [from_member_id, user.organization_id]
+  );
+  const toMember = await queryOne(
+    "SELECT id FROM org_members WHERE id = $1 AND organization_id = $2 AND status = 'active'",
+    [to_member_id, user.organization_id]
+  );
+
+  if (!fromMember) return NextResponse.json({ error: "Source khatib not found" }, { status: 400 });
+  if (!toMember) return NextResponse.json({ error: "Target khatib not found or inactive" }, { status: 400 });
+
+  const today = new Date().toISOString().split("T")[0];
+  const result = await query(
+    "UPDATE friday_assignments SET member_id = $1, updated_at = NOW() WHERE organization_id = $2 AND member_id = $3 AND friday_date >= $4",
+    [to_member_id, user.organization_id, from_member_id, today]
+  );
+
+  return NextResponse.json({ ok: true, updated: Array.isArray(result) ? result.length : 0 });
+}
+
 export async function DELETE(req: Request) {
   let userId: string;
   try { userId = await getUserId(); } catch (e) {

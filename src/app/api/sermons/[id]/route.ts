@@ -47,7 +47,7 @@ export async function PUT(
 
   const { id } = await params;
 
-  const existing = await queryOne("SELECT id FROM sermons WHERE id = $1 AND author_id = $2", [id, userId]);
+  const existing = await queryOne<{ id: string; updated_at: string }>("SELECT id, updated_at FROM sermons WHERE id = $1 AND author_id = $2", [id, userId]);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -58,6 +58,14 @@ export async function PUT(
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
   const d = parsed.data;
+
+  if (d.lastUpdated) {
+    const clientTime = new Date(d.lastUpdated).getTime();
+    const serverTime = new Date(existing.updated_at).getTime();
+    if (serverTime > clientTime) {
+      return NextResponse.json({ error: "conflict", serverUpdatedAt: existing.updated_at }, { status: 409 });
+    }
+  }
 
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -85,6 +93,8 @@ export async function PUT(
   }
   if (d.subTopicId !== undefined) { fields.push(`sub_topic_id = $${paramIdx++}`); values.push(d.subTopicId || null); }
   if (d.mosqueId !== undefined) { fields.push(`mosque_id = $${paramIdx++}`); values.push(d.mosqueId || null); }
+  if (d.language !== undefined) { fields.push(`language = $${paramIdx++}`); values.push(d.language); }
+  if (d.translationOf !== undefined) { fields.push(`translation_of = $${paramIdx++}`); values.push(d.translationOf || null); }
 
   if (fields.length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });

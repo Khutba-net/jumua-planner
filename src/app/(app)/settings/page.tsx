@@ -9,6 +9,8 @@ interface UserData {
   name: string;
   email: string;
   account_type: string;
+  role: string;
+  organization_id: string | null;
   avatar_url: string | null;
   bio: string | null;
   phone: string | null;
@@ -139,6 +141,8 @@ export default function SettingsPage() {
   const [switchingType, setSwitchingType] = useState(false);
   const [selectedType, setSelectedType] = useState("");
   const [switchOrgName, setSwitchOrgName] = useState("");
+  const [myOrgs, setMyOrgs] = useState<{ org_id: string; org_name: string; role: string; active: boolean }[]>([]);
+  const [switchingOrg, setSwitchingOrg] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -162,6 +166,12 @@ export default function SettingsPage() {
         setThemeMode(s.theme_mode);
         setEditorFontSize(String(s.editor_font_size));
         setSelectedType(u.account_type);
+        if (data.orgMemberships && Array.isArray(data.orgMemberships)) {
+          setMyOrgs(data.orgMemberships.map((m: { org_id: string; org_name: string; role: string }) => ({
+            ...m,
+            active: m.org_id === u.organization_id,
+          })));
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -829,6 +839,43 @@ export default function SettingsPage() {
           <div>
             <h2 className="text-xl font-bold text-ink mb-1">{t("settings.organization")}</h2>
             <p className="text-sm text-mute mb-6">{t("settings.manageMasjid")}</p>
+
+            {myOrgs.length > 1 && (
+              <div className="mb-6">
+                <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.myOrgs")}</p>
+                <div className="space-y-2">
+                  {myOrgs.map((org) => (
+                    <div key={org.org_id} className={`flex items-center gap-3 px-4 py-3 border rounded ${org.active ? "border-primary bg-primary/5" : "border-line bg-white"}`}>
+                      <span className="material-symbols-outlined text-primary text-lg">mosque</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-ink truncate">{org.org_name}</p>
+                        <p className="text-[11px] text-mute">{org.role}</p>
+                      </div>
+                      {org.active ? (
+                        <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">{t("settings.activeOrg")}</span>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            setSwitchingOrg(org.org_id);
+                            await fetch("/api/settings", {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ section: "org_switch", org_id: org.org_id }),
+                            });
+                            setSwitchingOrg(null);
+                            window.location.reload();
+                          }}
+                          disabled={switchingOrg === org.org_id}
+                          className="px-3 py-1.5 text-[11px] font-semibold text-primary bg-white border border-primary/30 rounded hover:bg-primary/5 transition-colors disabled:opacity-50"
+                        >
+                          {switchingOrg === org.org_id ? "..." : t("settings.switchOrg")}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="bg-surface border border-line p-6 text-center">
               <span className="material-symbols-outlined text-primary text-4xl mb-3 block">group</span>
