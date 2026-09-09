@@ -61,6 +61,13 @@ export async function PUT(req: Request, { params }: Params) {
       await exec("UPDATE org_members SET role = 'khatib', updated_at = NOW() WHERE id = $1", [adminMember.id]);
     }
     await exec("UPDATE users SET role = 'khatib', updated_at = NOW() WHERE id = $1", [userId]);
+  } else if (action === "assign_mosque") {
+    const { mosque_id } = body;
+    if (mosque_id) {
+      const mosque = await queryOne("SELECT id FROM mosques WHERE id = $1 AND organization_id = $2", [mosque_id, user.organization_id]);
+      if (!mosque) return NextResponse.json({ error: "Mosque not found" }, { status: 400 });
+    }
+    await exec("UPDATE org_members SET mosque_id = $1, updated_at = NOW() WHERE id = $2", [mosque_id || null, id]);
   } else {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }

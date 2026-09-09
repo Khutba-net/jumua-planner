@@ -21,20 +21,35 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const from = url.searchParams.get("from") || new Date().toISOString().split("T")[0];
   const weeks = Math.min(Math.max(parseInt(url.searchParams.get("weeks") || "12") || 12, 1), 52);
+  const mosqueId = url.searchParams.get("mosque_id");
+
+  const assignmentParams: unknown[] = [user.organization_id, from, weeks];
+  let assignmentWhere = "fa.organization_id = $1 AND fa.friday_date >= $2";
+  if (mosqueId) {
+    assignmentWhere += " AND fa.mosque_id = $4";
+    assignmentParams.push(mosqueId);
+  }
 
   const assignments = await query(`
-    SELECT fa.id, fa.friday_date, fa.member_id, fa.guest_name, fa.status, fa.swap_reason, fa.notes,
+    SELECT fa.id, fa.friday_date, fa.member_id, fa.guest_name, fa.status, fa.swap_reason, fa.notes, fa.mosque_id,
            m.name as khatib_name, m.status as khatib_status
     FROM friday_assignments fa
     LEFT JOIN org_members m ON m.id = fa.member_id
-    WHERE fa.organization_id = $1 AND fa.friday_date >= $2
+    WHERE ${assignmentWhere}
     ORDER BY fa.friday_date ASC
     LIMIT $3
-  `, [user.organization_id, from, weeks]);
+  `, assignmentParams);
+
+  const memberParams: unknown[] = [user.organization_id];
+  let memberWhere = "organization_id = $1 AND role = 'khatib' AND status = 'active'";
+  if (mosqueId) {
+    memberWhere += " AND mosque_id = $2";
+    memberParams.push(mosqueId);
+  }
 
   const members = await query(
-    "SELECT id, name, status FROM org_members WHERE organization_id = $1 AND role = 'khatib' AND status = 'active' ORDER BY name",
-    [user.organization_id]
+    `SELECT id, name, status FROM org_members WHERE ${memberWhere} ORDER BY name`,
+    memberParams
   );
 
   const myMember = await queryOne<{ id: string }>(
@@ -62,7 +77,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { friday_date, member_id, guest_name, notes } = body;
+  const { friday_date, member_id, guest_name, notes, mosque_id } = body;
 
   if (!friday_date || typeof friday_date !== "string" || !DATE_REGEX.test(friday_date)) {
     return NextResponse.json({ error: "Valid Friday date is required (YYYY-MM-DD)" }, { status: 400 });
@@ -80,9 +95,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Notes are too long" }, { status: 400 });
   }
 
+  if (mosque_id) {
+    const mosque = await queryOne("SELECT id FROM mosques WHERE id = $1 AND organization_id = $2", [mosque_id, user.organization_id]);
+    if (!mosque) return NextResponse.json({ error: "Mosque not found" }, { status: 400 });
+  }
+
+  const existingParams: unknown[] = [user.organization_id, friday_date];
+  let existingWhere = "organization_id = $1 AND friday_date = $2";
+  if (mosque_id) {
+    existingWhere += " AND mosque_id = $3";
+    existingParams.push(mosque_id);
+  } else {
+    existingWhere += " AND mosque_id IS NULL";
+  }
   const existing = await queryOne(
-    "SELECT id FROM friday_assignments WHERE organization_id = $1 AND friday_date = $2",
-    [user.organization_id, friday_date]
+    `SELECT id FROM friday_assignments WHERE ${existingWhere}`,
+    existingParams
   );
 
   if (existing) {
@@ -101,8 +129,8 @@ export async function POST(req: Request) {
 
   const id = cuid();
   await query(
-    "INSERT INTO friday_assignments (id, organization_id, member_id, friday_date, guest_name, notes) VALUES ($1, $2, $3, $4, $5, $6)",
-    [id, user.organization_id, member_id || null, friday_date, guest_name?.slice(0, 200) || null, notes?.slice(0, 1000) || null]
+    "INSERT INTO friday_assignments (id, organization_id, mosque_id, member_id, friday_date, guest_name, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    [id, user.organization_id, mosque_id || null, member_id || null, friday_date, guest_name?.slice(0, 200) || null, notes?.slice(0, 1000) || null]
   );
 
   const assignment = await queryOne("SELECT * FROM friday_assignments WHERE id = $1", [id]);

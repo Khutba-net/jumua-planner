@@ -279,15 +279,25 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3 mb-4">
               <span className="material-symbols-outlined text-primary text-2xl">admin_panel_settings</span>
               <div>
-                <p className="text-sm font-semibold text-ink">{t("dash.adminDashboard")}</p>
-                <p className="text-xs text-mute">{t("dash.adminDesc")}</p>
+                <p className="text-sm font-semibold text-ink">
+                  {data.user.account_type === "institution" ? t("org.institutionDashboard") : t("dash.adminDashboard")}
+                </p>
+                <p className="text-xs text-mute">
+                  {data.user.account_type === "institution" ? t("org.institutionDesc") : t("dash.adminDesc")}
+                </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className={`grid grid-cols-1 ${data.user.account_type === "institution" ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3`}>
               <Link href="/org/dashboard" className="bg-surface border border-line/50 p-4 hover:bg-primary/5 transition-colors flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary">monitoring</span>
                 <span className="text-sm font-medium text-ink">{t("nav.orgDashboard")}</span>
               </Link>
+              {data.user.account_type === "institution" && (
+                <Link href="/org/mosques" className="bg-surface border border-line/50 p-4 hover:bg-primary/5 transition-colors flex items-center gap-3">
+                  <span className="material-symbols-outlined text-primary">mosque</span>
+                  <span className="text-sm font-medium text-ink">{t("nav.mosques")}</span>
+                </Link>
+              )}
               <Link href="/org/schedule" className="bg-surface border border-line/50 p-4 hover:bg-primary/5 transition-colors flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary">date_range</span>
                 <span className="text-sm font-medium text-ink">{t("nav.schedule")}</span>

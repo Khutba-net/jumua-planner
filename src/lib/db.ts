@@ -202,6 +202,7 @@ async function initTables() {
         id TEXT PRIMARY KEY,
         organization_id TEXT NOT NULL REFERENCES organizations(id),
         user_id TEXT REFERENCES users(id),
+        mosque_id TEXT REFERENCES mosques(id),
         name TEXT NOT NULL,
         email TEXT,
         role TEXT NOT NULL DEFAULT 'khatib',
@@ -232,6 +233,7 @@ async function initTables() {
       CREATE TABLE IF NOT EXISTS friday_assignments (
         id TEXT PRIMARY KEY,
         organization_id TEXT NOT NULL REFERENCES organizations(id),
+        mosque_id TEXT REFERENCES mosques(id),
         member_id TEXT REFERENCES org_members(id),
         friday_date TEXT NOT NULL,
         guest_name TEXT,
@@ -240,9 +242,13 @@ async function initTables() {
         notes TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE(organization_id, friday_date)
+        UNIQUE(organization_id, mosque_id, friday_date)
       );
     `);
+
+    // Add mosque_id columns to existing tables (safe to run multiple times)
+    await client.query(`ALTER TABLE org_members ADD COLUMN IF NOT EXISTS mosque_id TEXT REFERENCES mosques(id)`).catch(() => {});
+    await client.query(`ALTER TABLE friday_assignments ADD COLUMN IF NOT EXISTS mosque_id TEXT REFERENCES mosques(id)`).catch(() => {});
 
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`);
@@ -261,6 +267,9 @@ async function initTables() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_org_members_invite_code ON org_members(invite_code)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_friday_assignments_org_date ON friday_assignments(organization_id, friday_date)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_friday_assignments_member ON friday_assignments(member_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_org_members_mosque_id ON org_members(mosque_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_friday_assignments_mosque_id ON friday_assignments(mosque_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_mosques_org_id ON mosques(organization_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`);
 

@@ -14,11 +14,21 @@ type KhatibStat = {
   this_week_sermon: { id: string; title: string; status: string; scheduled_date: string } | null;
 };
 
+type MosqueOverview = {
+  id: string;
+  name: string;
+  city: string | null;
+  khatib_count: number;
+  active_khatib_count: number;
+  thisFriday: { khatib: string | null; isGuest: boolean } | null;
+};
+
 type DashboardData = {
   organization: { id: string; name: string; type: string; city: string; country: string };
   stats: { totalKhatibs: number; activeKhatibs: number; pendingInvites: number };
   khatibStats: KhatibStat[];
   thisFriday: { date: string; khatib: string | null; isGuest: boolean; notes: string | null };
+  mosqueOverview: MosqueOverview[] | null;
 };
 
 export default function OrgDashboardPage() {
@@ -51,9 +61,10 @@ export default function OrgDashboardPage() {
     );
   }
 
-  const { organization, stats, khatibStats, thisFriday } = data;
+  const { organization, stats, khatibStats, thisFriday, mosqueOverview } = data;
   const totalSermons = khatibStats.reduce((s, k) => s + k.total_sermons, 0);
   const deliveredSermons = khatibStats.reduce((s, k) => s + k.delivered_sermons, 0);
+  const isInstitution = organization.type === "institution";
 
   const fridayFormatted = new Date(thisFriday.date + "T00:00:00").toLocaleDateString(
     isAr ? "ar-SA" : "en-US",
@@ -100,12 +111,58 @@ export default function OrgDashboardPage() {
         )}
       </div>
 
+      {/* Mosque overview (institution only) */}
+      {isInstitution && mosqueOverview && mosqueOverview.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-ink/50 uppercase tracking-wider">{t("org.mosquesOverview")}</h2>
+            <Link
+              href="/org/mosques"
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              {t("dash.viewAll")}
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {mosqueOverview.map((m) => (
+              <Link
+                key={m.id}
+                href={`/org/mosques/${m.id}`}
+                className="bg-white border border-line rounded-xl p-4 hover:border-primary/30 transition-colors block"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <span className="material-symbols-outlined text-xl">mosque</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-ink text-sm truncate">{m.name}</p>
+                    <p className="text-xs text-mute">{m.city || " "} · {m.active_khatib_count} {t("org.mosqueKhatibs").toLowerCase()}</p>
+                  </div>
+                </div>
+                <div className={`rounded-lg p-2.5 text-xs ${m.thisFriday ? "bg-primary/5" : "bg-amber-50"}`}>
+                  <span className="font-semibold text-ink/50">{t("org.thisWeekSchedule")}:</span>{" "}
+                  {m.thisFriday ? (
+                    <span className="font-semibold text-ink">
+                      {m.thisFriday.khatib}
+                      {m.thisFriday.isGuest && <span className="text-accent-gold ms-1">({t("org.guest")})</span>}
+                    </span>
+                  ) : (
+                    <span className="text-mute italic">{t("org.unassigned")}</span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         {[
+          ...(isInstitution ? [{ label: t("org.totalMosques"), value: mosqueOverview?.length ?? 0, icon: "mosque", color: "text-primary" }] : []),
           { label: t("org.totalKhatibs"), value: stats.totalKhatibs, icon: "group", color: "text-primary" },
           { label: t("org.activeKhatibs"), value: stats.activeKhatibs, icon: "check_circle", color: "text-emerald-600" },
-          { label: t("org.pendingInvites"), value: stats.pendingInvites, icon: "schedule", color: "text-amber-600" },
+          ...(isInstitution ? [] : [{ label: t("org.pendingInvites"), value: stats.pendingInvites, icon: "schedule", color: "text-amber-600" }]),
           { label: t("org.totalSermons"), value: totalSermons, icon: "description", color: "text-primary" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-line rounded-xl p-4">

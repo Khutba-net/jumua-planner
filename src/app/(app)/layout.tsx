@@ -129,6 +129,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
               <p className="px-4 text-[10px] font-bold text-mute uppercase tracking-wider mb-1">{t("nav.organization")}</p>
               {(user.role === "admin" ? [
                 { href: "/org/dashboard", key: "nav.orgDashboard", icon: "monitoring" },
+                ...(user.account_type === "institution" ? [{ href: "/org/mosques", key: "nav.mosques", icon: "mosque" }] : []),
                 { href: "/org/schedule", key: "nav.schedule", icon: "date_range" },
                 { href: "/org/khatibs", key: "nav.khatibs", icon: "group" },
               ] : [

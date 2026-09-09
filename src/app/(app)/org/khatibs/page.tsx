@@ -13,6 +13,13 @@ type Member = {
   invite_code: string | null;
   invite_expires_at: string | null;
   created_at: string;
+  mosque_id: string | null;
+  mosque_name: string | null;
+};
+
+type Mosque = {
+  id: string;
+  name: string;
 };
 
 export default function KhatibsPage() {
@@ -26,6 +33,15 @@ export default function KhatibsPage() {
   const [adding, setAdding] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [mosques, setMosques] = useState<Mosque[]>([]);
+  const [isInstitution, setIsInstitution] = useState(false);
+
+  const fetchMosques = useCallback(() => {
+    fetch("/api/org/mosques")
+      .then((r) => { if (r.ok) { setIsInstitution(true); return r.json(); } return []; })
+      .then((d) => { if (Array.isArray(d)) setMosques(d); })
+      .catch(() => {});
+  }, []);
 
   const fetchMembers = useCallback(() => {
     fetch("/api/org/members")
@@ -34,7 +50,7 @@ export default function KhatibsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { fetchMembers(); }, [fetchMembers]);
+  useEffect(() => { fetchMembers(); fetchMosques(); }, [fetchMembers, fetchMosques]);
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
@@ -160,8 +176,38 @@ export default function KhatibsPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-ink text-sm">{m.name}</p>
-              {m.email && <p className="text-xs text-mute truncate">{m.email}</p>}
+              <div className="flex items-center gap-2">
+                {m.email && <p className="text-xs text-mute truncate">{m.email}</p>}
+                {isInstitution && m.mosque_name && (
+                  <span className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-full font-semibold truncate max-w-[140px]">
+                    {m.mosque_name}
+                  </span>
+                )}
+              </div>
             </div>
+
+            {isInstitution && m.status === "active" && (
+              <select
+                value={m.mosque_id || ""}
+                onChange={async (e) => {
+                  setActionLoading(m.id);
+                  await fetch(`/api/org/members/${m.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "assign_mosque", mosque_id: e.target.value || null }),
+                  });
+                  fetchMembers();
+                  setActionLoading(null);
+                }}
+                disabled={actionLoading === m.id}
+                className="text-xs px-2 py-1 rounded-lg border border-line bg-white text-ink focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/10 max-w-[120px]"
+              >
+                <option value="">{t("org.unassignedMosque")}</option>
+                {mosques.map((mq) => (
+                  <option key={mq.id} value={mq.id}>{mq.name}</option>
+                ))}
+              </select>
+            )}
 
             <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${statusColor(m.status)}`}>
               {t(`org.status.${m.status}`)}

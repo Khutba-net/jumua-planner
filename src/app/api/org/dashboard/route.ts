@@ -74,6 +74,43 @@ export async function GET() {
     LIMIT 1
   `, [user.organization_id, thisFridayDate]);
 
+  // For institution accounts, include mosque overview
+  let mosqueOverview = null;
+  if (org && (org as Record<string, unknown>).type === "institution") {
+    const mosques = await query<{ id: string; name: string; city: string | null; khatib_count: string; active_khatib_count: string }>(`
+      SELECT m.id, m.name, m.city,
+        (SELECT COUNT(*) FROM org_members om WHERE om.mosque_id = m.id AND om.role = 'khatib') as khatib_count,
+        (SELECT COUNT(*) FROM org_members om WHERE om.mosque_id = m.id AND om.role = 'khatib' AND om.status = 'active') as active_khatib_count
+      FROM mosques m
+      WHERE m.organization_id = $1
+      ORDER BY m.created_at ASC
+    `, [user.organization_id]);
+
+    const mosqueSchedules = [];
+    for (const mosque of mosques) {
+      const assignment = await queryOne<{ friday_date: string; guest_name: string | null; khatib_name: string | null }>(`
+        SELECT fa.friday_date, fa.guest_name, m.name as khatib_name
+        FROM friday_assignments fa
+        LEFT JOIN org_members m ON fa.member_id = m.id
+        WHERE fa.mosque_id = $1 AND fa.friday_date = $2
+        LIMIT 1
+      `, [mosque.id, thisFridayDate]);
+
+      mosqueSchedules.push({
+        id: mosque.id,
+        name: mosque.name,
+        city: mosque.city,
+        khatib_count: Number(mosque.khatib_count),
+        active_khatib_count: Number(mosque.active_khatib_count),
+        thisFriday: assignment ? {
+          khatib: assignment.guest_name || assignment.khatib_name,
+          isGuest: !!assignment.guest_name,
+        } : null,
+      });
+    }
+    mosqueOverview = mosqueSchedules;
+  }
+
   return NextResponse.json(toJSON({
     organization: org,
     stats: { totalKhatibs, activeKhatibs, pendingInvites },
@@ -84,5 +121,6 @@ export async function GET() {
       isGuest: !!thisFridayAssignment.guest_name,
       notes: thisFridayAssignment.notes,
     } : { date: thisFridayDate, khatib: null, isGuest: false, notes: null },
+    mosqueOverview,
   }));
 }

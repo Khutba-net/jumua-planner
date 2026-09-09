@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   const body = await req.json();
-  const { account_type, org_name, city, country, planning_year, khatib_names } = body;
+  const { account_type, org_name, city, country, planning_year, khatib_names, mosque_entries } = body;
 
   if (user.organization_id && user.role === "khatib") {
     await query(
@@ -55,17 +55,29 @@ export async function POST(req: Request) {
           [cuid(), organizationId, userId, user.name]
         );
 
-        const names: string[] = Array.isArray(khatib_names) ? khatib_names : [];
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        if (account_type === "institution") {
+          const entries: { name: string; city?: string }[] = Array.isArray(mosque_entries) ? mosque_entries : [];
+          for (const entry of entries) {
+            const trimmedName = entry.name?.trim();
+            if (!trimmedName) continue;
+            await client.query(
+              "INSERT INTO mosques (id, name, city, organization_id) VALUES ($1, $2, $3, $4)",
+              [cuid(), trimmedName.slice(0, 200), entry.city?.trim()?.slice(0, 100) || null, organizationId]
+            );
+          }
+        } else {
+          const names: string[] = Array.isArray(khatib_names) ? khatib_names : [];
+          const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        for (const kn of names) {
-          const trimmed = kn.trim();
-          if (!trimmed) continue;
-          const inviteCode = randomBytes(4).toString("hex");
-          await client.query(
-            "INSERT INTO org_members (id, organization_id, name, role, status, invite_code, invite_expires_at) VALUES ($1, $2, $3, 'khatib', 'invited', $4, $5)",
-            [cuid(), organizationId, trimmed, inviteCode, expiresAt]
-          );
+          for (const kn of names) {
+            const trimmed = kn.trim();
+            if (!trimmed) continue;
+            const inviteCode = randomBytes(4).toString("hex");
+            await client.query(
+              "INSERT INTO org_members (id, organization_id, name, role, status, invite_code, invite_expires_at) VALUES ($1, $2, $3, 'khatib', 'invited', $4, $5)",
+              [cuid(), organizationId, trimmed, inviteCode, expiresAt]
+            );
+          }
         }
       }
 
