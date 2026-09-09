@@ -104,6 +104,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [backlogOpen, setBacklogOpen] = useState(false);
   const [loggingId, setLoggingId] = useState<string | null>(null);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState<"friday" | "eid" | "talk" | "other">("friday");
@@ -257,6 +258,36 @@ export default function DashboardPage() {
       setFeedbackAttendance("");
       setFeedbackComment("");
     }
+  }
+
+  async function handleBulkLog(status: "delivered" | "skipped") {
+    if (!data || data.backlogSermons.length === 0) return;
+    setBulkUpdating(true);
+    const ids = data.backlogSermons.map((s) => s.id);
+    await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/sermons/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        })
+      )
+    );
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        backlogSermons: [],
+        backlogCount: 0,
+        stats: {
+          ...prev.stats,
+          delivered: status === "delivered" ? prev.stats.delivered + ids.length : prev.stats.delivered,
+        },
+        lastFriday: null,
+      };
+    });
+    setBulkUpdating(false);
+    setBacklogOpen(false);
   }
 
   async function handleFeedbackSubmit() {
@@ -614,7 +645,28 @@ export default function DashboardPage() {
               </span>
             </button>
             {backlogOpen && (
-              <div className="border-t border-red-200 divide-y divide-red-100">
+              <div className="border-t border-red-200">
+                {data.backlogSermons.length > 1 && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50/50 border-b border-red-200">
+                    <button
+                      onClick={() => handleBulkLog("delivered")}
+                      disabled={bulkUpdating}
+                      className="px-3 py-1.5 bg-primary text-white text-[11px] font-medium rounded hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">done_all</span>
+                      {bulkUpdating ? t("dash.bulkUpdating") : t("dash.markAllDelivered")}
+                    </button>
+                    <button
+                      onClick={() => handleBulkLog("skipped")}
+                      disabled={bulkUpdating}
+                      className="px-3 py-1.5 border border-line bg-white text-mute text-[11px] font-medium rounded hover:bg-surface transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">skip_next</span>
+                      {bulkUpdating ? t("dash.bulkUpdating") : t("dash.markAllSkipped")}
+                    </button>
+                  </div>
+                )}
+                <div className="divide-y divide-red-100">
                 {data.backlogSermons.map((sermon) => (
                   <div key={sermon.id} className="flex items-center gap-3 px-4 py-3">
                     <div className="flex-1 min-w-0">
@@ -649,6 +701,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+                </div>
               </div>
             )}
           </div>

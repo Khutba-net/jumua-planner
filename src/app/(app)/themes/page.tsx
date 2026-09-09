@@ -188,6 +188,7 @@ export default function AnnualPlanPage() {
   const [seasonFullModal, setSeasonFullModal] = useState<{ seasonN: number; theme: Theme } | null>(null);
   const [overwriteTarget, setOverwriteTarget] = useState<string | null>(null);
   const [deliveryCounts, setDeliveryCounts] = useState<Record<string, number>>({});
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     try {
@@ -220,6 +221,27 @@ export default function AnnualPlanPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+  }
+
+  async function importFromYear(fromYear: number) {
+    setImporting(true);
+    try {
+      const res = await fetch("/api/themes/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromYear, toYear: year }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || t("themes.importError"));
+        return;
+      }
+      fetchAll();
+    } catch {
+      alert(t("themes.importError"));
+    } finally {
+      setImporting(false);
+    }
   }
 
   const yearThemes = useMemo(
@@ -581,7 +603,7 @@ export default function AnnualPlanPage() {
               gridAddIso={gridAddIso} gridAddText={gridAddText} setGridAddText={setGridAddText}
               onStartGridAdd={startGridAdd} onCancelGridAdd={cancelGridAdd} onSubmitGridAdd={submitGridAdd} gridBusy={gridBusy} />
           ) : yearThemes.length === 0 ? (
-            <EmptyWizard year={year} onStart={() => openCreate(1)} />
+            <EmptyWizard year={year} onStart={() => openCreate(1)} onImport={importFromYear} importing={importing} />
           ) : (
             <div className="flex flex-col gap-4 max-w-6xl">
               {seasonGroups.map((sg, i) => (
@@ -1246,8 +1268,9 @@ function YearGrid({
 }
 
 /* ── Empty state / guided wizard ── */
-function EmptyWizard({ year, onStart }: { year: number; onStart: () => void }) {
+function EmptyWizard({ year, onStart, onImport, importing }: { year: number; onStart: () => void; onImport: (fromYear: number) => void; importing: boolean }) {
   const { t } = useI18n();
+  const prevYear = year - 1;
   const steps = [
     { icon: "category", title: t("themes.step1"), desc: t("themes.step1Desc") },
     { icon: "account_tree", title: t("themes.step2"), desc: t("themes.step2Desc") },
@@ -1272,10 +1295,18 @@ function EmptyWizard({ year, onStart }: { year: number; onStart: () => void }) {
           </div>
         ))}
       </div>
-      <button onClick={onStart}
-        className="px-7 py-3 bg-primary text-white text-sm font-bold rounded-full hover:bg-secondary transition-all active:scale-95 shadow-sm">
-        {t("themes.startSeason1")}
-      </button>
+      <div className="flex flex-col items-center gap-3">
+        <button onClick={onStart}
+          className="px-7 py-3 bg-primary text-white text-sm font-bold rounded-full hover:bg-secondary transition-all active:scale-95 shadow-sm">
+          {t("themes.startSeason1")}
+        </button>
+        <p className="text-[12px] text-mute">{t("themes.orImport")}</p>
+        <button onClick={() => onImport(prevYear)} disabled={importing}
+          className="px-5 py-2.5 text-[13px] font-semibold text-primary bg-primary/5 border border-primary/20 rounded-full hover:bg-primary/10 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2">
+          <span className="material-symbols-outlined text-[16px]">content_copy</span>
+          {importing ? t("themes.importing") : `${t("themes.importPlan")} (${prevYear})`}
+        </button>
+      </div>
     </div>
   );
 }

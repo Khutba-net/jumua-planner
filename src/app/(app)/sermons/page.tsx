@@ -21,6 +21,11 @@ const statusDot: Record<string, string> = {
   ready: "bg-green-500",
   delivered: "bg-primary",
   archived: "bg-mute/30",
+  submitted: "bg-blue-500",
+  in_review: "bg-amber-500",
+  approved: "bg-green-600",
+  rejected: "bg-red-400",
+  skipped: "bg-mute/30",
 };
 
 const typeIcon: Record<string, string> = {
@@ -52,6 +57,11 @@ export default function SermonsPage() {
     ready: t("status.ready"),
     delivered: t("status.delivered"),
     archived: t("status.archived"),
+    skipped: t("status.skipped"),
+    submitted: t("status.submitted"),
+    in_review: t("status.inReview"),
+    approved: t("status.approved"),
+    rejected: t("status.rejected"),
   };
 
   const typeLabel: Record<string, string> = {
@@ -90,6 +100,20 @@ export default function SermonsPage() {
     acc[tp] = (acc[tp] || 0) + 1;
     return acc;
   }, {});
+
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+
+  async function handleDuplicate(e: React.MouseEvent, sermonId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDuplicatingId(sermonId);
+    const res = await fetch(`/api/sermons/${sermonId}/duplicate`, { method: "POST" });
+    if (res.ok) {
+      const newSermon = await res.json();
+      router.push(`/sermons/${newSermon.id}/edit`);
+    }
+    setDuplicatingId(null);
+  }
 
   async function handleCreate() {
     if (!newTitle.trim()) return;
@@ -287,10 +311,18 @@ export default function SermonsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {sermon.scheduled_date && (
                       <p className="text-xs text-mute">{formatDate(sermon.scheduled_date)}</p>
                     )}
+                    <button
+                      onClick={(e) => handleDuplicate(e, sermon.id)}
+                      disabled={duplicatingId === sermon.id}
+                      title={t("sermons.duplicate")}
+                      className="w-7 h-7 grid place-items-center text-mute/40 hover:text-primary hover:bg-primary/5 rounded transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                    </button>
                   </div>
                 </div>
               </Link>

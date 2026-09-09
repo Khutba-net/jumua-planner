@@ -32,7 +32,7 @@ function wordCount(text: string | null) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-const allStatuses = ["draft", "ready", "delivered", "archived", "skipped"];
+const allStatuses = ["draft", "ready", "submitted", "in_review", "approved", "delivered", "archived", "skipped"];
 
 const statusStyle: Record<string, string> = {
   draft: "bg-[#f3f0ea] text-[#8a7968]",
@@ -116,6 +116,10 @@ export default function SermonEditorPage({
   const [overrideSaving, setOverrideSaving] = useState(false);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [userRole, setUserRole] = useState<string>("member");
+  const [hasOrg, setHasOrg] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [recoveredDraft, setRecoveredDraft] = useState<{ title: string; content: string; notes: string } | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
   const locale = isAr ? "ar-SA" : "en-US";
@@ -125,6 +129,10 @@ export default function SermonEditorPage({
     ready: t("status.ready"),
     delivered: t("status.delivered"),
     archived: t("status.archived"),
+    submitted: t("status.submitted"),
+    in_review: t("status.inReview"),
+    approved: t("status.approved"),
+    rejected: t("status.rejected"),
   };
 
   useEffect(() => {
@@ -134,6 +142,10 @@ export default function SermonEditorPage({
         if (data.settings) {
           setUserWordTarget(data.settings.word_target || 2500);
           setEditorFontSize(data.settings.editor_font_size || 16);
+        }
+        if (data.user) {
+          setUserRole(data.user.role || "member");
+          setHasOrg(!!data.user.organization_id);
         }
       })
       .catch(() => {});
@@ -162,25 +174,51 @@ export default function SermonEditorPage({
         setNotes(data.notes ?? "");
         setReferences(data.references ?? []);
         setLoading(false);
+        try {
+          const saved = localStorage.getItem(`jp_draft_${id}`);
+          if (saved) {
+            const draft = JSON.parse(saved);
+            if (draft.content !== data.content || draft.title !== data.title || draft.notes !== (data.notes ?? "")) {
+              setRecoveredDraft(draft);
+            } else {
+              localStorage.removeItem(`jp_draft_${id}`);
+            }
+          }
+        } catch {}
       })
       .catch(() => setLoading(false));
   }, [id]);
 
   const save = useCallback(async (overrides?: { status?: string }) => {
     setSaving(true);
-    await fetch(`/api/sermons/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title,
-        content,
-        outline: "",
-        status: overrides?.status ?? status,
-        scheduledDate: scheduledDate || null,
-        notes,
-      }),
-    });
-    setLastSaved(new Date());
+    try {
+      const res = await fetch(`/api/sermons/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          content,
+          outline: "",
+          status: overrides?.status ?? status,
+          scheduledDate: scheduledDate || null,
+          notes,
+        }),
+      });
+      if (res.status === 401) {
+        try {
+          localStorage.setItem(`jp_draft_${id}`, JSON.stringify({ title, content, notes, savedAt: Date.now() }));
+        } catch {}
+        setSessionExpired(true);
+        setSaving(false);
+        return;
+      }
+      setLastSaved(new Date());
+      try { localStorage.removeItem(`jp_draft_${id}`); } catch {}
+    } catch {
+      try {
+        localStorage.setItem(`jp_draft_${id}`, JSON.stringify({ title, content, notes, savedAt: Date.now() }));
+      } catch {}
+    }
     setSaving(false);
   }, [id, title, content, status, scheduledDate, notes]);
 
@@ -433,6 +471,49 @@ export default function SermonEditorPage({
             </select>
           </div>
 
+          {hasOrg && (status === "ready" || status === "draft") && userRole !== "admin" && (
+            <button
+              onClick={() => changeStatus("submitted")}
+              className="w-full mb-2.5 px-3 py-2 bg-blue-600 text-white text-[11px] font-semibold rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[14px]">send</span>
+              {t("approval.submit")}
+            </button>
+          )}
+          {hasOrg && (status === "submitted" || status === "in_review") && userRole === "admin" && (
+            <div className="mb-2.5 flex flex-col gap-1.5">
+              {status === "submitted" && (
+                <button
+                  onClick={() => changeStatus("in_review")}
+                  className="w-full px-3 py-2 bg-amber-500 text-white text-[11px] font-semibold rounded hover:bg-amber-600 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[14px]">rate_review</span>
+                  {t("status.inReview")}
+                </button>
+              )}
+              <button
+                onClick={() => changeStatus("approved")}
+                className="w-full px-3 py-2 bg-green-600 text-white text-[11px] font-semibold rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                {t("approval.approve")}
+              </button>
+              <button
+                onClick={() => changeStatus("rejected")}
+                className="w-full px-3 py-2 border border-red-200 text-red-600 text-[11px] font-semibold rounded hover:bg-red-50 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[14px]">undo</span>
+                {t("approval.reject")}
+              </button>
+            </div>
+          )}
+          {hasOrg && (status === "submitted" || status === "in_review") && userRole !== "admin" && (
+            <div className="mb-2.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-700 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px]">hourglass_top</span>
+              {t("approval.pending")}
+            </div>
+          )}
+
           <div className="mb-2.5">
             <p className="text-[10px] text-mute/60">{t("editor.words")}</p>
             <p className="text-xs font-medium text-ink">{words}</p>
@@ -549,6 +630,26 @@ export default function SermonEditorPage({
 
           {/* Title + Editor wrapper */}
           <div className="flex-1 flex flex-col min-h-0 bg-white">
+            {sessionExpired && (
+              <div className="mx-5 sm:mx-8 mt-4 flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-800">
+                <span className="material-symbols-outlined text-amber-500 text-lg">warning</span>
+                {t("editor.sessionExpired")}
+              </div>
+            )}
+            {recoveredDraft && (
+              <div className="mx-5 sm:mx-8 mt-4 flex items-center gap-2 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-[13px] text-blue-800">
+                <span className="material-symbols-outlined text-blue-500 text-lg">restore</span>
+                <span className="flex-1">{t("editor.recoveredDraft")}</span>
+                <button onClick={() => { setTitle(recoveredDraft.title); setContent(recoveredDraft.content); setNotes(recoveredDraft.notes); setRecoveredDraft(null); try { localStorage.removeItem(`jp_draft_${id}`); } catch {} }}
+                  className="px-3 py-1 bg-blue-600 text-white text-[11px] font-medium rounded hover:bg-blue-700 transition-colors">
+                  {t("editor.restoreDraft")}
+                </button>
+                <button onClick={() => { setRecoveredDraft(null); try { localStorage.removeItem(`jp_draft_${id}`); } catch {} }}
+                  className="px-3 py-1 border border-blue-200 text-blue-600 text-[11px] font-medium rounded hover:bg-blue-100 transition-colors">
+                  {t("editor.discardDraft")}
+                </button>
+              </div>
+            )}
             {/* Title */}
             <div className="px-5 sm:px-8 pt-5 pb-1">
               <input
