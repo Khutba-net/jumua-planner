@@ -162,6 +162,8 @@ async function initTables() {
         mosque_id TEXT REFERENCES mosques(id),
         theme_id TEXT REFERENCES themes(id),
         sub_topic_id TEXT REFERENCES sub_topics(id),
+        original_theme_id TEXT REFERENCES themes(id),
+        is_override INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
@@ -249,6 +251,8 @@ async function initTables() {
     // Add mosque_id columns to existing tables (safe to run multiple times)
     await client.query(`ALTER TABLE org_members ADD COLUMN IF NOT EXISTS mosque_id TEXT REFERENCES mosques(id)`).catch(() => {});
     await client.query(`ALTER TABLE friday_assignments ADD COLUMN IF NOT EXISTS mosque_id TEXT REFERENCES mosques(id)`).catch(() => {});
+    await client.query(`ALTER TABLE sermons ADD COLUMN IF NOT EXISTS original_theme_id TEXT REFERENCES themes(id)`).catch(() => {});
+    await client.query(`ALTER TABLE sermons ADD COLUMN IF NOT EXISTS is_override INTEGER NOT NULL DEFAULT 0`).catch(() => {});
 
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`);

@@ -24,6 +24,17 @@ function countFridaysInYear(year: number): number {
   return count;
 }
 
+function countFridaysFromDate(startDate: Date, year: number): number {
+  let count = 0;
+  const d = new Date(year, 0, 1);
+  while (d.getDay() !== 5) d.setDate(d.getDate() + 1);
+  while (d.getFullYear() === year) {
+    if (d >= startDate) count++;
+    d.setDate(d.getDate() + 7);
+  }
+  return count;
+}
+
 function getLastFriday(): string {
   const now = new Date();
   const day = now.getDay();
@@ -159,6 +170,7 @@ export async function GET() {
       deliveredSermons,
       progress: totalSermons > 0 ? Math.round((deliveredSermons / totalSermons) * 100) : 0,
       isCurrent: def.months.includes(currentMonth),
+      isPast: def.months[def.months.length - 1] < currentMonth,
     });
   }
 
@@ -187,6 +199,12 @@ export async function GET() {
 
   const deliveredThisYear = Number(planSermonStats?.delivered ?? 0);
 
+  const userCreatedAt = new Date(user.created_at as string);
+  const joinedInPlanningYear = userCreatedAt.getFullYear() === planningYear;
+  const effectiveFridays = joinedInPlanningYear
+    ? countFridaysFromDate(userCreatedAt, planningYear)
+    : countFridaysInYear(planningYear);
+
   let myAssignments: unknown[] = [];
   let orgName: string | null = null;
   if (user.organization_id) {
@@ -209,7 +227,7 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json(toJSON({
+  const responseData: Record<string, unknown> = {
     user,
     stats: {
       total: totalSermons,
@@ -234,12 +252,27 @@ export async function GET() {
     checklist: {
       themes: { done: seasonsWithThemes, total: 4 },
       subTopics: { done: subTopicsSet, total: 16 },
-      titles: { done: Number(planSermonStats?.titled ?? 0), total: countFridaysInYear(planningYear) },
-      delivered: { done: deliveredThisYear, total: countFridaysInYear(planningYear) },
+      titles: { done: Number(planSermonStats?.titled ?? 0), total: effectiveFridays },
+      delivered: { done: deliveredThisYear, total: effectiveFridays },
       reviewed: { done: feedbackCount, total: deliveredThisYear || 1 },
     },
     planningYear,
     orgName,
     myAssignments,
-  }));
+    nextYearPrompt: null,
+  };
+
+  const currentYear = new Date().getFullYear();
+  const currentMonthNum = new Date().getMonth() + 1;
+  if (currentMonthNum >= 10 && planningYear === currentYear) {
+    const nextYear = currentYear + 1;
+    const nextYearThemes = await queryOne<{ count: string }>(
+      "SELECT COUNT(*) as count FROM themes WHERE (owner_id = $1 OR organization_id IN (SELECT organization_id FROM users WHERE id = $2)) AND year = $3",
+      [userId, userId, nextYear]
+    );
+    const hasThemes = Number(nextYearThemes?.count ?? 0) > 0;
+    responseData.nextYearPrompt = { nextYear, hasThemes };
+  }
+
+  return NextResponse.json(toJSON(responseData));
 }

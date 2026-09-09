@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getUpcomingHijriEvents, getHijriDateString, type ResolvedHijriEvent } from "@/lib/hijri-events";
+import { getUpcomingHijriEvents, getHijriDateString, isEidDate, type ResolvedHijriEvent } from "@/lib/hijri-events";
 import { useI18n } from "@/lib/i18n";
 
 interface DashboardData {
@@ -74,6 +74,7 @@ interface DashboardData {
   planningYear: number;
   orgName: string | null;
   myAssignments: { friday_date: string; notes: string | null }[];
+  nextYearPrompt: { nextYear: number; hasThemes: boolean } | null;
 }
 
 const statusDot: Record<string, string> = {
@@ -108,6 +109,8 @@ export default function DashboardPage() {
   const [newType, setNewType] = useState<"friday" | "eid" | "talk" | "other">("friday");
   const [creating, setCreating] = useState(false);
   const [feedbackSermonId, setFeedbackSermonId] = useState<string | null>(null);
+  const [showSwapConfirm, setShowSwapConfirm] = useState(false);
+  const [swapping, setSwapping] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackAttendance, setFeedbackAttendance] = useState("");
   const [feedbackComment, setFeedbackComment] = useState("");
@@ -201,6 +204,29 @@ export default function DashboardPage() {
     setNewType("friday");
   }
 
+  async function handleEmergencySwap() {
+    if (!data?.thisFriday.sermon) return;
+    setSwapping(true);
+    await fetch(`/api/sermons/${data.thisFriday.sermon.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "archived" }),
+    });
+    const res = await fetch("/api/sermons", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "",
+        type: "friday",
+        scheduledDate: data.thisFriday.date,
+      }),
+    });
+    const newSermon = await res.json();
+    setSwapping(false);
+    setShowSwapConfirm(false);
+    router.push(`/sermons/${newSermon.id}/edit`);
+  }
+
   async function handleQuickLog(sermonId: string, status: "delivered" | "archived" | "skipped") {
     setLoggingId(sermonId);
     await fetch(`/api/sermons/${sermonId}`, {
@@ -257,8 +283,9 @@ export default function DashboardPage() {
     return <div className="flex items-center justify-center h-full text-mute">{t("dash.failedToLoad")}</div>;
   }
 
-  const { user, stats, recentSermons, upcomingSermons, thisFriday, lastFriday, backlogCount, backlogSermons, seasons, checklist, orgName, myAssignments } = data;
+  const { user, stats, recentSermons, upcomingSermons, thisFriday, lastFriday, backlogCount, backlogSermons, seasons, checklist, orgName, myAssignments, nextYearPrompt } = data;
   const isOrgAdmin = user.role === "admin" && user.account_type !== "individual";
+  const eidOnFriday = isEidDate(thisFriday.date);
 
   const seasonLabelMap: Record<string, string> = {
     "Season 1": t("season.1"),
@@ -428,6 +455,11 @@ export default function DashboardPage() {
                   <span className="material-symbols-outlined text-primary text-lg">mosque</span>
                   <span className="text-xs font-semibold text-primary">{getFridayLabel(thisFriday.date)}</span>
                   <span className="text-xs text-mute">{formatDate(thisFriday.date)}</span>
+                  {eidOnFriday && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-700 tracking-wide">
+                      {t("dash.eidFriday")}
+                    </span>
+                  )}
                 </div>
                 <p className="text-base font-semibold text-ink truncate">{thisFriday.sermon.title}</p>
                 <div className="flex items-center gap-3 mt-2">
@@ -441,7 +473,16 @@ export default function DashboardPage() {
                   <span className="text-xs text-mute">{wordCount(thisFriday.sermon.content)} {t("dash.words")}</span>
                 </div>
               </div>
-              <span className="material-symbols-outlined text-primary/40 group-hover:text-primary/60 transition-colors text-xl mt-1">arrow_forward</span>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <span className="material-symbols-outlined text-primary/40 group-hover:text-primary/60 transition-colors text-xl">arrow_forward</span>
+                <button
+                  onClick={(e) => { e.preventDefault(); setShowSwapConfirm(true); }}
+                  className="text-[10px] font-semibold text-red-500 hover:text-red-700 flex items-center gap-0.5 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[14px]">swap_horiz</span>
+                  {t("dash.swapSermon")}
+                </button>
+              </div>
             </div>
           </Link>
         ) : (
@@ -458,6 +499,25 @@ export default function DashboardPage() {
             >
               {t("dash.planSermon")}
             </button>
+          </div>
+        )}
+
+        {/* Eid Friday Banner */}
+        {eidOnFriday && (
+          <div className="bg-amber-50 border border-amber-200 p-4 mb-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-amber-600 text-xl mt-0.5">celebration</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-800">
+                {t("dash.eidFriday")} — {isAr ? eidOnFriday.nameAr : eidOnFriday.name}
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">{t("dash.eidFridayNote")}</p>
+              <button
+                onClick={() => { setNewType("eid"); openNewForm(); }}
+                className="mt-2 text-xs font-semibold px-3 py-1.5 bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+              >
+                {t("dash.createEidSermon")}
+              </button>
+            </div>
           </div>
         )}
 
@@ -731,6 +791,45 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Year Transition Prompt */}
+        {nextYearPrompt && !nextYearPrompt.hasThemes && (
+          <div className="bg-primary/5 border border-primary/15 p-5 mb-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-primary text-2xl mt-0.5">event_upcoming</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-ink">
+                {t("dash.nextYearTitle")} {nextYearPrompt.nextYear}?
+              </p>
+              <p className="text-xs text-mute mt-1">{t("dash.nextYearDesc")}</p>
+              <button
+                onClick={async () => {
+                  await fetch("/api/settings", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ section: "profile", name: user.name }),
+                  });
+                  await fetch(`/api/settings`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ section: "sermon", default_language: "ar-first" }),
+                  });
+                  window.location.href = `/themes?year=${nextYearPrompt.nextYear}`;
+                }}
+                className="mt-3 text-xs font-semibold px-4 py-2 bg-primary text-white hover:bg-secondary transition-colors"
+              >
+                {t("dash.startPlanning")} {nextYearPrompt.nextYear}
+              </button>
+            </div>
+          </div>
+        )}
+        {nextYearPrompt && nextYearPrompt.hasThemes && (
+          <div className="bg-green-50 border border-green-200 p-3 mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-green-600 text-base">check_circle</span>
+            <p className="text-xs text-green-700 font-medium">
+              {t("dash.nextYearStarted")} {nextYearPrompt.nextYear}
+            </p>
+          </div>
+        )}
+
         {/* Season Progress */}
         <div className="mb-6">
           <p className="text-sm font-semibold text-ink mb-3">{t("dash.seasonProgress")}</p>
@@ -875,6 +974,34 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Emergency Swap Confirm Modal */}
+      {showSwapConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="material-symbols-outlined text-red-500 text-xl">swap_horiz</span>
+              <h3 className="text-lg font-bold text-ink">{t("dash.swapSermon")}</h3>
+            </div>
+            <p className="text-sm text-mute mb-5">{t("dash.swapDesc")}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSwapConfirm(false)}
+                className="flex-1 px-4 py-2 border border-line text-sm text-mute hover:bg-surface transition-colors"
+              >
+                {t("dash.cancel")}
+              </button>
+              <button
+                onClick={handleEmergencySwap}
+                disabled={swapping}
+                className="flex-1 px-4 py-2 bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {swapping ? t("settings.saving") : t("dash.swapConfirm")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {feedbackSermonId && (

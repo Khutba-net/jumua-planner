@@ -22,6 +22,8 @@ interface Sermon {
   notes: string | null;
   theme_id: string | null;
   theme_name: string | null;
+  original_theme_id: string | null;
+  is_override: number;
   references: Reference[];
 }
 
@@ -109,6 +111,9 @@ export default function SermonEditorPage({
   const [refContent, setRefContent] = useState("");
   const [refSaving, setRefSaving] = useState(false);
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
+  const [themes, setThemes] = useState<{ id: string; name: string }[]>([]);
+  const [overrideThemeId, setOverrideThemeId] = useState("");
+  const [overrideSaving, setOverrideSaving] = useState(false);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -131,6 +136,10 @@ export default function SermonEditorPage({
           setEditorFontSize(data.settings.editor_font_size || 16);
         }
       })
+      .catch(() => {});
+    fetch("/api/themes")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setThemes(data.map((t: Record<string, string>) => ({ id: t.id, name: t.name }))); })
       .catch(() => {});
   }, []);
 
@@ -670,6 +679,70 @@ export default function SermonEditorPage({
               <p className="text-[10px] text-mute">{t("editor.noDate")}</p>
             )}
           </div>
+
+          <div className="h-px bg-line my-2.5" />
+          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">{t("editor.themeOverride")}</p>
+          {sermon?.is_override ? (
+            <div className="bg-amber-50 border border-amber-200 p-2 mb-3">
+              <div className="flex items-center gap-1 mb-1">
+                <span className="material-symbols-outlined text-amber-600 text-[14px]">swap_horiz</span>
+                <span className="text-[10px] font-bold text-amber-700">{t("editor.overrideActive")}</span>
+              </div>
+              <p className="text-[10px] text-amber-600 mb-2">{sermon.theme_name}</p>
+              <button
+                disabled={overrideSaving}
+                onClick={async () => {
+                  if (!sermon.original_theme_id) return;
+                  setOverrideSaving(true);
+                  await fetch(`/api/sermons/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ themeId: sermon.original_theme_id, isOverride: false }),
+                  });
+                  const r = await fetch(`/api/sermons/${id}`);
+                  const data = await r.json();
+                  setSermon(data);
+                  setOverrideSaving(false);
+                }}
+                className="w-full text-[10px] font-bold py-1.5 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors"
+              >
+                {t("editor.restoreTheme")}
+              </button>
+            </div>
+          ) : (
+            <div className="mb-3">
+              <select
+                value={overrideThemeId}
+                onChange={(e) => setOverrideThemeId(e.target.value)}
+                className="w-full border border-line px-2 py-1.5 text-[11px] bg-white mb-1.5"
+              >
+                <option value="">{t("editor.selectTheme")}</option>
+                {themes.filter((th) => th.id !== sermon?.theme_id).map((th) => (
+                  <option key={th.id} value={th.id}>{th.name}</option>
+                ))}
+              </select>
+              <button
+                disabled={!overrideThemeId || overrideSaving}
+                onClick={async () => {
+                  if (!overrideThemeId) return;
+                  setOverrideSaving(true);
+                  await fetch(`/api/sermons/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ themeId: overrideThemeId, isOverride: true }),
+                  });
+                  const r = await fetch(`/api/sermons/${id}`);
+                  const data = await r.json();
+                  setSermon(data);
+                  setOverrideThemeId("");
+                  setOverrideSaving(false);
+                }}
+                className="w-full text-[10px] font-bold py-1.5 bg-primary text-white hover:bg-secondary transition-colors disabled:opacity-50"
+              >
+                {t("editor.overrideTheme")}
+              </button>
+            </div>
+          )}
 
           <p className="text-[9px] tracking-[2px] text-mute/60 mb-2 mt-1">{t("editor.wordTarget")}</p>
           <div className="mb-3">

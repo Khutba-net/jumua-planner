@@ -34,6 +34,7 @@ export const sermonCreateSchema = z.object({
   mosqueId: z.string().max(50).nullable().optional(),
   themeId: z.string().max(50).nullable().optional(),
   subTopicId: z.string().max(50).nullable().optional(),
+  isOverride: z.boolean().optional(),
 });
 
 export const sermonUpdateSchema = sermonCreateSchema;

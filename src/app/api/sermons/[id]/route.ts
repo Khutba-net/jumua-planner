@@ -70,7 +70,19 @@ export async function PUT(
   if (d.notes !== undefined) { fields.push(`notes = $${paramIdx++}`); values.push(d.notes); }
   if (d.type !== undefined) { fields.push(`type = $${paramIdx++}`); values.push(d.type); }
   if (d.scheduledDate !== undefined) { fields.push(`scheduled_date = $${paramIdx++}`); values.push(d.scheduledDate || null); }
-  if (d.themeId !== undefined) { fields.push(`theme_id = $${paramIdx++}`); values.push(d.themeId || null); }
+  if (d.themeId !== undefined) {
+    if (d.isOverride) {
+      const current = await queryOne<{ theme_id: string | null; original_theme_id: string | null }>("SELECT theme_id, original_theme_id FROM sermons WHERE id = $1", [id]);
+      if (current && !current.original_theme_id && current.theme_id) {
+        fields.push(`original_theme_id = $${paramIdx++}`); values.push(current.theme_id);
+      }
+      fields.push(`is_override = $${paramIdx++}`); values.push(1);
+    } else if (d.isOverride === false) {
+      fields.push(`original_theme_id = $${paramIdx++}`); values.push(null);
+      fields.push(`is_override = $${paramIdx++}`); values.push(0);
+    }
+    fields.push(`theme_id = $${paramIdx++}`); values.push(d.themeId || null);
+  }
   if (d.subTopicId !== undefined) { fields.push(`sub_topic_id = $${paramIdx++}`); values.push(d.subTopicId || null); }
   if (d.mosqueId !== undefined) { fields.push(`mosque_id = $${paramIdx++}`); values.push(d.mosqueId || null); }
 

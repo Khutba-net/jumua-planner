@@ -82,6 +82,12 @@ export function getHijriEventsForMonth(gregorianYear: number, month: number): Re
   );
 }
 
+export function isEidDate(dateStr: string): ResolvedHijriEvent | null {
+  const year = Number(dateStr.slice(0, 4));
+  const events = getHijriEventsForYear(year);
+  return events.find((e) => e.dateStr === dateStr && e.type === "eid") ?? null;
+}
+
 export function getUpcomingHijriEvents(count: number = 5): ResolvedHijriEvent[] {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
