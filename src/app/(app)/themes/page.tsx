@@ -860,22 +860,13 @@ function SeasonBlock({
 }) {
   const { t, isAr } = useI18n();
   const STATUS_MAP = useStatusMap();
-  const theme = season.themes[0] ?? null;
-  const color = theme?.color || "#00666d";
   const ss = season.themes.flatMap((t) => themeSermons(t.id));
   const fridayCount = ss.filter((s) => !s.type || s.type === "friday").length;
   const occasionCount = ss.filter((s) => s.type && s.type !== "friday").length;
-  const allSubTopics = season.themes.flatMap((t) => t.sub_topics);
-  const minSlots = Math.max(4, allSubTopics.length);
-  const subSlots = Array.from({ length: minSlots }, (_, i) => allSubTopics[i] ?? null);
   const seasonLabel = isAr ? t(`season.${season.n}`) : season.label;
   const seasonRange = isAr ? t(`season.${season.n}.range`) : season.range;
-
-  const themeName = theme?.name?.toLowerCase() ?? "";
   const prevSeason = allSeasons.find((s) => s.n === season.n - 1);
   const nextSeason = allSeasons.find((s) => s.n === season.n + 1);
-  const continuesFromPrev = prevSeason?.themes.some((t) => t.name.toLowerCase() === themeName) ?? false;
-  const continuesInNext = nextSeason?.themes.some((t) => t.name.toLowerCase() === themeName) ?? false;
 
   return (
     <div className="bg-white border border-line/50 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.02)]">
@@ -892,10 +883,12 @@ function SeasonBlock({
             <p className="text-[10.5px] text-mute/50 font-[var(--font-arabic)] mt-0.5" dir="rtl">{season.ar}</p>
           </div>
         </div>
-        {theme && (
+        {season.themes.length > 0 && (
           <div className="hidden sm:flex items-center gap-3 text-[11px] text-mute/70 font-medium tabular-nums">
-            <span>{ss.length} {t("themes.slots")}</span>
+            <span>{season.themes.length} {season.themes.length === 1 ? t("themes.theme") : t("themes.themesPlural")}</span>
             <span className="text-mute/30">|</span>
+            <span>{ss.length} {t("themes.slots")}</span>
+            <span className="text-mute/30">·</span>
             <span>{fridayCount} {t("themes.fridayShort")}</span>
             <span className="text-mute/30">·</span>
             <span className="text-accent-gold/80">{occasionCount} {t("themes.occasionShort")}</span>
@@ -903,7 +896,7 @@ function SeasonBlock({
         )}
       </div>
 
-      {!theme ? (
+      {season.themes.length === 0 ? (
         <button onClick={onAddThemeToSeason}
           className="w-full py-10 text-center text-[12px] text-mute/50 hover:text-primary transition-all duration-200 flex flex-col items-center gap-2 group">
           <span className="material-symbols-outlined text-2xl text-mute/25 group-hover:text-primary/50 transition-colors duration-200">add_circle</span>
@@ -912,6 +905,19 @@ function SeasonBlock({
         </button>
       ) : (
         <div>
+          {season.themes.map((theme, themeIdx) => {
+            const color = theme.color || "#00666d";
+            const themeName = theme.name?.toLowerCase() ?? "";
+            const continuesFromPrev = prevSeason?.themes.some((t) => t.name.toLowerCase() === themeName) ?? false;
+            const continuesInNext = nextSeason?.themes.some((t) => t.name.toLowerCase() === themeName) ?? false;
+            const themeSubTopics = theme.sub_topics;
+            const minSlots = Math.max(4, themeSubTopics.length);
+            const subSlots = Array.from({ length: minSlots }, (_, i) => themeSubTopics[i] ?? null);
+            const themeSs = themeSermons(theme.id);
+            const allSorted = [...themeSs].sort((a, b) => (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? ""));
+
+            return (
+              <div key={theme.id} className={themeIdx > 0 ? "border-t-2 border-line/60" : ""}>
           {/* Theme name bar */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-line/40 bg-ink/[0.015]">
             <div className="flex items-center gap-2.5">
@@ -938,7 +944,7 @@ function SeasonBlock({
                 </span>
               )}
               <span className="text-[10px] text-mute/70 font-medium">
-                {theme.sub_topics.length} {t("themes.bouquets")} · {ss.length} {t("themes.slots")}
+                {theme.sub_topics.length} {t("themes.bouquets")} · {themeSs.length} {t("themes.slots")}
               </span>
             </div>
           </div>
@@ -948,12 +954,9 @@ function SeasonBlock({
             <span>{t("themes.subBouquet")}</span><span>{t("themes.sermonTitles")}</span>
           </div>
 
-          {/* 4 elastic sub-bouquets — season hard cap 16, sub-bouquet distribution is flexible */}
           {(() => {
-            const allSorted = [...ss].sort((a, b) => (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? ""));
-            const totalUsed = ss.length;
+            const totalUsed = themeSs.length;
             const seasonOver = totalUsed >= SLOTS_PER_SEASON;
-            const seasonRemaining = Math.max(0, SLOTS_PER_SEASON - totalUsed);
 
             const fridaysBySubId = new Map<string, Sermon[]>();
             for (const sub of subSlots) {
@@ -1179,14 +1182,30 @@ function SeasonBlock({
                   );
                 })}
 
-                {/* Season total indicator */}
+                {/* Theme total indicator */}
                 <div className="px-5 py-2 flex items-center justify-between text-[10px] text-mute/50">
-                  <span>{totalUsed}/{SLOTS_PER_SEASON} {t("themes.slots")} · {fridayCount} {t("themes.fridayShort")} · {occasionCount} {t("themes.occasionShort")}</span>
+                  <span>{totalUsed} {t("themes.slots")}</span>
                   {seasonOver && <span className="text-[9px] font-semibold text-accent-gold/70">{t("themes.beyondRecommended")}</span>}
                 </div>
               </div>
             );
           })()}
+              </div>
+            );
+          })}
+
+          {/* Add another theme to this season */}
+          <button onClick={onAddThemeToSeason}
+            className="w-full py-3 text-center text-[11px] text-mute/40 hover:text-primary transition-all duration-200 flex items-center justify-center gap-1.5 border-t border-line/40 group">
+            <span className="material-symbols-outlined text-[15px] text-mute/25 group-hover:text-primary/50 transition-colors duration-200">add</span>
+            {t("themes.addAnotherTheme")}
+          </button>
+
+          {/* Season total across all themes */}
+          <div className="px-5 py-2 flex items-center justify-between text-[10px] text-mute/50 border-t border-line/40 bg-ink/[0.01]">
+            <span>{season.themes.length} {season.themes.length === 1 ? t("themes.theme") : t("themes.themesPlural")} · {ss.length}/{SLOTS_PER_SEASON} {t("themes.slots")} · {fridayCount} {t("themes.fridayShort")} · {occasionCount} {t("themes.occasionShort")}</span>
+            {ss.length >= SLOTS_PER_SEASON && <span className="text-[9px] font-semibold text-accent-gold/70">{t("themes.beyondRecommended")}</span>}
+          </div>
         </div>
       )}
     </div>
