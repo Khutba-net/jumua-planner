@@ -1,4 +1,4 @@
-const CACHE_NAME = "jumua-planner-v1";
+const CACHE_NAME = "khutba-v1";
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = ["/dashboard", "/sermons", "/themes", "/settings"];
 

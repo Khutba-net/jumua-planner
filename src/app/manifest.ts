@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Jumua Planner",
-    short_name: "Jumua",
+    name: "Khutba",
+    short_name: "Khutba",
     description: "Professional Khutbah Management Platform",
     start_url: "/dashboard",
     display: "standalone",

@@ -14,7 +14,7 @@ const tr = {
     step3: "Step 3 of 3",
     welcomeUser: (name: string) => `Welcome, ${name}`,
     choosePlan: "Choose your plan",
-    howUse: "How will you use JumuaPlanner?",
+    howUse: "How will you use Khutba?",
     continue: "Continue",
     back: "Back",
     individual: "Individual",
@@ -242,7 +242,7 @@ export default function SetupPage() {
               <rect x="1" y="16" width="11" height="11" rx="2" fill="#00666d" opacity="0.6"/>
               <rect x="16" y="16" width="11" height="11" rx="2" fill="#C4A35A" opacity="0.8"/>
             </svg>
-            <span className="text-lg font-bold text-primary tracking-tight">JumuaPlanner</span>
+            <span className="text-lg font-bold text-primary tracking-tight">Khutba</span>
           </Link>
 
           <div className="flex items-center gap-3">

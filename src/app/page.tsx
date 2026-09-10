@@ -17,15 +17,15 @@ const t = {
     salam: "السلام عليكم ورحمة الله وبركاته",
     heroTitle: "A year of khutbahs that hold together.",
     heroAccent: "",
-    heroSub: <>JumuaPlanner is a planning tool for Friday khatibs. It won{"'"}t let you drift into a topic a week: you set the year{"'"}s main themes first, break each into sub-bouquets, and only then name the sermons underneath. The result is a plan your congregation can actually follow, one coherent line of thought from January to December, written and rehearsed before each Friday arrives.</>,
+    heroSub: <>Khutba is a planning tool for Friday khatibs. It won{"'"}t let you drift into a topic a week: you set the year{"'"}s main themes first, break each into sub-bouquets, and only then name the sermons underneath. The result is a plan your congregation can actually follow, one coherent line of thought from January to December, written and rehearsed before each Friday arrives.</>,
     heroCta: "Start Planning Your Year",
 
     twoObjectives: "Two Objectives",
-    whatHelps: "What JumuaPlanner helps you achieve",
+    whatHelps: "What Khutba helps you achieve",
 
     obj1Title: "Plan the entire year in one sitting.",
-    obj1Text: <>The software divides your year into <strong>4</strong> seasons, 3 months or 13 weeks each. You name a main theme per season, choose <strong>4</strong> sub-bouquets under it, then title <strong>4</strong> sermons under every sub-bouquet. Eid and the other Hijri occasions rarely land on a Friday; those khutbahs sit in the plan on whatever weekday or weekend they fall.</>,
-    obj1Result: "= 64 sermons a year, about 13 Fridays per main theme, plus occasion khutbahs on any day.",
+    obj1Text: <>The software starts you with <strong>4</strong> seasons, 3 months or 13 weeks each. You name a main theme per season, choose sub-bouquets under it, then title the sermons underneath. The 4×4×4 structure is a recommended starting point — you can add unlimited themes, sub-topics, or sermons at any time. Eid and the other Hijri occasions rarely land on a Friday; those khutbahs sit in the plan on whatever weekday or weekend they fall.</>,
+    obj1Result: "= 64+ sermons a year, about 13 Fridays per main theme, plus occasion khutbahs on any day.",
     obj1Summary: <>This is the <u>1<sup>st</sup></u> objective of our software system.</>,
     obj1Link: "Build your annual plan",
     annualStructure: "Annual Structure",
@@ -147,8 +147,8 @@ const t = {
     footerTagline: "Built for mosque administration and khatibs",
     privacy: "Privacy",
     terms: "Terms",
-    support: "Support",
-    status: "Status",
+    contact: "Contact",
+    developedBy: "Developed by Zulker Nyne",
   },
   ar: {
     navPlan: "الخطة",
@@ -160,7 +160,7 @@ const t = {
     salam: "السلام عليكم ورحمة الله وبركاته",
     heroTitle: <>عامٌ من الخطب <span style={{color: "#806000"}}>يشدّ بعضه بعضاً.</span></>,
     heroAccent: "",
-    heroSub: <>{"«مخطِّط الجمعة» نظامٌ لتخطيط خطب الجمعة يأخذ بيد الخطيب إلى الترتيب: تضع عناوين عامك الرئيسية أولاً، ثم تقسم كل عنوان إلى باقاتٍ فرعية، ثم تسمّي الخطب تحتها — فلا تنتقل من موضوع إلى موضوع بغير رابط."}<br /><br />{"فتخرج خطةٌ يتابعها جمهورك: خطٌّ واحد متصل من أول العام إلى آخره، مكتوبةٌ خطبه ومُتدرَّبٌ على إلقائها قبل أن تهلّ الجمعة."}</>,
+    heroSub: <>{"«خطبة» نظامٌ لتخطيط خطب الجمعة يأخذ بيد الخطيب إلى الترتيب: تضع عناوين عامك الرئيسية أولاً، ثم تقسم كل عنوان إلى باقاتٍ فرعية، ثم تسمّي الخطب تحتها — فلا تنتقل من موضوع إلى موضوع بغير رابط."}<br /><br />{"فتخرج خطةٌ يتابعها جمهورك: خطٌّ واحد متصل من أول العام إلى آخره، مكتوبةٌ خطبه ومُتدرَّبٌ على إلقائها قبل أن تهلّ الجمعة."}</>,
     heroCta: "ابدأ تخطيط عامك",
 
     twoObjectives: "النظام",
@@ -290,8 +290,8 @@ const t = {
     footerTagline: "أُعدّ لإدارة شؤون المساجد والخطباء",
     privacy: "الخصوصية",
     terms: "الشروط",
-    support: "الدعم",
-    status: "الحالة",
+    contact: "تواصل معنا",
+    developedBy: "طوّره زلكر نين",
   },
 } as const satisfies Record<string, Record<string, ReactNode>>;
 
@@ -333,7 +333,7 @@ export default function LandingPage() {
               <rect x="1" y="16" width="11" height="11" rx="2" fill="#00666d" opacity="0.6"/>
               <rect x="16" y="16" width="11" height="11" rx="2" fill="#C4A35A" opacity="0.8"/>
             </svg>
-            <h1 className="text-base md:text-lg font-bold text-primary tracking-tight">JumuaPlanner</h1>
+            <h1 className="text-base md:text-lg font-bold text-primary tracking-tight">Khutba</h1>
           </div>
           <nav className="hidden md:flex items-center gap-8 text-sm">
             <a className="text-primary/70 font-medium hover:text-primary transition-colors" href="#framework">{c.navPlan}</a>
@@ -733,23 +733,15 @@ export default function LandingPage() {
       <footer className="bg-surface w-full border-t border-line px-5 md:px-20 py-8 md:py-12">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex flex-col items-center md:items-start gap-4">
-            <div className="text-2xl font-bold text-primary tracking-tight">JumuaPlanner</div>
+            <div className="text-2xl font-bold text-primary tracking-tight">Khutba</div>
             <p className="text-mute text-center md:text-left">{c.footerTagline}</p>
           </div>
           <nav className="flex flex-wrap justify-center gap-x-8 gap-y-4">
-            <a className="text-xs font-bold uppercase tracking-widest text-mute hover:text-primary transition-all" href="#">{c.privacy}</a>
-            <a className="text-xs font-bold uppercase tracking-widest text-mute hover:text-primary transition-all" href="#">{c.terms}</a>
-            <a className="text-xs font-bold uppercase tracking-widest text-mute hover:text-primary transition-all" href="#">{c.support}</a>
-            <a className="text-xs font-bold uppercase tracking-widest text-mute hover:text-primary transition-all" href="#">{c.status}</a>
+            <Link href="/privacy" className="text-xs font-bold uppercase tracking-widest text-mute hover:text-primary transition-all">{c.privacy}</Link>
+            <Link href="/terms" className="text-xs font-bold uppercase tracking-widest text-mute hover:text-primary transition-all">{c.terms}</Link>
+            <a className="text-xs font-bold uppercase tracking-widest text-mute hover:text-primary transition-all" href="mailto:support@khutba.net">{c.contact}</a>
           </nav>
-          <div className="flex gap-4">
-            <a className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all" href="#">
-              <span className="material-symbols-outlined text-lg">share</span>
-            </a>
-            <a className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all" href="#">
-              <span className="material-symbols-outlined text-lg">public</span>
-            </a>
-          </div>
+          <p className="text-xs text-mute/60">{c.developedBy}</p>
         </div>
       </footer>
     </div>

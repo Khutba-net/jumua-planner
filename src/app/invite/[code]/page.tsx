@@ -10,7 +10,7 @@ const tr = {
     invalidDesc: "This invite link is invalid or has expired.",
     backHome: "Go to homepage",
     joinOrg: (org: string) => `Join ${org}`,
-    youreInvited: (name: string, org: string) => `${name}, you've been invited to join ${org} on JumuaPlanner.`,
+    youreInvited: (name: string, org: string) => `${name}, you've been invited to join ${org} on Khutba.`,
     createAccount: "Create your account to get started.",
     name: "Full name",
     namePlaceholder: "Enter your full name",
@@ -141,7 +141,7 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
                 <rect x="1" y="16" width="11" height="11" rx="2" fill="#00666d" opacity="0.6"/>
                 <rect x="16" y="16" width="11" height="11" rx="2" fill="#C4A35A" opacity="0.8"/>
               </svg>
-              <span className="text-xl font-bold text-primary tracking-tight">JumuaPlanner</span>
+              <span className="text-xl font-bold text-primary tracking-tight">Khutba</span>
             </Link>
           </div>
           <button

@@ -63,7 +63,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
             <rect x="1" y="16" width="11" height="11" rx="2" fill="currentColor" opacity="0.6"/>
             <rect x="16" y="16" width="11" height="11" rx="2" fill="#C4A35A" opacity="0.8"/>
           </svg>
-          <span className="text-base font-bold tracking-tight">JumuaPlanner</span>
+          <span className="text-base font-bold tracking-tight">Khutba</span>
         </button>
         <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
           {user?.name?.[0] ?? "?"}
@@ -91,7 +91,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
               <rect x="1" y="16" width="11" height="11" rx="2" fill="currentColor" opacity="0.6"/>
               <rect x="16" y="16" width="11" height="11" rx="2" fill="#C4A35A" opacity="0.8"/>
             </svg>
-            <span className="text-lg font-bold tracking-tight">JumuaPlanner</span>
+            <span className="text-lg font-bold tracking-tight">Khutba</span>
           </button>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-mute">
             <span className="material-symbols-outlined">close</span>

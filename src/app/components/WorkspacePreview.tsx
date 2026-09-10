@@ -27,7 +27,7 @@ function SidebarMockup({ active }: { active: string }) {
           <rect x="1" y="16" width="11" height="11" rx="2" fill="#00666d" opacity="0.6"/>
           <rect x="16" y="16" width="11" height="11" rx="2" fill="#C4A35A" opacity="0.8"/>
         </svg>
-        <span className="hidden md:block text-[11px] font-bold text-[#00666d]">JumuaPlanner</span>
+        <span className="hidden md:block text-[11px] font-bold text-[#00666d]">Khutba</span>
       </div>
       <nav className="flex-1 px-2 py-2.5 flex flex-col gap-0.5">
         {navItems.map((item) => (

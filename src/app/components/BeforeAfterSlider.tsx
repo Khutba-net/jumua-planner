@@ -42,7 +42,7 @@ export default function BeforeAfterSlider() {
       {/* After image (full, behind) */}
       <img
         src="/after.png"
-        alt="With JumuaPlanner — organized sermon editor"
+        alt="With Khutba — organized sermon editor"
         className="absolute inset-0 w-full h-full object-cover object-top"
         draggable={false}
       />
@@ -77,7 +77,7 @@ export default function BeforeAfterSlider() {
         Without a plan
       </div>
       <div className="absolute top-4 right-4 bg-primary/90 text-white text-xs font-bold px-3 py-1.5 rounded-full z-20 pointer-events-none">
-        With JumuaPlanner
+        With Khutba
       </div>
     </div>
   );

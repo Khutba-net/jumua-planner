@@ -15,7 +15,7 @@ const notoArabic = Noto_Naskh_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "Jumua Planner",
+  title: "Khutba",
   description: "Professional Khutbah Management Platform",
 };
 

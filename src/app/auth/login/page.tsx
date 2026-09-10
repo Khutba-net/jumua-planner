@@ -102,7 +102,7 @@ function LoginForm() {
                 <rect x="1" y="16" width="11" height="11" rx="2" fill="#00666d" opacity="0.6"/>
                 <rect x="16" y="16" width="11" height="11" rx="2" fill="#C4A35A" opacity="0.8"/>
               </svg>
-              <span className="text-xl font-bold text-primary tracking-tight">JumuaPlanner</span>
+              <span className="text-xl font-bold text-primary tracking-tight">Khutba</span>
             </Link>
           </div>
           <button
