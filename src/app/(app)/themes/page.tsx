@@ -670,10 +670,10 @@ export default function AnnualPlanPage() {
                 <select value={formMonth} onChange={(e) => setFormMonth(Number(e.target.value))}
                   className="w-full text-[13px] font-medium text-ink border border-line/60 rounded-xl px-3 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200">
                   {SEASONS.map((s) => {
-                    const taken = !editingTheme && yearThemes.some((t) => Math.floor((t.month - 1) / 3) === s.n - 1);
+                    const count = yearThemes.filter((t) => Math.floor((t.month - 1) / 3) === s.n - 1).length;
                     return (
-                      <option key={s.n} value={s.startMonth} disabled={taken}>
-                        {isAr ? t(`season.${s.n}`) : s.label} · {isAr ? t(`season.${s.n}.range`) : s.range}{taken ? ` (${t("themes.filled")})` : ""}
+                      <option key={s.n} value={s.startMonth}>
+                        {isAr ? t(`season.${s.n}`) : s.label} · {isAr ? t(`season.${s.n}.range`) : s.range}{count > 0 ? ` (${count})` : ""}
                       </option>
                     );
                   })}
