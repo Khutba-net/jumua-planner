@@ -1,3 +1,6 @@
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
 const hits = new Map<string, { count: number; resetAt: number }>();
 
 setInterval(() => {
@@ -7,7 +10,19 @@ setInterval(() => {
   }
 }, 60_000);
 
-export function rateLimit(
+let _upstash: Ratelimit | null = null;
+function getUpstash(limit: number, windowMs: number) {
+  if (!process.env.UPSTASH_REDIS_REST_URL) return null;
+  if (!_upstash) {
+    _upstash = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(limit, `${windowMs}ms`),
+    });
+  }
+  return _upstash;
+}
+
+function memoryRateLimit(
   key: string,
   limit: number,
   windowMs: number
@@ -23,6 +38,27 @@ export function rateLimit(
   entry.count++;
   const remaining = Math.max(0, limit - entry.count);
   return { allowed: entry.count <= limit, remaining };
+}
+
+export function rateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): { allowed: boolean; remaining: number } {
+  return memoryRateLimit(key, limit, windowMs);
+}
+
+export async function rateLimitAsync(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<{ allowed: boolean; remaining: number }> {
+  const upstash = getUpstash(limit, windowMs);
+  if (upstash) {
+    const result = await upstash.limit(key);
+    return { allowed: result.success, remaining: result.remaining };
+  }
+  return memoryRateLimit(key, limit, windowMs);
 }
 
 export function rateLimitByIp(
