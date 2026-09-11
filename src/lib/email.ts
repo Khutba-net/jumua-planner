@@ -6,7 +6,7 @@ function getResend() {
   return _resend;
 }
 
-const FROM = "Khutba <noreply@khutba.net>";
+const FROM = process.env.EMAIL_FROM || "Khutba <onboarding@resend.dev>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
 
 function baseHtml(content: string) {
