@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, exec, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sendAssignmentNotification } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +149,7 @@ export async function POST(req: Request) {
           : (await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id]))?.name ?? "Organization";
         const dateFormatted = new Date(friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
         await sendAssignmentNotification(khatibUser.email, member.name, notes || "Friday Khutbah", dateFormatted, mosqueName).catch((err) =>
-          console.error("Failed to send assignment email:", err)
+          logger.error("Failed to send assignment email", { error: String(err) })
         );
       }
     }
@@ -222,7 +223,7 @@ export async function PUT(req: Request) {
           : (await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id]))?.name ?? "Organization";
         const dateFormatted = new Date(oldAssignment.friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
         await sendAssignmentNotification(khatibUser.email, member.name, swap_reason ? `Swap: ${swap_reason}` : "Friday Khutbah", dateFormatted, mosqueName).catch((err) =>
-          console.error("Failed to send swap email:", err)
+          logger.error("Failed to send swap email", { error: String(err) })
         );
       }
     }

@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { query, queryOne, exec, cuid, toJSON, hashPassword } from "@/lib/db";
@@ -48,10 +49,10 @@ export async function POST(req: Request) {
 
   if (process.env.RESEND_API_KEY) {
     await sendEmailVerification(email, name, verificationCode).catch((err) =>
-      console.error("Failed to send verification email:", err)
+      logger.error("Failed to send verification email", { error: String(err) })
     );
   } else {
-    console.log(`[DEV] Verification code for ${email}: ${verificationCode}`);
+    logger.info("Verification code generated", { email, code: verificationCode });
   }
 
   const res = NextResponse.json({ user: toJSON(user) });

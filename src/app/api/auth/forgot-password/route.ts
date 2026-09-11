@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { queryOne, exec, cuid } from "@/lib/db";
@@ -44,10 +45,10 @@ export async function POST(req: Request) {
 
   if (process.env.RESEND_API_KEY) {
     await sendPasswordReset(email, user.name, resetUrl).catch((err) =>
-      console.error("Failed to send password reset email:", err)
+      logger.error("Failed to send password reset email", { error: String(err) })
     );
   } else {
-    console.log(`[DEV] Password reset link for ${email}: ${resetUrl}`);
+    logger.info("Password reset link generated", { email });
   }
 
   return NextResponse.json({ ok: true, message: "If an account with that email exists, a reset link has been generated." });

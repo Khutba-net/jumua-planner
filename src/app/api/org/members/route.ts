@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { query, queryOne, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sendInvitation } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
     const inviteUrl = `${APP_URL}/invite/${inviteCode}`;
     await sendInvitation(inviteEmail.trim(), admin?.name ?? "Admin", orgLabel, inviteUrl).catch((err) =>
-      console.error("Failed to send invitation email:", err)
+      logger.error("Failed to send invitation email", { error: String(err) })
     );
   }
 

@@ -4,6 +4,7 @@ import { queryOne, exec, toJSON } from "@/lib/db";
 import { deleteAllUserSessions } from "@/lib/session";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sendInvitation } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export async function PUT(req: Request, { params }: Params) {
       const orgLabel = mosqueName ? `${org?.name ?? "your organization"} — ${mosqueName}` : (org?.name ?? "your organization");
       const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
       await sendInvitation(member.email as string, admin?.name ?? "Admin", orgLabel, `${APP_URL}/invite/${newCode}`).catch((err) =>
-        console.error("Failed to resend invitation email:", err)
+        logger.error("Failed to resend invitation email", { error: String(err) })
       );
     }
   } else if (action === "deactivate") {
