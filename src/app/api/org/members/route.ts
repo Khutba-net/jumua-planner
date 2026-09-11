@@ -81,9 +81,11 @@ export async function POST(req: Request) {
   if (inviteEmail && typeof inviteEmail === "string" && process.env.RESEND_API_KEY) {
     const org = await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id]);
     const admin = await queryOne<{ name: string }>("SELECT name FROM users WHERE id = $1", [userId]);
+    const mosqueName = mosque_id ? (await queryOne<{ name: string }>("SELECT name FROM mosques WHERE id = $1", [mosque_id]))?.name : null;
+    const orgLabel = mosqueName ? `${org?.name ?? "your organization"} — ${mosqueName}` : (org?.name ?? "your organization");
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
     const inviteUrl = `${APP_URL}/invite/${inviteCode}`;
-    await sendInvitation(inviteEmail.trim(), admin?.name ?? "Admin", org?.name ?? "your organization", inviteUrl).catch((err) =>
+    await sendInvitation(inviteEmail.trim(), admin?.name ?? "Admin", orgLabel, inviteUrl).catch((err) =>
       console.error("Failed to send invitation email:", err)
     );
   }

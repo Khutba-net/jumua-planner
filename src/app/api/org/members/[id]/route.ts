@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { queryOne, exec, toJSON } from "@/lib/db";
 import { deleteAllUserSessions } from "@/lib/session";
 import { getUserId, AuthError } from "@/lib/auth";
+import { sendInvitation } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,17 @@ export async function PUT(req: Request, { params }: Params) {
     const newCode = randomBytes(4).toString("hex");
     const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     await exec("UPDATE org_members SET invite_code = $1, invite_expires_at = $2, updated_at = NOW() WHERE id = $3", [newCode, newExpiry, id]);
+
+    if (member.email && process.env.RESEND_API_KEY) {
+      const org = await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id]);
+      const admin = await queryOne<{ name: string }>("SELECT name FROM users WHERE id = $1", [userId]);
+      const mosqueName = member.mosque_id ? (await queryOne<{ name: string }>("SELECT name FROM mosques WHERE id = $1", [member.mosque_id]))?.name : null;
+      const orgLabel = mosqueName ? `${org?.name ?? "your organization"} — ${mosqueName}` : (org?.name ?? "your organization");
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
+      await sendInvitation(member.email as string, admin?.name ?? "Admin", orgLabel, `${APP_URL}/invite/${newCode}`).catch((err) =>
+        console.error("Failed to resend invitation email:", err)
+      );
+    }
   } else if (action === "deactivate") {
     if (member.user_id === userId) {
       return NextResponse.json({ error: "You cannot deactivate yourself" }, { status: 400 });
