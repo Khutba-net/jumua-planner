@@ -3,15 +3,20 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = new Set([
   "/",
+  "/privacy",
+  "/terms",
   "/auth/login",
   "/auth/signup",
   "/auth/forgot-password",
   "/auth/reset-password",
+  "/auth/verify-email",
   "/api/auth/login",
   "/api/auth/signup",
   "/api/auth/logout",
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
+  "/api/auth/verify-email",
+  "/api/auth/resend-verification",
   "/api/auth/cleanup-sessions",
 ]);
 

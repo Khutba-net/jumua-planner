@@ -256,6 +256,18 @@ async function initTables() {
     await client.query(`ALTER TABLE sermons ADD COLUMN IF NOT EXISTS is_override INTEGER NOT NULL DEFAULT 0`).catch(() => {});
     await client.query(`ALTER TABLE sermons ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'ar'`).catch(() => {});
     await client.query(`ALTER TABLE sermons ADD COLUMN IF NOT EXISTS translation_of TEXT REFERENCES sermons(id)`).catch(() => {});
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified INTEGER NOT NULL DEFAULT 0`).catch(() => {});
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        code TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `).catch(() => {});
 
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`);

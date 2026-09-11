@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { query, queryOne, cuid, toJSON, hashPassword } from "@/lib/db";
+import { randomBytes } from "crypto";
+import { query, queryOne, exec, cuid, toJSON, hashPassword } from "@/lib/db";
 import { rateLimitByIp } from "@/lib/rate-limit";
 import { signupSchema, parseBody } from "@/lib/validations";
 import { createSession, sessionCookieOptions } from "@/lib/session";
+import { sendEmailVerification } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +36,23 @@ export async function POST(req: Request) {
     [userId, email, name, passwordHash, "khatib", 0]
   );
 
-  const user = await queryOne("SELECT id, email, name, onboarding_complete FROM users WHERE id = $1", [userId]);
+  const user = await queryOne("SELECT id, email, name, onboarding_complete, email_verified FROM users WHERE id = $1", [userId]);
+
+  const verificationCode = randomBytes(3).toString("hex").toUpperCase().slice(0, 6);
+  const tokenId = cuid();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await exec(
+    "INSERT INTO email_verification_tokens (id, user_id, code, expires_at) VALUES ($1, $2, $3, $4)",
+    [tokenId, userId, verificationCode, expiresAt.toISOString()]
+  );
+
+  if (process.env.RESEND_API_KEY) {
+    await sendEmailVerification(email, name, verificationCode).catch((err) =>
+      console.error("Failed to send verification email:", err)
+    );
+  } else {
+    console.log(`[DEV] Verification code for ${email}: ${verificationCode}`);
+  }
 
   const res = NextResponse.json({ user: toJSON(user) });
   const token = await createSession(userId);

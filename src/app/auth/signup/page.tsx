@@ -80,7 +80,7 @@ export default function SignupPage() {
         setLoading(false);
         return;
       }
-      window.location.href = "/setup";
+      window.location.href = "/auth/verify-email";
     } catch {
       setError(c.fallbackError);
       setLoading(false);

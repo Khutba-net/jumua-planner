@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { queryOne, exec, cuid } from "@/lib/db";
 import { rateLimitByIp } from "@/lib/rate-limit";
+import { sendPasswordReset } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Email is required" }, { status: 400 });
   }
 
-  const user = await queryOne<{ id: string }>(
-    "SELECT id FROM users WHERE LOWER(email) = $1", [email.toLowerCase().trim()]
+  const user = await queryOne<{ id: string; name: string }>(
+    "SELECT id, name FROM users WHERE LOWER(email) = $1", [email.toLowerCase().trim()]
   );
 
   // Always return success to prevent email enumeration
@@ -41,12 +42,13 @@ export async function POST(req: Request) {
   // In production, send email with reset link. For now, log it and return the token in dev.
   const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100"}/auth/reset-password?token=${token}`;
 
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.RESEND_API_KEY) {
+    await sendPasswordReset(email, user.name, resetUrl).catch((err) =>
+      console.error("Failed to send password reset email:", err)
+    );
+  } else {
     console.log(`[DEV] Password reset link for ${email}: ${resetUrl}`);
-    return NextResponse.json({ ok: true, message: "If an account with that email exists, a reset link has been generated.", dev_reset_url: resetUrl });
   }
 
-  // TODO: Integrate email service (SendGrid/Resend) to send resetUrl
-  console.log(`Password reset requested for ${email}`);
   return NextResponse.json({ ok: true, message: "If an account with that email exists, a reset link has been generated." });
 }

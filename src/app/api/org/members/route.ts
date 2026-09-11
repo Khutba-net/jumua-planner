@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { query, queryOne, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { sendInvitation } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, mosque_id } = body;
+  const { name, mosque_id, email: inviteEmail } = body;
   if (!name?.trim() || typeof name !== "string") {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
@@ -76,5 +77,16 @@ export async function POST(req: Request) {
   );
 
   const member = await queryOne("SELECT * FROM org_members WHERE id = $1", [id]);
+
+  if (inviteEmail && typeof inviteEmail === "string" && process.env.RESEND_API_KEY) {
+    const org = await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id]);
+    const admin = await queryOne<{ name: string }>("SELECT name FROM users WHERE id = $1", [userId]);
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
+    const inviteUrl = `${APP_URL}/invite/${inviteCode}`;
+    await sendInvitation(inviteEmail.trim(), admin?.name ?? "Admin", org?.name ?? "your organization", inviteUrl).catch((err) =>
+      console.error("Failed to send invitation email:", err)
+    );
+  }
+
   return NextResponse.json(toJSON(member), { status: 201 });
 }
