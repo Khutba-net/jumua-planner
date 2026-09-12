@@ -3,14 +3,14 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { queryOne, exec, cuid } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
-import { rateLimitByIp } from "@/lib/rate-limit";
+import { rateLimitByIpAsync } from "@/lib/rate-limit";
 import { sendEmailVerification } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const { allowed } = rateLimitByIp(ip, "resend-verification", 2, 60_000);
+  const { allowed } = await rateLimitByIpAsync(ip, "resend-verification", 2, 60_000);
   if (!allowed) {
     return NextResponse.json({ error: "Too many requests. Try again in a minute." }, { status: 429 });
   }

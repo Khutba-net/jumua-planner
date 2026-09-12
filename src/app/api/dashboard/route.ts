@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { getSubscriptionStatus } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -260,6 +261,7 @@ export async function GET() {
     orgName,
     myAssignments,
     nextYearPrompt: null,
+    subscription: await getSubscriptionStatus(userId),
   };
 
   const currentYear = new Date().getFullYear();

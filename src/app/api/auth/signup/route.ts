@@ -2,7 +2,7 @@ import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { query, queryOne, exec, cuid, toJSON, hashPassword } from "@/lib/db";
-import { rateLimitByIp } from "@/lib/rate-limit";
+import { rateLimitByIpAsync } from "@/lib/rate-limit";
 import { signupSchema, parseBody } from "@/lib/validations";
 import { createSession, sessionCookieOptions } from "@/lib/session";
 import { sendEmailVerification } from "@/lib/email";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const { allowed } = rateLimitByIp(ip, "signup", 3, 60_000);
+  const { allowed } = await rateLimitByIpAsync(ip, "signup", 3, 60_000);
   if (!allowed) {
     return NextResponse.json({ error: "Too many signup attempts. Try again in a minute." }, { status: 429 });
   }

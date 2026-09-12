@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { queryOne, exec, hashPassword } from "@/lib/db";
 import { deleteAllUserSessions } from "@/lib/session";
-import { rateLimitByIp } from "@/lib/rate-limit";
+import { rateLimitByIpAsync } from "@/lib/rate-limit";
 import { resetPasswordSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const { allowed } = rateLimitByIp(ip, "reset-password", 5, 60_000);
+  const { allowed } = await rateLimitByIpAsync(ip, "reset-password", 5, 60_000);
   if (!allowed) {
     return NextResponse.json({ error: "Too many attempts. Try again in a minute." }, { status: 429 });
   }

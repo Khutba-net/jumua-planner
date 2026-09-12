@@ -69,3 +69,12 @@ export function rateLimitByIp(
 ) {
   return rateLimit(`${endpoint}:${ip}`, limit, windowMs);
 }
+
+export async function rateLimitByIpAsync(
+  ip: string,
+  endpoint: string,
+  limit: number,
+  windowMs: number
+) {
+  return rateLimitAsync(`${endpoint}:${ip}`, limit, windowMs);
+}

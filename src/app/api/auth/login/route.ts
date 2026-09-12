@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, exec, toJSON, verifyPassword, withTransaction } from "@/lib/db";
-import { rateLimitByIp } from "@/lib/rate-limit";
+import { rateLimitByIpAsync } from "@/lib/rate-limit";
 import { loginSchema, parseBody } from "@/lib/validations";
 import { createSession, sessionCookieOptions } from "@/lib/session";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const { allowed } = rateLimitByIp(ip, "login", 5, 60_000);
+  const { allowed } = await rateLimitByIpAsync(ip, "login", 5, 60_000);
   if (!allowed) {
     return NextResponse.json({ error: "Too many login attempts. Try again in a minute." }, { status: 429 });
   }

@@ -17,8 +17,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { t, lang, setLang, isAr } = useI18n();
-  const [user, setUser] = useState<{ name: string; account_type: string; role: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; account_type: string; role: string; id?: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [subStatus, setSubStatus] = useState<string | null>(null);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -32,7 +33,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         if (r.status === 403) return r.json().then((d: { onboarding?: boolean }) => { if (d.onboarding === false) router.push("/setup"); return null; });
         return r.json();
       })
-      .then((d) => { if (d) setUser(d.user); })
+      .then((d) => { if (d) { setUser(d.user); setSubStatus(d.subscription?.status ?? "none"); } })
       .catch(() => { router.push("/auth/login"); });
   }, []);
 
@@ -197,6 +198,23 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <main data-app-main className={`flex-1 min-w-0 min-h-screen pt-14 lg:pt-0 ${isAr ? "font-[var(--font-arabic)]" : ""}`}>
+        {subStatus && subStatus !== "active" && subStatus !== "trialing" && user?.id !== "demo-user" && (
+          <div className="bg-accent-gold/10 border-b border-accent-gold/20 px-5 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="material-symbols-outlined text-accent-gold text-lg">info</span>
+              <span className="text-ink/80 font-medium">
+                {isAr ? "اشترك للوصول الكامل إلى جميع الميزات" : "Subscribe to unlock all features"}
+              </span>
+            </div>
+            <Link
+              href="/settings"
+              onClick={() => setTimeout(() => document.querySelector<HTMLButtonElement>('[data-section="subscription"]')?.click(), 100)}
+              className="shrink-0 px-4 py-1.5 bg-primary text-white text-xs font-semibold hover:bg-secondary transition-colors"
+            >
+              {isAr ? "الترقية" : "Upgrade"}
+            </Link>
+          </div>
+        )}
         {children}
       </main>
     </div>

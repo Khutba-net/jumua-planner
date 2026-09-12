@@ -144,6 +144,55 @@ export default function SettingsPage() {
   const [myOrgs, setMyOrgs] = useState<{ org_id: string; org_name: string; role: string; active: boolean }[]>([]);
   const [switchingOrg, setSwitchingOrg] = useState<string | null>(null);
 
+  const [subscription, setSubscription] = useState<{
+    plan: string;
+    status: string;
+    currentPeriodEnd: string;
+    cancelAtPeriodEnd: boolean;
+    trialEnd: string | null;
+  } | null>(null);
+  const [subLoading, setSubLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/stripe/subscription")
+      .then((r) => r.ok ? r.json() : { subscription: null })
+      .then((d) => setSubscription(d.subscription))
+      .catch(() => {})
+      .finally(() => setSubLoading(false));
+  }, []);
+
+  async function handleCheckout(plan: string) {
+    setCheckoutLoading(plan);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else showToast(data.error || "Failed", "error");
+    } catch {
+      showToast(isAr ? "فشل بدء الدفع" : "Failed to start checkout", "error");
+    }
+    setCheckoutLoading(null);
+  }
+
+  async function handlePortal() {
+    setPortalLoading(true);
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else showToast(data.error || "Failed", "error");
+    } catch {
+      showToast(isAr ? "فشل فتح إدارة الاشتراك" : "Failed to open billing portal", "error");
+    }
+    setPortalLoading(false);
+  }
+
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => {
@@ -764,73 +813,134 @@ export default function SettingsPage() {
             <h2 className="text-xl font-bold text-ink mb-1">{t("settings.subscription")}</h2>
             <p className="text-sm text-mute mb-6">{t("settings.managePlan")}</p>
 
-            <div className="border-2 border-primary/20 p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
+            {subLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : subscription ? (
+              <>
+                <div className="border-2 border-primary/20 p-6 mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase">{t("settings.currentPlan")}</p>
+                      <p className="text-xl font-bold text-primary mt-1 capitalize">{subscription.plan}</p>
+                    </div>
+                    <div className="text-end">
+                      <p className="text-2xl font-bold text-ink">
+                        {subscription.plan === "organization" ? "$50" : "$10"}
+                        <span className="text-sm font-normal text-mute">/mo</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-mute">
+                    <span className={`material-symbols-outlined text-sm ${
+                      subscription.status === "active" || subscription.status === "trialing" ? "text-primary" : "text-red-500"
+                    }`}>
+                      {subscription.status === "active" || subscription.status === "trialing" ? "check_circle" : "error"}
+                    </span>
+                    {subscription.status === "trialing" ? (
+                      isAr ? `فترة تجريبية — تنتهي ${new Date(subscription.trialEnd!).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
+                      `Trial — ends ${new Date(subscription.trialEnd!).toLocaleDateString()}`
+                    ) : subscription.status === "active" ? (
+                      subscription.cancelAtPeriodEnd
+                        ? (isAr ? `ملغى — ينتهي ${new Date(subscription.currentPeriodEnd).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
+                           `Cancels ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`)
+                        : (isAr ? `نشط — يُجدد ${new Date(subscription.currentPeriodEnd).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
+                           `Active — renews ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`)
+                    ) : (
+                      isAr ? `${subscription.status} — انتهى ${new Date(subscription.currentPeriodEnd).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
+                      `${subscription.status} — ended ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.planIncludes")}</p>
+                  <ul className="space-y-2">
+                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "محرر خطب عربي + إنجليزي" : "Arabic + English sermon editor"}</li>
+                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "مخطط المواضيع السنوي" : "Annual theme planner"}</li>
+                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "تقويم الجمعة" : "Jumu'ah calendar"}</li>
+                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "تصدير إلى PDF و Word" : "Export to PDF & Word"}</li>
+                    {subscription.plan === "organization" && (
+                      <>
+                        <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "حتى 20 حساب خطيب" : "Up to 20 khatib accounts"}</li>
+                        <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "أدوات مراجعة المشرف" : "Moderator review tools"}</li>
+                        <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "بنك خطب مشترك" : "Shared khutbah bank"}</li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+
                 <div>
-                  <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase">{t("settings.currentPlan")}</p>
-                  <p className="text-xl font-bold text-primary mt-1">{isOrg ? t("settings.organization") : t("settings.individual")}</p>
-                </div>
-                <div className="text-end">
-                  <p className="text-2xl font-bold text-ink">{isOrg ? "$49" : "$9"}<span className="text-sm font-normal text-mute">/mo</span></p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-mute">
-                <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
-                Active — renews Aug 21, 2026
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.planIncludes")}</p>
-              <ul className="space-y-2">
-                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "محرر خطب عربي + إنجليزي" : "Arabic + English sermon editor"}</li>
-                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "مخطط المواضيع السنوي" : "Annual theme planner"}</li>
-                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "تقويم الجمعة" : "Jumu'ah calendar"}</li>
-                <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "تصدير إلى PDF و Word" : "Export to PDF & Word"}</li>
-                {isOrg && (
-                  <>
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "حتى 20 حساب خطيب" : "Up to 20 khatib accounts"}</li>
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "أدوات مراجعة المشرف" : "Moderator review tools"}</li>
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "بنك خطب مشترك" : "Shared khutbah bank"}</li>
-                  </>
-                )}
-              </ul>
-            </div>
-
-            {!isOrg && (
-              <div className="bg-accent-gold/5 border border-accent-gold/20 p-5 mb-6">
-                <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-accent-gold text-xl mt-0.5">upgrade</span>
-                  <div>
-                    <p className="text-sm font-semibold text-ink">{isAr ? "الترقية إلى المؤسسة" : "Upgrade to Organization"}</p>
-                    <p className="text-xs text-mute mt-1">{isAr ? "احصل على إدارة متعددة الخطباء وبنك خطب مشترك وأدوات المشرف لمسجدك." : "Get multi-khatib management, shared sermon bank, and moderator tools for your masjid."}</p>
-                    <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="mt-3 px-5 py-2 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">
-                      {isAr ? "الترقية — $49/شهر" : "Upgrade — $49/mo"}
+                  <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.billing")}</p>
+                  <div className="space-y-3">
+                    <button
+                      onClick={handlePortal}
+                      disabled={portalLoading}
+                      className="w-full flex items-center justify-between py-3 px-4 border border-line hover:bg-surface transition-colors disabled:opacity-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-mute text-lg">credit_card</span>
+                        <p className="text-sm text-ink font-medium">{isAr ? "إدارة الاشتراك والفواتير" : "Manage subscription & invoices"}</p>
+                      </div>
+                      <span className="material-symbols-outlined text-mute text-base">{isAr ? "arrow_back" : "arrow_forward"}</span>
                     </button>
                   </div>
                 </div>
-              </div>
-            )}
+              </>
+            ) : (
+              <>
+                <div className="bg-surface border border-line p-6 mb-6 text-center">
+                  <span className="material-symbols-outlined text-primary text-4xl mb-3 block">credit_card_off</span>
+                  <p className="text-sm font-semibold text-ink mb-1">{isAr ? "لا يوجد اشتراك نشط" : "No active subscription"}</p>
+                  <p className="text-xs text-mute mb-4">{isAr ? "ابدأ بفترة تجريبية مجانية لمدة 14 يوماً" : "Start with a free 14-day trial"}</p>
+                </div>
 
-            <div>
-              <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.billing")}</p>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-3 border-b border-line">
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-mute text-lg">credit_card</span>
-                    <div>
-                      <p className="text-sm text-ink font-medium">{isAr ? "Visa تنتهي بـ 4242" : "Visa ending in 4242"}</p>
-                      <p className="text-xs text-mute">{isAr ? "تنتهي 12/2027" : "Expires 12/2027"}</p>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="border border-line p-5">
+                    <p className="text-xs font-bold text-mute tracking-[1.5px] uppercase mb-1">{isAr ? "فردي" : "Individual"}</p>
+                    <p className="text-2xl font-bold text-ink mb-1">$10<span className="text-sm font-normal text-mute">/mo</span></p>
+                    <p className="text-xs text-mute mb-4">{isAr ? "للخطيب الفرد" : "For solo khatibs"}</p>
+                    <ul className="space-y-1.5 mb-5">
+                      <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-primary text-sm">check</span> {isAr ? "تخطيط سنوي كامل" : "Full annual planning"}</li>
+                      <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-primary text-sm">check</span> {isAr ? "محرر عربي + إنجليزي" : "Arabic + English editor"}</li>
+                      <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-primary text-sm">check</span> {isAr ? "تقويم الجمعة" : "Friday calendar"}</li>
+                    </ul>
+                    <button
+                      onClick={() => handleCheckout("individual")}
+                      disabled={!!checkoutLoading}
+                      className="w-full py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {checkoutLoading === "individual" && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+                      {isAr ? "ابدأ التجربة المجانية" : "Start free trial"}
+                    </button>
                   </div>
-                  <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="text-xs text-primary font-semibold hover:underline">{isAr ? "تحديث" : "Update"}</button>
+
+                  <div className="border-2 border-primary p-5 relative">
+                    <div className="absolute -top-3 left-4 bg-primary text-white text-[10px] font-bold px-2.5 py-0.5 tracking-wider uppercase">
+                      {isAr ? "للمساجد" : "For mosques"}
+                    </div>
+                    <p className="text-xs font-bold text-mute tracking-[1.5px] uppercase mb-1">{isAr ? "مؤسسة" : "Organization"}</p>
+                    <p className="text-2xl font-bold text-ink mb-1">$50<span className="text-sm font-normal text-mute">/mo</span></p>
+                    <p className="text-xs text-mute mb-4">{isAr ? "لعدة خطباء" : "For multiple khatibs"}</p>
+                    <ul className="space-y-1.5 mb-5">
+                      <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-primary text-sm">check</span> {isAr ? "كل ميزات الفردي" : "Everything in Individual"}</li>
+                      <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-accent-gold text-sm">check</span> {isAr ? "حتى 10 خطباء" : "Up to 10 khatibs"}</li>
+                      <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-accent-gold text-sm">check</span> {isAr ? "جدول وتعيينات" : "Schedule & assignments"}</li>
+                    </ul>
+                    <button
+                      onClick={() => handleCheckout("organization")}
+                      disabled={!!checkoutLoading}
+                      className="w-full py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {checkoutLoading === "organization" && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+                      {isAr ? "ابدأ التجربة المجانية" : "Start free trial"}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between py-3 border-b border-line">
-                  <p className="text-sm text-ink">{isAr ? "عرض الفواتير" : "View invoices"}</p>
-                  <button onClick={() => showToast(t("settings.comingSoon"), "error")} className="text-xs text-primary font-semibold hover:underline">{t("dash.viewAll")}</button>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         )}
 
