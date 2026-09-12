@@ -20,6 +20,8 @@ const tr = {
     noAccount: "Don't have an account?",
     createOne: "Create one",
     fallbackError: "Something went wrong. Please try again.",
+    tryDemo: "Try Demo",
+    demoHint: "Explore the app with a pre-configured demo account",
   },
   ar: {
     welcome: "مرحباً بعودتك",
@@ -36,6 +38,8 @@ const tr = {
     noAccount: "ليس لديك حساب؟",
     createOne: "أنشئ حساباً",
     fallbackError: "حدث خطأ. يرجى المحاولة مرة أخرى.",
+    tryDemo: "تجربة العرض",
+    demoHint: "استكشف التطبيق بحساب تجريبي جاهز",
   },
 };
 
@@ -58,6 +62,7 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -86,6 +91,28 @@ function LoginForm() {
     } catch {
       setError(c.fallbackError);
       setLoading(false);
+    }
+  };
+
+  const handleDemo = async () => {
+    setDemoLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "ahmed@example.com", password: "demo1234" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Demo login failed");
+        setDemoLoading(false);
+        return;
+      }
+      window.location.href = data.user?.onboarding_complete ? "/dashboard" : "/setup";
+    } catch {
+      setError(c.fallbackError);
+      setDemoLoading(false);
     }
   };
 
@@ -166,7 +193,22 @@ function LoginForm() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-ink/40 mt-8">
+        <div className="mt-6 flex items-center gap-3">
+          <div className="flex-1 h-px bg-line" />
+          <span className="text-xs text-ink/30 font-medium">{c.or}</span>
+          <div className="flex-1 h-px bg-line" />
+        </div>
+
+        <button
+          onClick={handleDemo}
+          disabled={demoLoading}
+          className="w-full mt-4 py-3 rounded-full border-2 border-primary/20 text-primary font-bold text-sm hover:bg-primary/5 transition-all active:scale-[0.98] disabled:opacity-50"
+        >
+          {demoLoading ? c.signing : c.tryDemo}
+        </button>
+        <p className="text-center text-xs text-ink/30 mt-2">{c.demoHint}</p>
+
+        <p className="text-center text-sm text-ink/40 mt-6">
           {c.noAccount}{" "}
           <Link href="/auth/signup" className="text-primary font-semibold hover:underline">
             {c.createOne}

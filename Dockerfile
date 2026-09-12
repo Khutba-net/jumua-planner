@@ -20,12 +20,10 @@ ENV NODE_ENV=production
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=root:root /app/.next/standalone ./
 COPY --from=builder --chown=root:root /app/.next/static ./.next/static
-COPY start.sh ./start.sh
-RUN chmod +x ./start.sh
+COPY --from=builder /app/migrations ./migrations
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-ENV DB_PATH="/app/data/jumua.db"
 
-CMD ["./start.sh"]
+CMD ["node", "server.js"]
