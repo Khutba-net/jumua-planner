@@ -52,7 +52,7 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
   const c = tr[lang];
   const isAr = lang === "ar";
 
-  const [inviteData, setInviteData] = useState<{ khatib_name: string; org_name: string } | null>(null);
+  const [inviteData, setInviteData] = useState<{ khatib_name: string; org_name: string; email?: string } | null>(null);
   const [inviteError, setInviteError] = useState("");
   const [loadingInvite, setLoadingInvite] = useState(true);
 
@@ -79,6 +79,7 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
         const d = await r.json();
         setInviteData(d);
         setName(d.khatib_name);
+        if (d.email) setEmail(d.email);
       })
       .finally(() => setLoadingInvite(false));
   }, [code]);

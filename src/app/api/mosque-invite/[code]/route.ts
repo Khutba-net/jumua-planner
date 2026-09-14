@@ -9,8 +9,8 @@ type Params = { params: Promise<{ code: string }> };
 export async function GET(_req: Request, { params }: Params) {
   const { code } = await params;
 
-  const mosque = await queryOne<{ id: string; name: string; invite_status: string; invite_expires_at: string; org_name: string; org_id: string }>(
-    `SELECT m.id, m.name, m.invite_status, m.invite_expires_at, o.name as org_name, o.id as org_id
+  const mosque = await queryOne<{ id: string; name: string; admin_email: string | null; invite_status: string; invite_expires_at: string; org_name: string; org_id: string }>(
+    `SELECT m.id, m.name, m.admin_email, m.invite_status, m.invite_expires_at, o.name as org_name, o.id as org_id
      FROM mosques m JOIN organizations o ON o.id = m.organization_id
      WHERE m.invite_code = $1`,
     [code]
@@ -31,6 +31,7 @@ export async function GET(_req: Request, { params }: Params) {
   return NextResponse.json({
     mosque_name: mosque.name,
     org_name: mosque.org_name,
+    admin_email: mosque.admin_email || undefined,
   });
 }
 

@@ -52,7 +52,7 @@ export default function MosqueInvitePage({ params }: { params: Promise<{ code: s
   const c = tr[lang];
   const isAr = lang === "ar";
 
-  const [inviteData, setInviteData] = useState<{ mosque_name: string; org_name: string } | null>(null);
+  const [inviteData, setInviteData] = useState<{ mosque_name: string; org_name: string; admin_email?: string } | null>(null);
   const [inviteError, setInviteError] = useState("");
   const [loadingInvite, setLoadingInvite] = useState(true);
 
@@ -78,6 +78,7 @@ export default function MosqueInvitePage({ params }: { params: Promise<{ code: s
         }
         const d = await r.json();
         setInviteData(d);
+        if (d.admin_email) setEmail(d.admin_email);
       })
       .finally(() => setLoadingInvite(false));
   }, [code]);

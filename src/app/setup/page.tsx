@@ -55,10 +55,12 @@ const tr = {
     addKhatib: "Add another khatib",
     maxKhatibs: "Maximum 10 khatibs",
     yourMosques: "Your Mosques",
-    mosquesDesc: "Add the mosques under your institution. You can add khatibs later.",
+    mosquesDesc: "Add the mosques under your institution. An invite link will be sent to each admin email.",
     mosqueName: "Mosque name",
     mosquePlaceholder: (n: number) => `Mosque ${n}`,
     mosqueCity: "City",
+    mosqueEmail: "Admin email",
+    mosqueEmailPlaceholder: "admin@mosque.org",
     addMosque: "Add another mosque",
     maxMosques: "Maximum 20 mosques",
     pickYear: "Pick your planning year",
@@ -117,10 +119,12 @@ const tr = {
     addKhatib: "إضافة خطيب آخر",
     maxKhatibs: "الحد الأقصى ١٠ خطباء",
     yourMosques: "المساجد",
-    mosquesDesc: "أضف المساجد التابعة لمؤسستك. يمكنك إضافة الخطباء لاحقاً.",
+    mosquesDesc: "أضف المساجد التابعة لمؤسستك. سيتم إرسال رابط دعوة لكل بريد مدير.",
     mosqueName: "اسم المسجد",
     mosquePlaceholder: (n: number) => `المسجد ${n}`,
     mosqueCity: "المدينة",
+    mosqueEmail: "بريد المدير",
+    mosqueEmailPlaceholder: "admin@mosque.org",
     addMosque: "إضافة مسجد آخر",
     maxMosques: "الحد الأقصى ٢٠ مسجداً",
     pickYear: "اختر سنة التخطيط",
@@ -145,7 +149,7 @@ export default function SetupPage() {
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
   const [khatibNames, setKhatibNames] = useState<string[]>([""]);
-  const [mosqueEntries, setMosqueEntries] = useState<{ name: string; city: string }[]>([{ name: "", city: "" }]);
+  const [mosqueEntries, setMosqueEntries] = useState<{ name: string; city: string; email: string }[]>([{ name: "", city: "", email: "" }]);
   const [planningYear, setPlanningYear] = useState(new Date().getFullYear());
   const [saving, setSaving] = useState(false);
   const [userName, setUserName] = useState("");
@@ -166,9 +170,9 @@ export default function SetupPage() {
         if (!d) return;
         if (d.onboarding_complete) { window.location.href = "/dashboard"; return; }
         setUserName(d.name || "");
-        if (d.organization_id && d.role === "khatib") {
+        if (d.organization_id && (d.role === "khatib" || d.role === "mosque_admin")) {
           setIsInvitedKhatib(true);
-          setSelectedType("organization");
+          setSelectedType(d.role === "mosque_admin" ? "institution" : "organization");
           setStep("year");
         }
       });
@@ -496,45 +500,58 @@ export default function SetupPage() {
                     <p className="text-xs text-ink/30 mb-3">{c.mosquesDesc}</p>
                     <div className="flex flex-col gap-2">
                       {mosqueEntries.map((entry, i) => (
-                        <div key={i} className="flex items-center gap-2">
+                        <div key={i} className="flex flex-col gap-2 pb-3 mb-3 border-b border-line/50 last:border-0 last:pb-0 last:mb-0">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={entry.name}
+                              onChange={(e) => {
+                                const updated = [...mosqueEntries];
+                                updated[i] = { ...updated[i], name: e.target.value };
+                                setMosqueEntries(updated);
+                              }}
+                              placeholder={c.mosquePlaceholder(i + 1)}
+                              className="flex-1 px-4 py-2.5 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
+                            />
+                            <input
+                              type="text"
+                              value={entry.city}
+                              onChange={(e) => {
+                                const updated = [...mosqueEntries];
+                                updated[i] = { ...updated[i], city: e.target.value };
+                                setMosqueEntries(updated);
+                              }}
+                              placeholder={c.mosqueCity}
+                              className="w-28 px-3 py-2.5 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
+                            />
+                            {mosqueEntries.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setMosqueEntries(mosqueEntries.filter((_, j) => j !== i))}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-ink/25 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-lg">close</span>
+                              </button>
+                            )}
+                          </div>
                           <input
-                            type="text"
-                            value={entry.name}
+                            type="email"
+                            value={entry.email}
                             onChange={(e) => {
                               const updated = [...mosqueEntries];
-                              updated[i] = { ...updated[i], name: e.target.value };
+                              updated[i] = { ...updated[i], email: e.target.value };
                               setMosqueEntries(updated);
                             }}
-                            placeholder={c.mosquePlaceholder(i + 1)}
-                            className="flex-1 px-4 py-2.5 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
+                            placeholder={c.mosqueEmailPlaceholder}
+                            className="px-4 py-2.5 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
                           />
-                          <input
-                            type="text"
-                            value={entry.city}
-                            onChange={(e) => {
-                              const updated = [...mosqueEntries];
-                              updated[i] = { ...updated[i], city: e.target.value };
-                              setMosqueEntries(updated);
-                            }}
-                            placeholder={c.mosqueCity}
-                            className="w-28 px-3 py-2.5 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
-                          />
-                          {mosqueEntries.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setMosqueEntries(mosqueEntries.filter((_, j) => j !== i))}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-ink/25 hover:text-red-500 hover:bg-red-50 transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-lg">close</span>
-                            </button>
-                          )}
                         </div>
                       ))}
                     </div>
                     {mosqueEntries.length < 20 ? (
                       <button
                         type="button"
-                        onClick={() => setMosqueEntries([...mosqueEntries, { name: "", city: "" }])}
+                        onClick={() => setMosqueEntries([...mosqueEntries, { name: "", city: "", email: "" }])}
                         className="flex items-center gap-1.5 text-sm text-primary font-semibold mt-3 hover:text-secondary transition-colors"
                       >
                         <span className="material-symbols-outlined text-base">add_circle</span>

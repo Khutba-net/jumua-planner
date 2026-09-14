@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { query, queryOne, cuid, toJSON, withTransaction } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { sendMosqueInvitation } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { account_type, org_name, city, country, planning_year, khatib_names, mosque_entries } = body;
 
-  if (user.organization_id && user.role === "khatib") {
+  if (user.organization_id && (user.role === "khatib" || user.role === "mosque_admin")) {
     await query(
       "UPDATE users SET onboarding_complete = 1, planning_year = $1, updated_at = NOW() WHERE id = $2",
       [planning_year || new Date().getFullYear(), userId]
@@ -56,14 +58,41 @@ export async function POST(req: Request) {
         );
 
         if (account_type === "institution") {
-          const entries: { name: string; city?: string }[] = Array.isArray(mosque_entries) ? mosque_entries : [];
+          const entries: { name: string; city?: string; email?: string }[] = Array.isArray(mosque_entries) ? mosque_entries : [];
+          const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
+          const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
           for (const entry of entries) {
             const trimmedName = entry.name?.trim();
             if (!trimmedName) continue;
+            const adminEmail = entry.email?.trim()?.toLowerCase() || null;
+            const inviteCode = adminEmail ? randomBytes(4).toString("hex") : null;
+
             await client.query(
-              "INSERT INTO mosques (id, name, city, organization_id) VALUES ($1, $2, $3, $4)",
-              [cuid(), trimmedName.slice(0, 200), entry.city?.trim()?.slice(0, 100) || null, organizationId]
+              `INSERT INTO mosques (id, name, city, organization_id, admin_email, invite_code, invite_expires_at, invite_status)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              [
+                cuid(),
+                trimmedName.slice(0, 200),
+                entry.city?.trim()?.slice(0, 100) || null,
+                organizationId,
+                adminEmail,
+                inviteCode,
+                adminEmail ? expiresAt : null,
+                adminEmail ? "invited" : "pending",
+              ]
             );
+
+            if (adminEmail && inviteCode && process.env.RESEND_API_KEY) {
+              const inviteUrl = `${APP_URL}/mosque-invite/${inviteCode}`;
+              sendMosqueInvitation(
+                adminEmail,
+                user.name,
+                trimmedName,
+                org_name,
+                inviteUrl
+              ).catch((err) => logger.error("Failed to send mosque invitation email", { error: String(err) }));
+            }
           }
         } else {
           const names: string[] = Array.isArray(khatib_names) ? khatib_names : [];
