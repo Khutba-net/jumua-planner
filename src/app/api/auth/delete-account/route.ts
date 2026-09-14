@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { queryOne, exec, withTransaction } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { sendAccountDeleted } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +13,8 @@ export async function DELETE() {
     throw e;
   }
 
-  const user = await queryOne<{ id: string; role: string; organization_id: string | null }>(
-    "SELECT id, role, organization_id FROM users WHERE id = $1", [userId]
+  const user = await queryOne<{ id: string; email: string; name: string; role: string; organization_id: string | null }>(
+    "SELECT id, email, name, role, organization_id FROM users WHERE id = $1", [userId]
   );
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -37,7 +39,13 @@ export async function DELETE() {
     }
   }
 
+  const userEmail = user.email;
+  const userName = user.name;
+
   await withTransaction(async (client) => {
+    await client.query("DELETE FROM sessions WHERE user_id = $1", [userId]);
+    await client.query("DELETE FROM email_verification_tokens WHERE user_id = $1", [userId]);
+    await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM friday_assignments WHERE member_id IN (SELECT id FROM org_members WHERE user_id = $1)", [userId]);
     await client.query("DELETE FROM org_members WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM references_ WHERE sermon_id IN (SELECT id FROM sermons WHERE author_id = $1)", [userId]);
@@ -49,6 +57,12 @@ export async function DELETE() {
     await client.query("DELETE FROM user_settings WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM users WHERE id = $1", [userId]);
   });
+
+  if (process.env.RESEND_API_KEY) {
+    await sendAccountDeleted(userEmail, userName).catch((err) =>
+      logger.error("Failed to send account deleted email", { error: String(err) })
+    );
+  }
 
   const res = NextResponse.json({ ok: true });
   res.cookies.set("session", "", { path: "/", maxAge: 0 });

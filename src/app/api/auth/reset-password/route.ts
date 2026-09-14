@@ -3,6 +3,8 @@ import { queryOne, exec, hashPassword } from "@/lib/db";
 import { deleteAllUserSessions } from "@/lib/session";
 import { rateLimitByIpAsync } from "@/lib/rate-limit";
 import { resetPasswordSchema, parseBody } from "@/lib/validations";
+import { sendPasswordChanged } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -42,8 +44,16 @@ export async function POST(req: Request) {
   await exec("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2", [newHash, resetToken.user_id]);
   await exec("UPDATE password_reset_tokens SET used = 1 WHERE id = $1", [resetToken.id]);
 
-  // Revoke all existing sessions so user must log in with new password
   await deleteAllUserSessions(resetToken.user_id);
+
+  const user = await queryOne<{ email: string; name: string }>(
+    "SELECT email, name FROM users WHERE id = $1", [resetToken.user_id]
+  );
+  if (user && process.env.RESEND_API_KEY) {
+    await sendPasswordChanged(user.email, user.name).catch((err) =>
+      logger.error("Failed to send password changed email", { error: String(err) })
+    );
+  }
 
   return NextResponse.json({ ok: true, message: "Password has been reset. You can now sign in." });
 }

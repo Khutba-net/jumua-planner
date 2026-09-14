@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { queryOne, exec } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { rateLimitByIpAsync } from "@/lib/rate-limit";
+import { sendWelcomeVerified } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,15 @@ export async function POST(req: Request) {
 
   await exec("UPDATE email_verification_tokens SET used = 1 WHERE id = $1", [token.id]);
   await exec("UPDATE users SET email_verified = 1 WHERE id = $1", [userId]);
+
+  const user = await queryOne<{ email: string; name: string }>(
+    "SELECT email, name FROM users WHERE id = $1", [userId]
+  );
+  if (user && process.env.RESEND_API_KEY) {
+    await sendWelcomeVerified(user.email, user.name).catch((err) =>
+      logger.error("Failed to send welcome email", { error: String(err) })
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

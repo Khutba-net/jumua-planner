@@ -55,22 +55,6 @@ export async function sendPasswordReset(email: string, name: string, resetUrl: s
   });
 }
 
-export async function sendWelcome(email: string, name: string, verifyUrl: string) {
-  return getResend().emails.send({
-    from: FROM,
-    to: email,
-    subject: "Welcome to Khutba — verify your email",
-    html: baseHtml(`
-      <h1>Welcome to Khutba!</h1>
-      <p>Assalamu alaykom ${name},</p>
-      <p>Thank you for joining Khutba. Please verify your email address to get started:</p>
-      <p><a href="${verifyUrl}" class="btn">Verify Email</a></p>
-      <p class="muted">This link expires in 24 hours.</p>
-      <p class="muted" style="margin-top:16px;word-break:break-all">Or copy this link: ${verifyUrl}</p>
-    `),
-  });
-}
-
 export async function sendInvitation(email: string, inviterName: string, orgName: string, inviteUrl: string) {
   return getResend().emails.send({
     from: FROM,
@@ -168,6 +152,56 @@ export async function sendMosqueInvitation(email: string, inviterName: string, m
       <p><a href="${inviteUrl}" class="btn">Accept Invitation</a></p>
       <p class="muted">This invitation expires in 30 days.</p>
       <p class="muted" style="margin-top:16px;word-break:break-all">Or copy this link: ${inviteUrl}</p>
+    `),
+  });
+}
+
+export async function sendWelcomeVerified(email: string, name: string) {
+  return getResend().emails.send({
+    from: FROM,
+    to: email,
+    subject: "You're all set — welcome to Khutba!",
+    html: baseHtml(`
+      <h1>Jazakallahu khairan, ${name}!</h1>
+      <p>Assalamu alaykom,</p>
+      <p>Your email has been verified and your Khutba account is ready. Here's what you can do now:</p>
+      <ul style="font-size:14px;color:#3d4f51;line-height:1.8;margin:8px 0 16px;">
+        <li>Plan and organize your khutbahs</li>
+        <li>Build thematic sermon series</li>
+        <li>Collaborate with your mosque team</li>
+      </ul>
+      <p><a href="${APP_URL}/dashboard" class="btn">Go to Dashboard</a></p>
+      <p class="muted">May Allah accept your efforts in serving the ummah.</p>
+    `),
+  });
+}
+
+export async function sendPasswordChanged(email: string, name: string) {
+  return getResend().emails.send({
+    from: FROM,
+    to: email,
+    subject: "Your Khutba password was changed",
+    html: baseHtml(`
+      <h1>Password changed</h1>
+      <p>Assalamu alaykom ${name},</p>
+      <p>Your password was successfully changed. You can now sign in with your new password.</p>
+      <p><a href="${APP_URL}/auth/login" class="btn">Sign In</a></p>
+      <p class="muted">If you didn't make this change, please <a href="${APP_URL}/auth/forgot-password" style="color:#00666d;">reset your password immediately</a>.</p>
+    `),
+  });
+}
+
+export async function sendAccountDeleted(email: string, name: string) {
+  return getResend().emails.send({
+    from: FROM,
+    to: email,
+    subject: "Your Khutba account has been deleted",
+    html: baseHtml(`
+      <h1>Account deleted</h1>
+      <p>Assalamu alaykom ${name},</p>
+      <p>Your Khutba account and all associated data have been permanently deleted as requested.</p>
+      <p class="muted">If this was a mistake or you'd like to return, you can always create a new account at <a href="${APP_URL}" style="color:#00666d;">khutba.net</a>.</p>
+      <p class="muted">May Allah bless you in all your endeavours.</p>
     `),
   });
 }
