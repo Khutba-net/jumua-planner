@@ -61,6 +61,7 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [existingAccount, setExistingAccount] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("jp_lang");
@@ -95,11 +96,16 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to join");
+        if (res.status === 401) {
+          setExistingAccount(true);
+          setError(isAr ? "كلمة المرور غير صحيحة" : "Incorrect password for your existing account");
+        } else {
+          setError(data.error || "Failed to join");
+        }
         setSaving(false);
         return;
       }
-      window.location.href = "/setup";
+      window.location.href = data.user?.onboarding_complete ? "/dashboard" : "/setup";
     } catch {
       setError(c.fallbackError);
       setSaving(false);
@@ -160,7 +166,20 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
           <p className="text-ink/40 text-sm">{c.youreInvited(inviteData.khatib_name, inviteData.org_name)}</p>
         </div>
 
-        <p className="text-ink/40 text-sm text-center mb-6">{c.createAccount}</p>
+        {existingAccount && (
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-4 text-center">
+            <span className="material-symbols-outlined text-primary text-xl mb-1">account_circle</span>
+            <p className="text-sm text-ink/70 font-medium">
+              {isAr ? "تم العثور على حسابك — أدخل كلمة المرور للانضمام" : "Account found — enter your password to join"}
+            </p>
+          </div>
+        )}
+
+        {!existingAccount && (
+          <p className="text-ink/40 text-sm text-center mb-6">
+            {isAr ? "أنشئ حسابك أو سجّل دخولك للانضمام" : "Create an account or sign in to join as a khatib."}
+          </p>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-lg mb-4">
@@ -169,24 +188,26 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
         )}
 
         <form onSubmit={handleJoin} className="flex flex-col gap-5">
-          <div>
-            <label className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={c.namePlaceholder}
-              required
-              className="w-full px-4 py-3 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
-            />
-          </div>
+          {!existingAccount && (
+            <div>
+              <label className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={c.namePlaceholder}
+                required={!existingAccount}
+                className="w-full px-4 py-3 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
+              />
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-semibold text-ink/50 block mb-2">{c.email}</label>
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setExistingAccount(false); setError(""); }}
               placeholder={c.emailPlaceholder}
               required
               className="w-full px-4 py-3 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
@@ -194,12 +215,19 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-ink/50 block mb-2">{c.password}</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-ink/50">{c.password}</label>
+              {existingAccount && (
+                <Link href="/auth/forgot-password" className="text-xs text-primary/60 hover:text-primary font-semibold transition-colors">
+                  {isAr ? "نسيت كلمة المرور؟" : "Forgot password?"}
+                </Link>
+              )}
+            </div>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={c.passPlaceholder}
+              placeholder={existingAccount ? (isAr ? "أدخل كلمة المرور الحالية" : "Enter your existing password") : c.passPlaceholder}
               required
               minLength={8}
               className="w-full px-4 py-3 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
@@ -211,16 +239,9 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
             disabled={saving}
             className="w-full py-3.5 rounded-full bg-primary text-white font-bold text-sm hover:bg-secondary shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 mt-1"
           >
-            {saving ? c.joining : c.join}
+            {saving ? c.joining : existingAccount ? (isAr ? "تسجيل الدخول وقبول الدعوة" : "Sign in & Accept Invite") : c.join}
           </button>
         </form>
-
-        <p className="text-center text-sm text-ink/40 mt-8">
-          {c.hasAccount}{" "}
-          <Link href={`/auth/login?invite=${code}`} className="text-primary font-semibold hover:underline">
-            {c.signIn}
-          </Link>
-        </p>
       </div>
     </div>
   );

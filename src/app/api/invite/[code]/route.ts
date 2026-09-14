@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { query, queryOne, cuid, toJSON, hashPassword, withTransaction } from "@/lib/db";
+import { query, queryOne, cuid, toJSON, hashPassword, verifyPassword, withTransaction } from "@/lib/db";
 import { createSession, sessionCookieOptions } from "@/lib/session";
-import { signupSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -36,12 +35,12 @@ export async function GET(_req: Request, { params }: Params) {
 export async function POST(req: Request, { params }: Params) {
   const { code } = await params;
   const body = await req.json();
-  const parsed = parseBody(signupSchema, body);
-  if ("error" in parsed) {
-    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  const { name, email: rawEmail, password } = body as { name?: string; email?: string; password?: string };
+
+  if (!rawEmail || !password) {
+    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
   }
-  const { name, password } = parsed.data;
-  const email = parsed.data.email.toLowerCase().trim();
+  const email = rawEmail.toLowerCase().trim();
 
   const member = await queryOne<{ id: string; name: string; status: string; organization_id: string; invite_expires_at: string }>(
     "SELECT m.id, m.name, m.status, m.organization_id, m.invite_expires_at FROM org_members m WHERE m.invite_code = $1",
@@ -60,25 +59,44 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "This invite has expired" }, { status: 410 });
   }
 
-  const existing = await queryOne("SELECT id FROM users WHERE LOWER(email) = $1", [email]);
+  const existing = await queryOne<{ id: string; password_hash: string | null; name: string }>(
+    "SELECT id, password_hash, name FROM users WHERE LOWER(email) = $1", [email]
+  );
+
+  let userId: string;
+
   if (existing) {
-    return NextResponse.json({ error: "An account with this email already exists. Log in and use the invite link." }, { status: 409 });
+    if (!existing.password_hash || !verifyPassword(password, existing.password_hash)) {
+      return NextResponse.json({ error: "Incorrect password for existing account" }, { status: 401 });
+    }
+    userId = existing.id;
+    await withTransaction(async (client) => {
+      await client.query(
+        "UPDATE org_members SET user_id = $1, status = 'active', email = $2, updated_at = NOW() WHERE id = $3",
+        [userId, email, member.id]
+      );
+      await client.query(
+        "UPDATE users SET organization_id = $1, account_type = 'organization', role = 'khatib', updated_at = NOW() WHERE id = $2",
+        [member.organization_id, userId]
+      );
+    });
+  } else {
+    if (!name) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+    userId = cuid();
+    const passwordHash = hashPassword(password);
+    await withTransaction(async (client) => {
+      await client.query(
+        "INSERT INTO users (id, email, name, password_hash, role, account_type, organization_id, onboarding_complete, planning_year) VALUES ($1, $2, $3, $4, 'khatib', 'organization', $5, 0, $6)",
+        [userId, email, name, passwordHash, member.organization_id, new Date().getFullYear()]
+      );
+      await client.query(
+        "UPDATE org_members SET user_id = $1, status = 'active', email = $2, updated_at = NOW() WHERE id = $3",
+        [userId, email, member.id]
+      );
+    });
   }
-
-  const userId = cuid();
-  const passwordHash = hashPassword(password);
-
-  await withTransaction(async (client) => {
-    await client.query(
-      "INSERT INTO users (id, email, name, password_hash, role, account_type, organization_id, onboarding_complete, planning_year) VALUES ($1, $2, $3, $4, 'khatib', 'organization', $5, 0, $6)",
-      [userId, email, name, passwordHash, member.organization_id, new Date().getFullYear()]
-    );
-
-    await client.query(
-      "UPDATE org_members SET user_id = $1, status = 'active', email = $2, updated_at = NOW() WHERE id = $3",
-      [userId, email, member.id]
-    );
-  });
 
   const user = await queryOne("SELECT id, email, name, onboarding_complete FROM users WHERE id = $1", [userId]);
 
