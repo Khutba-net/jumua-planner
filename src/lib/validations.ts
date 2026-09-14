@@ -4,6 +4,7 @@ export const loginSchema = z.object({
   email: z.string().email("Invalid email format").max(255),
   password: z.string().min(1, "Password is required").max(128),
   invite_code: z.string().max(20).optional(),
+  mosque_invite_code: z.string().max(20).optional(),
 });
 
 const strongPassword = z.string().min(8, "Password must be at least 8 characters").max(128)

@@ -216,7 +216,7 @@ export default function MosqueInvitePage({ params }: { params: Promise<{ code: s
 
         <p className="text-center text-sm text-ink/40 mt-8">
           {c.hasAccount}{" "}
-          <Link href="/auth/login" className="text-primary font-semibold hover:underline">
+          <Link href={`/auth/login?mosque_invite=${code}`} className="text-primary font-semibold hover:underline">
             {c.signIn}
           </Link>
         </p>

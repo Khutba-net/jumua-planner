@@ -54,6 +54,8 @@ export default function LoginPage() {
 function LoginForm() {
   const searchParams = useSearchParams();
   const inviteCode = searchParams.get("invite") || "";
+  const mosqueInviteCode = searchParams.get("mosque_invite") || "";
+  const hasInvite = !!inviteCode || !!mosqueInviteCode;
 
   const [lang, setLang] = useState<"en" | "ar">("en");
   const c = tr[lang];
@@ -79,7 +81,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, invite_code: inviteCode || undefined }),
+        body: JSON.stringify({ email, password, invite_code: inviteCode || undefined, mosque_invite_code: mosqueInviteCode || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -140,11 +142,20 @@ function LoginForm() {
           </button>
         </div>
 
+        {hasInvite && (
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-6 text-center">
+            <span className="material-symbols-outlined text-primary text-2xl mb-1">{mosqueInviteCode ? "mosque" : "group_add"}</span>
+            <p className="text-sm text-ink/70 font-medium">
+              {isAr ? "سجّل دخولك لقبول الدعوة" : "Sign in to accept your invitation"}
+            </p>
+          </div>
+        )}
+
         <h1 className="text-2xl md:text-3xl font-bold text-ink text-center mb-1.5 tracking-tight">
-          {c.welcome}
+          {hasInvite ? (isAr ? "تسجيل الدخول للانضمام" : "Sign in to join") : c.welcome}
         </h1>
         <p className="text-ink/40 text-center mb-8 text-sm">
-          {c.subtitle}
+          {hasInvite ? (isAr ? "سجّل دخولك بحسابك الحالي لقبول الدعوة" : "Sign in with your existing account to accept the invite") : c.subtitle}
         </p>
 
 
