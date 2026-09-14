@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { query, queryOne, cuid, toJSON, withTransaction } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
-import { sendMosqueInvitation } from "@/lib/email";
+import { sendInvitation, sendMosqueInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   const body = await req.json();
-  const { account_type, org_name, city, country, planning_year, khatib_names, mosque_entries } = body;
+  const { account_type, org_name, city, country, planning_year, khatib_entries, mosque_entries } = body;
 
   if (user.organization_id && (user.role === "khatib" || user.role === "mosque_admin")) {
     await query(
@@ -95,17 +95,30 @@ export async function POST(req: Request) {
             }
           }
         } else {
-          const names: string[] = Array.isArray(khatib_names) ? khatib_names : [];
+          const entries: { name: string; email?: string }[] = Array.isArray(khatib_entries) ? khatib_entries : [];
+          const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
           const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-          for (const kn of names) {
-            const trimmed = kn.trim();
-            if (!trimmed) continue;
+          for (const entry of entries) {
+            const trimmedName = entry.name?.trim();
+            if (!trimmedName) continue;
+            const khatibEmail = entry.email?.trim()?.toLowerCase() || null;
             const inviteCode = randomBytes(4).toString("hex");
+
             await client.query(
-              "INSERT INTO org_members (id, organization_id, name, role, status, invite_code, invite_expires_at) VALUES ($1, $2, $3, 'khatib', 'invited', $4, $5)",
-              [cuid(), organizationId, trimmed, inviteCode, expiresAt]
+              "INSERT INTO org_members (id, organization_id, name, email, role, status, invite_code, invite_expires_at) VALUES ($1, $2, $3, $4, 'khatib', 'invited', $5, $6)",
+              [cuid(), organizationId, trimmedName, khatibEmail, inviteCode, expiresAt]
             );
+
+            if (khatibEmail && process.env.RESEND_API_KEY) {
+              const inviteUrl = `${APP_URL}/invite/${inviteCode}`;
+              sendInvitation(
+                khatibEmail,
+                user.name,
+                org_name,
+                inviteUrl
+              ).catch((err) => logger.error("Failed to send khatib invitation email", { error: String(err) }));
+            }
           }
         }
       }

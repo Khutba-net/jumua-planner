@@ -49,9 +49,10 @@ const tr = {
     city: "City",
     country: "Country",
     yourKhatibs: "Your Khatibs",
-    khatibsDesc: "Add the names of your khatibs. You can invite them later.",
+    khatibsDesc: "Add your khatibs. An invite link will be sent to each email.",
     khatibName: "Khatib name",
     khatibPlaceholder: (n: number) => `Khatib ${n}`,
+    khatibEmailPlaceholder: "khatib@email.com",
     addKhatib: "Add another khatib",
     maxKhatibs: "Maximum 10 khatibs",
     yourMosques: "Your Mosques",
@@ -113,9 +114,10 @@ const tr = {
     city: "المدينة",
     country: "الدولة",
     yourKhatibs: "الخطباء",
-    khatibsDesc: "أضف أسماء الخطباء. يمكنك دعوتهم لاحقاً.",
+    khatibsDesc: "أضف الخطباء. سيتم إرسال رابط دعوة لكل بريد إلكتروني.",
     khatibName: "اسم الخطيب",
     khatibPlaceholder: (n: number) => `الخطيب ${n}`,
+    khatibEmailPlaceholder: "khatib@email.com",
     addKhatib: "إضافة خطيب آخر",
     maxKhatibs: "الحد الأقصى ١٠ خطباء",
     yourMosques: "المساجد",
@@ -148,7 +150,7 @@ export default function SetupPage() {
   const [orgName, setOrgName] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
-  const [khatibNames, setKhatibNames] = useState<string[]>([""]);
+  const [khatibEntries, setKhatibEntries] = useState<{ name: string; email: string }[]>([{ name: "", email: "" }]);
   const [mosqueEntries, setMosqueEntries] = useState<{ name: string; city: string; email: string }[]>([{ name: "", city: "", email: "" }]);
   const [planningYear, setPlanningYear] = useState(new Date().getFullYear());
   const [saving, setSaving] = useState(false);
@@ -219,7 +221,7 @@ export default function SetupPage() {
           city,
           country,
           planning_year: planningYear,
-          khatib_names: selectedType === "organization" ? khatibNames.filter((n) => n.trim()) : [],
+          khatib_entries: selectedType === "organization" ? khatibEntries.filter((k) => k.name.trim()) : [],
           mosque_entries: selectedType === "institution" ? mosqueEntries.filter((m) => m.name.trim()) : [],
         }),
       });
@@ -449,39 +451,52 @@ export default function SetupPage() {
                   <div className="pt-2">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-xs font-semibold text-ink/50">{c.yourKhatibs}</label>
-                      <span className="text-[10px] text-mute">{khatibNames.length}/10</span>
+                      <span className="text-[10px] text-mute">{khatibEntries.length}/10</span>
                     </div>
                     <p className="text-xs text-ink/30 mb-3">{c.khatibsDesc}</p>
                     <div className="flex flex-col gap-2">
-                      {khatibNames.map((name, i) => (
-                        <div key={i} className="flex items-center gap-2">
+                      {khatibEntries.map((entry, i) => (
+                        <div key={i} className="flex flex-col gap-2 pb-3 mb-3 border-b border-line/50 last:border-0 last:pb-0 last:mb-0">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={entry.name}
+                              onChange={(e) => {
+                                const updated = [...khatibEntries];
+                                updated[i] = { ...updated[i], name: e.target.value };
+                                setKhatibEntries(updated);
+                              }}
+                              placeholder={c.khatibPlaceholder(i + 1)}
+                              className="flex-1 px-4 py-2.5 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
+                            />
+                            {khatibEntries.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setKhatibEntries(khatibEntries.filter((_, j) => j !== i))}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-ink/25 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-lg">close</span>
+                              </button>
+                            )}
+                          </div>
                           <input
-                            type="text"
-                            value={name}
+                            type="email"
+                            value={entry.email}
                             onChange={(e) => {
-                              const updated = [...khatibNames];
-                              updated[i] = e.target.value;
-                              setKhatibNames(updated);
+                              const updated = [...khatibEntries];
+                              updated[i] = { ...updated[i], email: e.target.value };
+                              setKhatibEntries(updated);
                             }}
-                            placeholder={c.khatibPlaceholder(i + 1)}
-                            className="flex-1 px-4 py-2.5 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
+                            placeholder={c.khatibEmailPlaceholder}
+                            className="px-4 py-2.5 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-sm"
                           />
-                          {khatibNames.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setKhatibNames(khatibNames.filter((_, j) => j !== i))}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-ink/25 hover:text-red-500 hover:bg-red-50 transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-lg">close</span>
-                            </button>
-                          )}
                         </div>
                       ))}
                     </div>
-                    {khatibNames.length < 10 ? (
+                    {khatibEntries.length < 10 ? (
                       <button
                         type="button"
-                        onClick={() => setKhatibNames([...khatibNames, ""])}
+                        onClick={() => setKhatibEntries([...khatibEntries, { name: "", email: "" }])}
                         className="flex items-center gap-1.5 text-sm text-primary font-semibold mt-3 hover:text-secondary transition-colors"
                       >
                         <span className="material-symbols-outlined text-base">add_circle</span>
