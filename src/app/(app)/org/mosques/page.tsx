@@ -11,6 +11,8 @@ type Mosque = {
   city: string | null;
   country: string | null;
   capacity: number | null;
+  admin_email: string | null;
+  invite_status: string | null;
   khatib_count: number;
   active_khatib_count: number;
   created_at: string;
@@ -26,7 +28,9 @@ export default function MosquesPage() {
   const [newCity, setNewCity] = useState("");
   const [newCountry, setNewCountry] = useState("");
   const [newCapacity, setNewCapacity] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [adding, setAdding] = useState(false);
+  const [resending, setResending] = useState<string | null>(null);
 
   const fetchMosques = useCallback(() => {
     fetch("/api/org/mosques")
@@ -48,6 +52,7 @@ export default function MosquesPage() {
         city: newCity.trim() || undefined,
         country: newCountry.trim() || undefined,
         capacity: newCapacity ? parseInt(newCapacity) : undefined,
+        admin_email: newEmail.trim() || undefined,
       }),
     });
     if (res.ok) {
@@ -55,16 +60,34 @@ export default function MosquesPage() {
       setNewCity("");
       setNewCountry("");
       setNewCapacity("");
+      setNewEmail("");
       setShowAdd(false);
       fetchMosques();
     }
     setAdding(false);
   };
 
+  const handleResendInvite = async (id: string) => {
+    setResending(id);
+    await fetch(`/api/org/mosques/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "resend_invite" }),
+    });
+    fetchMosques();
+    setResending(null);
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm(t("org.deleteMosqueConfirm"))) return;
     await fetch(`/api/org/mosques/${id}`, { method: "DELETE" });
     fetchMosques();
+  };
+
+  const inviteStatusBadge = (status: string | null) => {
+    if (status === "accepted") return <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Active</span>;
+    if (status === "invited") return <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Invited</span>;
+    return <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">No Admin</span>;
   };
 
   if (loading) {
@@ -105,6 +128,17 @@ export default function MosquesPage() {
                 className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
                 onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
               />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-ink/50 block mb-1.5">Mosque Admin Email</label>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="admin@mosque.com"
+                className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
+              />
+              <p className="text-[11px] text-mute mt-1">An invitation will be sent so they can manage this mosque</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
@@ -147,7 +181,7 @@ export default function MosquesPage() {
                 {adding ? "..." : t("org.addMosque")}
               </button>
               <button
-                onClick={() => { setShowAdd(false); setNewName(""); setNewCity(""); setNewCountry(""); setNewCapacity(""); }}
+                onClick={() => { setShowAdd(false); setNewName(""); setNewCity(""); setNewCountry(""); setNewCapacity(""); setNewEmail(""); }}
                 className="px-3 py-2 rounded-lg text-sm text-mute hover:text-ink transition-colors"
               >
                 {t("btn.cancel")}
@@ -175,17 +209,31 @@ export default function MosquesPage() {
                   <span className="material-symbols-outlined text-2xl">mosque</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-ink text-[15px] truncate">{m.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-ink text-[15px] truncate">{m.name}</h3>
+                    {inviteStatusBadge(m.invite_status)}
+                  </div>
                   <p className="text-xs text-mute mt-0.5">
-                    {[m.city, m.country].filter(Boolean).join(", ") || " "}
+                    {[m.city, m.country].filter(Boolean).join(", ") || " "}
                     {m.capacity ? ` · ${m.capacity} capacity` : ""}
+                    {m.admin_email ? ` · ${m.admin_email}` : ""}
                   </p>
                 </div>
-                <div className="flex items-center gap-4 shrink-0">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="text-center">
                     <p className="text-lg font-bold text-ink">{Number(m.active_khatib_count)}</p>
                     <p className="text-[10px] text-mute font-semibold uppercase">{t("org.mosqueKhatibs")}</p>
                   </div>
+                  {m.invite_status === "invited" && (
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleResendInvite(m.id); }}
+                      disabled={resending === m.id}
+                      className="p-1.5 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                      title="Resend invite"
+                    >
+                      <span className="material-symbols-outlined text-lg">send</span>
+                    </button>
+                  )}
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(m.id); }}
                     className="p-1.5 rounded-lg text-mute hover:text-red-500 hover:bg-red-50 transition-colors"

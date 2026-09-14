@@ -21,7 +21,7 @@ export async function PUT(req: Request, { params }: Params) {
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
 
-  if (!user?.organization_id || user.role !== "admin") {
+  if (!user?.organization_id || user.role !== "admin" && user.role !== "mosque_admin") {
     return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
   }
 
@@ -105,7 +105,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
 
-  if (!user?.organization_id || user.role !== "admin") {
+  if (!user?.organization_id || user.role !== "admin" && user.role !== "mosque_admin") {
     return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
   }
 

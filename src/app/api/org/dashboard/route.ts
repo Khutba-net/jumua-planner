@@ -14,15 +14,29 @@ export async function GET() {
     "SELECT id, organization_id, role, planning_year FROM users WHERE id = $1", [userId]
   );
 
-  if (!user?.organization_id || user.role !== "admin") {
+  if (!user?.organization_id || (user.role !== "admin" && user.role !== "mosque_admin")) {
     return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  }
+
+  let scopedMosqueId: string | null = null;
+  if (user.role === "mosque_admin") {
+    const mosque = await queryOne<{ id: string }>(
+      "SELECT id FROM mosques WHERE admin_user_id = $1 AND organization_id = $2",
+      [userId, user.organization_id]
+    );
+    if (!mosque) return NextResponse.json({ error: "Mosque not found" }, { status: 403 });
+    scopedMosqueId = mosque.id;
   }
 
   const org = await queryOne("SELECT id, name, type, city, country FROM organizations WHERE id = $1", [user.organization_id]);
 
+  const mosqueFilter = scopedMosqueId ? " AND mosque_id = $2" : "";
+  const memberParams: string[] = [user.organization_id];
+  if (scopedMosqueId) memberParams.push(scopedMosqueId);
+
   const members = await query<{ id: string; name: string; email: string | null; role: string; status: string; user_id: string | null }>(
-    "SELECT id, name, email, role, status, user_id FROM org_members WHERE organization_id = $1 ORDER BY role = 'admin' DESC, created_at ASC",
-    [user.organization_id]
+    `SELECT id, name, email, role, status, user_id FROM org_members WHERE organization_id = $1${mosqueFilter} ORDER BY role = 'admin' DESC, created_at ASC`,
+    memberParams
   );
 
   const khatibStats = [];
@@ -66,13 +80,17 @@ export async function GET() {
   friday.setDate(now.getDate() + (diff === 0 ? 0 : diff));
   const thisFridayDate = friday.toISOString().split("T")[0];
 
+  const assignmentMosqueFilter = scopedMosqueId ? " AND fa.mosque_id = $3" : "";
+  const assignmentParams: string[] = [user.organization_id, thisFridayDate];
+  if (scopedMosqueId) assignmentParams.push(scopedMosqueId);
+
   const thisFridayAssignment = await queryOne<{ id: string; friday_date: string; guest_name: string | null; khatib_name: string | null; notes: string | null }>(`
     SELECT fa.id, fa.friday_date, fa.guest_name, fa.notes, m.name as khatib_name
     FROM friday_assignments fa
     LEFT JOIN org_members m ON fa.member_id = m.id
-    WHERE fa.organization_id = $1 AND fa.friday_date = $2
+    WHERE fa.organization_id = $1 AND fa.friday_date = $2${assignmentMosqueFilter}
     LIMIT 1
-  `, [user.organization_id, thisFridayDate]);
+  `, assignmentParams);
 
   // For institution accounts, include mosque overview
   let mosqueOverview = null;

@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { query, queryOne, exec, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { sendMosqueInvitation } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 async function getInstAdmin() {
   const userId = await getUserId();
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string; account_type: string }>(
-    "SELECT id, organization_id, role, account_type FROM users WHERE id = $1", [userId]
+  const user = await queryOne<{ id: string; organization_id: string | null; role: string; account_type: string; name: string }>(
+    "SELECT id, organization_id, role, account_type, name FROM users WHERE id = $1", [userId]
   );
   if (!user?.organization_id || user.role !== "admin" || user.account_type !== "institution") {
     return null;
@@ -110,6 +113,37 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     await exec("UPDATE themes SET mosque_id = NULL WHERE mosque_id = $1", [id]);
     await exec("UPDATE mosques SET organization_id = NULL, updated_at = NOW() WHERE id = $1", [id]);
     return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "resend_invite") {
+    const mosque = await queryOne<{ id: string; name: string; admin_email: string | null; invite_status: string }>(
+      "SELECT id, name, admin_email, invite_status FROM mosques WHERE id = $1", [id]
+    );
+    if (!mosque?.admin_email) {
+      return NextResponse.json({ error: "No admin email set for this mosque" }, { status: 400 });
+    }
+    if (mosque.invite_status === "accepted") {
+      return NextResponse.json({ error: "Invite has already been accepted" }, { status: 400 });
+    }
+    const newCode = randomBytes(4).toString("hex");
+    const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await exec(
+      "UPDATE mosques SET invite_code = $1, invite_expires_at = $2, invite_status = 'invited', updated_at = NOW() WHERE id = $3",
+      [newCode, newExpiry, id]
+    );
+    if (process.env.RESEND_API_KEY) {
+      const org = await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user!.organization_id]);
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
+      await sendMosqueInvitation(
+        mosque.admin_email,
+        user!.name,
+        mosque.name,
+        org?.name ?? "your institution",
+        `${APP_URL}/mosque-invite/${newCode}`
+      ).catch((err) => logger.error("Failed to resend mosque invitation", { error: String(err) }));
+    }
+    const updated = await queryOne("SELECT * FROM mosques WHERE id = $1", [id]);
+    return NextResponse.json(toJSON(updated));
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });

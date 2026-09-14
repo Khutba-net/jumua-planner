@@ -23,7 +23,15 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const from = url.searchParams.get("from") || new Date().toISOString().split("T")[0];
   const weeks = Math.min(Math.max(parseInt(url.searchParams.get("weeks") || "12") || 12, 1), 52);
-  const mosqueId = url.searchParams.get("mosque_id");
+  let mosqueId = url.searchParams.get("mosque_id");
+
+  if (user.role === "mosque_admin" && !mosqueId) {
+    const mosque = await queryOne<{ id: string }>(
+      "SELECT id FROM mosques WHERE admin_user_id = $1 AND organization_id = $2",
+      [userId, user.organization_id]
+    );
+    if (mosque) mosqueId = mosque.id;
+  }
 
   const assignmentParams: unknown[] = [user.organization_id, from, weeks];
   let assignmentWhere = "fa.organization_id = $1 AND fa.friday_date >= $2";
@@ -59,7 +67,7 @@ export async function GET(req: Request) {
     [userId, user.organization_id]
   );
 
-  return NextResponse.json(toJSON({ assignments, members, isAdmin: user.role === "admin", myMemberId: myMember?.id || null }));
+  return NextResponse.json(toJSON({ assignments, members, isAdmin: user.role === "admin" || user.role === "mosque_admin", myMemberId: myMember?.id || null }));
 }
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -74,12 +82,20 @@ export async function POST(req: Request) {
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
 
-  if (!user?.organization_id || user.role !== "admin") {
+  if (!user?.organization_id || (user.role !== "admin" && user.role !== "mosque_admin")) {
     return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
   }
 
   const body = await req.json();
-  const { friday_date, member_id, guest_name, notes, mosque_id } = body;
+  let { friday_date, member_id, guest_name, notes, mosque_id } = body;
+
+  if (user.role === "mosque_admin" && !mosque_id) {
+    const mosque = await queryOne<{ id: string }>(
+      "SELECT id FROM mosques WHERE admin_user_id = $1 AND organization_id = $2",
+      [userId, user.organization_id]
+    );
+    if (mosque) mosque_id = mosque.id;
+  }
 
   if (!friday_date || typeof friday_date !== "string" || !DATE_REGEX.test(friday_date)) {
     return NextResponse.json({ error: "Valid Friday date is required (YYYY-MM-DD)" }, { status: 400 });

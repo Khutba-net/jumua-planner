@@ -31,6 +31,7 @@ export default function KhatibsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [mosques, setMosques] = useState<Mosque[]>([]);
@@ -58,10 +59,11 @@ export default function KhatibsPage() {
     const res = await fetch("/api/org/members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName.trim() }),
+      body: JSON.stringify({ name: newName.trim(), email: newEmail.trim() || undefined }),
     });
     if (res.ok) {
       setNewName("");
+      setNewEmail("");
       setShowAdd(false);
       fetchMembers();
     }
@@ -124,32 +126,51 @@ export default function KhatibsPage() {
       </div>
 
       {showAdd && (
-        <div className="bg-white border border-line rounded-xl p-4 mb-4 flex items-end gap-3">
-          <div className="flex-1">
-            <label className="text-xs font-semibold text-ink/50 block mb-1.5">{t("org.khatibNameLabel")}</label>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder={t("org.khatibNamePlaceholder")}
-              autoFocus
-              className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
-              onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-            />
+        <div className="bg-white border border-line rounded-xl p-4 mb-4">
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-ink/50 block mb-1.5">{t("org.khatibNameLabel")}</label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder={t("org.khatibNamePlaceholder")}
+                  autoFocus
+                  className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-ink/50 block mb-1.5">{isAr ? "البريد الإلكتروني" : "Email (optional)"}</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="khatib@email.com"
+                  className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
+                />
+              </div>
+            </div>
+            {newEmail.trim() && (
+              <p className="text-[11px] text-mute">An invitation email will be sent automatically</p>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleAdd}
+                disabled={adding || !newName.trim()}
+                className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50"
+              >
+                {adding ? "..." : t("org.add")}
+              </button>
+              <button
+                onClick={() => { setShowAdd(false); setNewName(""); setNewEmail(""); }}
+                className="px-3 py-2 rounded-lg text-sm text-mute hover:text-ink transition-colors"
+              >
+                {t("btn.cancel")}
+              </button>
+            </div>
           </div>
-          <button
-            onClick={handleAdd}
-            disabled={adding || !newName.trim()}
-            className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50"
-          >
-            {adding ? "..." : t("org.add")}
-          </button>
-          <button
-            onClick={() => { setShowAdd(false); setNewName(""); }}
-            className="px-3 py-2 rounded-lg text-sm text-mute hover:text-ink transition-colors"
-          >
-            {t("btn.cancel")}
-          </button>
         </div>
       )}
 

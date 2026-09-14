@@ -150,6 +150,28 @@ export async function sendApprovalResult(email: string, name: string, sermonTitl
   });
 }
 
+export async function sendMosqueInvitation(email: string, inviterName: string, mosqueName: string, orgName: string, inviteUrl: string) {
+  return getResend().emails.send({
+    from: FROM,
+    to: email,
+    subject: `You're invited to manage ${mosqueName} on Khutba`,
+    html: baseHtml(`
+      <h1>Manage your mosque on Khutba</h1>
+      <p>Assalamu alaykom,</p>
+      <p><strong>${inviterName}</strong> from <strong>${orgName}</strong> has invited you to manage <strong>${mosqueName}</strong> on Khutba — a platform for planning coherent, year-long khutbah series.</p>
+      <p>As a mosque admin, you'll be able to:</p>
+      <ul style="font-size:14px;color:#3d4f51;line-height:1.8;margin:8px 0 16px;">
+        <li>Add and manage khatibs for your mosque</li>
+        <li>Create and schedule khutbah themes</li>
+        <li>Coordinate the weekly schedule</li>
+      </ul>
+      <p><a href="${inviteUrl}" class="btn">Accept Invitation</a></p>
+      <p class="muted">This invitation expires in 30 days.</p>
+      <p class="muted" style="margin-top:16px;word-break:break-all">Or copy this link: ${inviteUrl}</p>
+    `),
+  });
+}
+
 export async function sendEmailVerification(email: string, name: string, code: string) {
   return getResend().emails.send({
     from: FROM,

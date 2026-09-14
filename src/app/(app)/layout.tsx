@@ -43,10 +43,13 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
-    const isOrgAdmin = user.role === "admin" && user.account_type !== "individual";
+    const isOrgAdmin = (user.role === "admin" || user.role === "mosque_admin") && user.account_type !== "individual";
     const khatibOnlyRoutes = ["/sermons", "/themes", "/calendar", "/resources"];
     if (isOrgAdmin && khatibOnlyRoutes.some((r) => pathname.startsWith(r))) {
       router.push("/dashboard");
+    }
+    if (user.role === "mosque_admin" && pathname.startsWith("/org/mosques")) {
+      router.push("/org/dashboard");
     }
   }, [user, pathname]);
 
@@ -124,13 +127,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          {(user?.role === "admin" || user?.role === "khatib") && user?.account_type !== "individual" && (
+          {(user?.role === "admin" || user?.role === "khatib" || user?.role === "mosque_admin") && user?.account_type !== "individual" && (
             <>
               <div className="h-px bg-line my-2" />
-              <p className="px-4 text-[10px] font-bold text-mute uppercase tracking-wider mb-1">{t("nav.organization")}</p>
+              <p className="px-4 text-[10px] font-bold text-mute uppercase tracking-wider mb-1">{user?.role === "mosque_admin" ? t("nav.mosque") || "Mosque" : t("nav.organization")}</p>
               {(user.role === "admin" ? [
                 { href: "/org/dashboard", key: "nav.orgDashboard", icon: "monitoring" },
                 ...(user.account_type === "institution" ? [{ href: "/org/mosques", key: "nav.mosques", icon: "mosque" }] : []),
+                { href: "/org/schedule", key: "nav.schedule", icon: "date_range" },
+                { href: "/org/khatibs", key: "nav.khatibs", icon: "group" },
+              ] : user.role === "mosque_admin" ? [
+                { href: "/org/dashboard", key: "nav.orgDashboard", icon: "monitoring" },
                 { href: "/org/schedule", key: "nav.schedule", icon: "date_range" },
                 { href: "/org/khatibs", key: "nav.khatibs", icon: "group" },
               ] : [
