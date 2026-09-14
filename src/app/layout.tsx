@@ -39,7 +39,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#00666d" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('jp_theme');if(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}}if('serviceWorker'in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){})}})()`,
+            __html: `(function(){try{var t=localStorage.getItem('jp_theme');if(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}if('serviceWorker'in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){})}})()`,
           }}
         />
       </head>

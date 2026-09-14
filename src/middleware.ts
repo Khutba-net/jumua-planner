@@ -20,7 +20,7 @@ const PUBLIC_PATHS = new Set([
   "/api/auth/cleanup-sessions",
 ]);
 
-const PUBLIC_PREFIXES = ["/api/invite/", "/invite/"];
+const PUBLIC_PREFIXES = ["/api/invite/", "/invite/", "/api/mosque-invite/", "/mosque-invite/"];
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
