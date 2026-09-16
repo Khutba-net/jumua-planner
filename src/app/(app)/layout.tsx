@@ -168,7 +168,19 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          {navKeys
+          {user?.is_platform_admin === 1 ? (
+            <Link
+              href="/admin"
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                pathname.startsWith("/admin")
+                  ? "bg-primary/10 text-primary"
+                  : "text-mute hover:bg-surface hover:text-ink"
+              }`}
+            >
+              <span className="material-symbols-outlined text-xl">admin_panel_settings</span>
+              Admin Dashboard
+            </Link>
+          ) : navKeys
             .filter((item) => {
               if (user?.role !== "admin" || user?.account_type === "individual") return true;
               return item.href === "/dashboard";
@@ -191,7 +203,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          {(user?.role === "admin" || user?.role === "khatib" || user?.role === "mosque_admin") && user?.account_type !== "individual" && (
+          {user?.is_platform_admin !== 1 && (user?.role === "admin" || user?.role === "khatib" || user?.role === "mosque_admin") && user?.account_type !== "individual" && (
             <>
               <div className="h-px bg-line my-2" />
               <p className="px-4 text-[10px] font-bold text-mute uppercase tracking-wider mb-1">{user?.role === "mosque_admin" ? t("nav.mosque") || "Mosque" : t("nav.organization")}</p>
@@ -248,19 +260,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
             <span className="material-symbols-outlined text-xl">translate</span>
             {isAr ? "English" : "العربية"}
           </button>
-          {user?.is_platform_admin === 1 && (
-            <Link
-              href="/admin"
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                pathname.startsWith("/admin")
-                  ? "bg-primary/10 text-primary"
-                  : "text-mute hover:bg-surface hover:text-ink"
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">admin_panel_settings</span>
-              Admin
-            </Link>
-          )}
           <Link
             href="/settings"
             className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
@@ -286,8 +285,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex-1 min-w-0">
               <p data-sidebar-name className="text-sm font-semibold text-ink truncate">{user?.name ?? "Loading..."}</p>
               <div className="flex items-center gap-1.5">
-                {user && (
+                {user && user.is_platform_admin !== 1 && (
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${planColor}`}>{planLabel}</span>
+                )}
+                {user?.is_platform_admin === 1 && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Platform Admin</span>
                 )}
                 {subIsOrgManaged && user?.role !== "admin" && (
                   <span className="text-[9px] text-mute">via {subOrgName || "org"}</span>
@@ -300,7 +302,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <main data-app-main className={`flex-1 min-w-0 min-h-screen pt-14 lg:pt-0 ${isAr ? "font-[var(--font-arabic)]" : ""}`}>
-        {subStatus && subStatus !== "active" && subStatus !== "trialing" && !pathname.startsWith("/settings") && !pathname.startsWith("/admin") && (
+        {subStatus && subStatus !== "active" && subStatus !== "trialing" && !pathname.startsWith("/settings") && !pathname.startsWith("/admin") && user?.is_platform_admin !== 1 && (
           <div className="fixed inset-0 z-40 bg-white/95 flex items-center justify-center p-6 lg:relative lg:inset-auto lg:min-h-[70vh]">
             <div className="max-w-md text-center">
               <div className="w-16 h-16 rounded-full bg-accent-gold/10 flex items-center justify-center mx-auto mb-5">

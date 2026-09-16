@@ -46,6 +46,15 @@ export async function GET() {
     const signupsThisWeek = await queryOne<{ count: string }>(
       "SELECT COUNT(*) as count FROM users WHERE created_at > NOW() - INTERVAL '7 days'"
     );
+    const subsByPlan = await query<{ plan: string; status: string; count: string }>(
+      `SELECT s.plan, s.status, COUNT(*) as count
+      FROM subscriptions s
+      GROUP BY s.plan, s.status
+      ORDER BY s.plan, s.status`
+    );
+    const totalRevenue = await queryOne<{ total: string }>(
+      "SELECT COALESCE(SUM(CASE WHEN status = 'active' OR status = 'trialing' THEN 1 ELSE 0 END), 0) as total FROM subscriptions"
+    );
 
     return NextResponse.json({
       totalUsers: Number(totalUsers?.count ?? 0),
@@ -58,6 +67,8 @@ export async function GET() {
       recentUsers,
       activeThisWeek: Number(activeThisWeek?.count ?? 0),
       signupsThisWeek: Number(signupsThisWeek?.count ?? 0),
+      subsByPlan: subsByPlan.map(r => ({ plan: r.plan, status: r.status, count: Number(r.count) })),
+      activeSubscriptions: Number(totalRevenue?.total ?? 0),
     });
   } catch (e) {
     logger.error("Admin: failed to load stats", { error: String(e) });

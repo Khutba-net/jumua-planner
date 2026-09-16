@@ -14,6 +14,8 @@ interface Stats {
   recentUsers: { id: string; name: string; email: string; account_type: string; role: string; created_at: string; is_platform_admin: number }[];
   activeThisWeek: number;
   signupsThisWeek: number;
+  subsByPlan: { plan: string; status: string; count: number }[];
+  activeSubscriptions: number;
 }
 
 interface Institution {
@@ -172,6 +174,50 @@ export default function AdminPage() {
             <StatCard icon="domain" label="Organizations" value={stats.totalOrgs} sub={`${stats.totalMosques} mosques`} />
             <StatCard icon="description" label="Sermons" value={stats.totalSermons} />
             <StatCard icon="trending_up" label="Active This Week" value={stats.activeThisWeek} sub="unique authors" />
+          </div>
+
+          {/* Subscriptions */}
+          <div className="border border-line p-5">
+            <h3 className="text-xs font-bold text-mute tracking-[1.5px] uppercase mb-4">
+              Subscriptions ({stats.activeSubscriptions} active)
+            </h3>
+            {stats.subsByPlan.length === 0 ? (
+              <p className="text-sm text-mute">No subscriptions yet</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-line">
+                      <th className="text-left py-2 pr-4 text-xs font-bold text-mute">Plan</th>
+                      <th className="text-left py-2 pr-4 text-xs font-bold text-mute">Status</th>
+                      <th className="text-right py-2 text-xs font-bold text-mute">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.subsByPlan.map((s, i) => (
+                      <tr key={i} className="border-b border-line/50">
+                        <td className="py-2.5 pr-4">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${planColors[s.plan] || "bg-gray-100 text-gray-600"}`}>
+                            {s.plan}
+                          </span>
+                        </td>
+                        <td className="py-2.5 pr-4">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                            s.status === "active" ? "bg-green-100 text-green-700" :
+                            s.status === "trialing" ? "bg-blue-100 text-blue-700" :
+                            s.status === "canceled" ? "bg-red-100 text-red-700" :
+                            "bg-gray-100 text-gray-600"
+                          }`}>
+                            {s.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right font-semibold text-ink">{s.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Users by plan */}
