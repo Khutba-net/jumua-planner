@@ -59,11 +59,15 @@ export async function POST(req: Request) {
   }
   if (!user) return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
 
+  const org = await queryOne<{ max_khatibs: number | null }>(
+    "SELECT max_khatibs FROM organizations WHERE id = $1", [user.organization_id!]
+  );
+  const maxMembers = (org?.max_khatibs ?? 10) + 1;
   const countRow = await queryOne<{ count: string }>(
     "SELECT COUNT(*) as count FROM org_members WHERE organization_id = $1", [user.organization_id!]
   );
-  if (Number(countRow?.count ?? 0) >= 11) {
-    return NextResponse.json({ error: "Maximum 10 khatibs reached" }, { status: 400 });
+  if (Number(countRow?.count ?? 0) >= maxMembers) {
+    return NextResponse.json({ error: `Maximum ${org?.max_khatibs ?? 10} khatibs reached` }, { status: 400 });
   }
 
   const body = await req.json();
