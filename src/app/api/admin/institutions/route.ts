@@ -33,7 +33,6 @@ export async function GET() {
         (SELECT COUNT(*) FROM mosques m WHERE m.organization_id = o.id)::int AS mosque_count,
         (SELECT COUNT(*) FROM org_members om WHERE om.organization_id = o.id)::int AS member_count
       FROM organizations o
-      WHERE o.type = 'institution'
       ORDER BY o.created_at DESC`
     );
 
