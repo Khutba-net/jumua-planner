@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, cuid, toJSON, hashPassword, verifyPassword, withTransaction } from "@/lib/db";
 import { createSession, sessionCookieOptions } from "@/lib/session";
+import { createNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,20 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   const user = await queryOne("SELECT id, email, name, onboarding_complete FROM users WHERE id = $1", [userId]);
+
+  const admins = await query<{ user_id: string }>(
+    "SELECT user_id FROM org_members WHERE organization_id = $1 AND role = 'admin' AND user_id IS NOT NULL",
+    [mosque.organization_id]
+  );
+  for (const admin of admins) {
+    createNotification(
+      admin.user_id,
+      "invite_accepted",
+      "Mosque admin joined",
+      `${name || email} accepted the invite for ${mosque.name}.`,
+      "/org/mosques"
+    ).catch(() => {});
+  }
 
   const res = NextResponse.json({ user: toJSON(user) });
   const token = await createSession(userId);

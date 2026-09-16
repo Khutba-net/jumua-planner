@@ -82,6 +82,7 @@ export default function MosqueDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showAddKhatib, setShowAddKhatib] = useState(false);
   const [newKhatibName, setNewKhatibName] = useState("");
+  const [newKhatibEmail, setNewKhatibEmail] = useState("");
   const [adding, setAdding] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -136,10 +137,15 @@ export default function MosqueDetailPage() {
     const res = await fetch("/api/org/members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newKhatibName.trim(), mosque_id: mosqueId }),
+      body: JSON.stringify({
+        name: newKhatibName.trim(),
+        mosque_id: mosqueId,
+        email: newKhatibEmail.trim() || undefined,
+      }),
     });
     if (res.ok) {
       setNewKhatibName("");
+      setNewKhatibEmail("");
       setShowAddKhatib(false);
       fetchData();
     }
@@ -282,32 +288,50 @@ export default function MosqueDetailPage() {
           </div>
 
           {showAddKhatib && (
-            <div className="bg-white border border-line rounded-xl p-4 mb-3 flex items-end gap-3">
-              <div className="flex-1">
-                <label className="text-xs font-semibold text-ink/50 block mb-1.5">{t("org.khatibNameLabel")}</label>
-                <input
-                  type="text"
-                  value={newKhatibName}
-                  onChange={(e) => setNewKhatibName(e.target.value)}
-                  placeholder={t("org.khatibNamePlaceholder")}
-                  autoFocus
-                  className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
-                  onKeyDown={(e) => { if (e.key === "Enter") handleAddKhatib(); }}
-                />
+            <div className="bg-white border border-line rounded-xl p-4 mb-3">
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-ink/50 block mb-1.5">{t("org.khatibNameLabel")}</label>
+                    <input
+                      type="text"
+                      value={newKhatibName}
+                      onChange={(e) => setNewKhatibName(e.target.value)}
+                      placeholder={t("org.khatibNamePlaceholder")}
+                      autoFocus
+                      className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
+                      onKeyDown={(e) => { if (e.key === "Enter") handleAddKhatib(); }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-ink/50 block mb-1.5">{isAr ? "البريد الإلكتروني" : "Email (optional)"}</label>
+                    <input
+                      type="email"
+                      value={newKhatibEmail}
+                      onChange={(e) => setNewKhatibEmail(e.target.value)}
+                      placeholder="khatib@email.com"
+                      className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
+                      onKeyDown={(e) => { if (e.key === "Enter") handleAddKhatib(); }}
+                    />
+                    <p className="text-[10px] text-mute mt-1">{isAr ? "سيتم إرسال رابط الدعوة عبر البريد" : "Invite link will be emailed if provided"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleAddKhatib}
+                    disabled={adding || !newKhatibName.trim()}
+                    className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50"
+                  >
+                    {adding ? "..." : isAr ? "إضافة ودعوة" : "Add & Invite"}
+                  </button>
+                  <button
+                    onClick={() => { setShowAddKhatib(false); setNewKhatibName(""); setNewKhatibEmail(""); }}
+                    className="px-3 py-2 rounded-lg text-sm text-mute hover:text-ink transition-colors"
+                  >
+                    {t("btn.cancel")}
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={handleAddKhatib}
-                disabled={adding || !newKhatibName.trim()}
-                className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50"
-              >
-                {adding ? "..." : t("org.add")}
-              </button>
-              <button
-                onClick={() => { setShowAddKhatib(false); setNewKhatibName(""); }}
-                className="px-3 py-2 rounded-lg text-sm text-mute hover:text-ink transition-colors"
-              >
-                {t("btn.cancel")}
-              </button>
             </div>
           )}
 

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { queryOne, exec, toJSON } from "@/lib/db";
+import { queryOne, query, exec, toJSON } from "@/lib/db";
 import { deleteAllUserSessions } from "@/lib/session";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sendInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
+import { createNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -126,5 +127,26 @@ export async function DELETE(_req: Request, { params }: Params) {
 
   await exec("DELETE FROM friday_assignments WHERE member_id = $1", [id]);
   await exec("DELETE FROM org_members WHERE id = $1", [id]);
+
+  if (member.user_id) {
+    const otherMemberships = await query(
+      "SELECT id FROM org_members WHERE user_id = $1",
+      [member.user_id]
+    );
+    if (otherMemberships.length === 0) {
+      await exec(
+        "UPDATE users SET organization_id = NULL, role = 'khatib', account_type = 'individual', updated_at = NOW() WHERE id = $1",
+        [member.user_id]
+      );
+    }
+    createNotification(
+      member.user_id as string,
+      "member_removed",
+      "Removed from organization",
+      "You have been removed from the organization. Your account is now individual.",
+      "/settings"
+    ).catch(() => {});
+  }
+
   return NextResponse.json({ ok: true });
 }

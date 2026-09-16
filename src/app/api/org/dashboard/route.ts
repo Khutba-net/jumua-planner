@@ -34,8 +34,12 @@ export async function GET() {
   const memberParams: string[] = [user.organization_id];
   if (scopedMosqueId) memberParams.push(scopedMosqueId);
 
-  const members = await query<{ id: string; name: string; email: string | null; role: string; status: string; user_id: string | null }>(
-    `SELECT id, name, email, role, status, user_id FROM org_members WHERE organization_id = $1${mosqueFilter} ORDER BY role = 'admin' DESC, created_at ASC`,
+  const members = await query<{ id: string; name: string; email: string | null; role: string; status: string; user_id: string | null; mosque_id: string | null; mosque_name: string | null }>(
+    `SELECT om.id, om.name, om.email, om.role, om.status, om.user_id, om.mosque_id, m.name as mosque_name
+     FROM org_members om
+     LEFT JOIN mosques m ON om.mosque_id = m.id
+     WHERE om.organization_id = $1${mosqueFilter}
+     ORDER BY om.role = 'admin' DESC, om.created_at ASC`,
     memberParams
   );
 
@@ -62,6 +66,7 @@ export async function GET() {
       member_id: m.id,
       name: m.name,
       user_id: m.user_id,
+      mosque_name: m.mosque_name,
       total_sermons: Number(totalRow?.c ?? 0),
       ready_sermons: Number(readyRow?.c ?? 0),
       delivered_sermons: Number(deliveredRow?.c ?? 0),

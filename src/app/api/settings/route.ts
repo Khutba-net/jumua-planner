@@ -88,12 +88,42 @@ export async function PUT(req: NextRequest) {
 
   if (section === "account_type" && "account_type" in d) {
     const newType = d.account_type;
-    const user = await queryOne<{ organization_id: string | null; account_type: string }>(
-      "SELECT organization_id, account_type FROM users WHERE id = $1", [userId]
+    const user = await queryOne<{ organization_id: string | null; account_type: string; role: string }>(
+      "SELECT organization_id, account_type, role FROM users WHERE id = $1", [userId]
     );
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     let orgId = user.organization_id;
+
+    if (newType === "individual" && orgId) {
+      if (user.role === "admin") {
+        const otherAdmins = await queryOne(
+          "SELECT id FROM org_members WHERE organization_id = $1 AND role = 'admin' AND user_id != $2 LIMIT 1",
+          [orgId, userId]
+        );
+        if (!otherAdmins) {
+          const activeMembers = await queryOne(
+            "SELECT id FROM org_members WHERE organization_id = $1 AND status = 'active' AND user_id != $2 LIMIT 1",
+            [orgId, userId]
+          );
+          if (activeMembers) {
+            return NextResponse.json(
+              { error: "You are the sole admin with active members. Transfer admin role first." },
+              { status: 400 }
+            );
+          }
+        }
+      }
+      const member = await queryOne<{ id: string }>(
+        "SELECT id FROM org_members WHERE user_id = $1 AND organization_id = $2",
+        [userId, orgId]
+      );
+      if (member) {
+        const today = new Date().toISOString().split("T")[0];
+        await exec("DELETE FROM friday_assignments WHERE member_id = $1 AND friday_date >= $2", [member.id, today]);
+        await exec("DELETE FROM org_members WHERE id = $1", [member.id]);
+      }
+    }
 
     if (newType !== "individual" && !orgId) {
       if (!d.org_name) return NextResponse.json({ error: "Organization name required" }, { status: 400 });

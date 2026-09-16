@@ -64,11 +64,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name is too long" }, { status: 400 });
   }
 
+  const org = await queryOne<{ max_mosques: number | null }>(
+    "SELECT max_mosques FROM organizations WHERE id = $1", [user.organization_id]
+  );
+  const maxMosques = org?.max_mosques ?? 20;
   const countRow = await queryOne<{ count: string }>(
     "SELECT COUNT(*) as count FROM mosques WHERE organization_id = $1", [user.organization_id]
   );
-  if (Number(countRow?.count ?? 0) >= 20) {
-    return NextResponse.json({ error: "Maximum 20 mosques reached" }, { status: 400 });
+  if (Number(countRow?.count ?? 0) >= maxMosques) {
+    return NextResponse.json({ error: `Maximum ${maxMosques} mosques reached` }, { status: 400 });
   }
 
   const id = cuid();

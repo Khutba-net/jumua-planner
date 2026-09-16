@@ -148,8 +148,10 @@ export default function SettingsPage() {
     plan: string;
     status: string;
     currentPeriodEnd: string;
-    cancelAtPeriodEnd: boolean;
+    cancelAtPeriodEnd?: boolean;
     trialEnd: string | null;
+    isOrgManaged?: boolean;
+    orgName?: string | null;
   } | null>(null);
   const [subLoading, setSubLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
@@ -818,6 +820,26 @@ export default function SettingsPage() {
                 <Skeleton className="h-32 w-full" />
                 <Skeleton className="h-20 w-full" />
               </div>
+            ) : subscription?.isOrgManaged && user?.role !== "admin" ? (
+              <div className="bg-surface border border-line p-6 text-center">
+                <span className="material-symbols-outlined text-primary text-4xl mb-3 block">admin_panel_settings</span>
+                <p className="text-sm font-semibold text-ink mb-2">
+                  {isAr ? `خطتك تدار بواسطة ${subscription.orgName || "مؤسستك"}` : `Managed by ${subscription.orgName || "your organization"}`}
+                </p>
+                <p className="text-xs text-mute">
+                  {isAr ? "تواصل مع مسؤول مؤسستك لإدارة الاشتراك." : "Contact your organization admin to manage the subscription."}
+                </p>
+                {subscription.status && subscription.status !== "none" && (
+                  <div className="flex items-center justify-center gap-2 text-xs text-mute mt-4">
+                    <span className={`material-symbols-outlined text-sm ${
+                      subscription.status === "active" || subscription.status === "trialing" ? "text-primary" : "text-red-500"
+                    }`}>
+                      {subscription.status === "active" || subscription.status === "trialing" ? "check_circle" : "error"}
+                    </span>
+                    <span className="capitalize">{subscription.status}</span>
+                  </div>
+                )}
+              </div>
             ) : subscription ? (
               <>
                 <div className="border-2 border-primary/20 p-6 mb-6">
@@ -828,7 +850,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="text-end">
                       <p className="text-2xl font-bold text-ink">
-                        {subscription.plan === "organization" ? "$50" : "$10"}
+                        {subscription.plan === "institution" ? "$100" : subscription.plan === "organization" ? "$50" : "$10"}
                         <span className="text-sm font-normal text-mute">/mo</span>
                       </p>
                     </div>
@@ -853,23 +875,6 @@ export default function SettingsPage() {
                       `${subscription.status} — ended ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
                     )}
                   </div>
-                </div>
-
-                <div className="mb-6">
-                  <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.planIncludes")}</p>
-                  <ul className="space-y-2">
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "محرر خطب عربي + إنجليزي" : "Arabic + English sermon editor"}</li>
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "مخطط المواضيع السنوي" : "Annual theme planner"}</li>
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "تقويم الجمعة" : "Jumu'ah calendar"}</li>
-                    <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-primary text-base">check</span> {isAr ? "تصدير إلى PDF و Word" : "Export to PDF & Word"}</li>
-                    {subscription.plan === "organization" && (
-                      <>
-                        <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "حتى 20 حساب خطيب" : "Up to 20 khatib accounts"}</li>
-                        <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "أدوات مراجعة المشرف" : "Moderator review tools"}</li>
-                        <li className="flex items-center gap-2 text-sm text-ink"><span className="material-symbols-outlined text-accent-gold text-base">check</span> {isAr ? "بنك خطب مشترك" : "Shared khutbah bank"}</li>
-                      </>
-                    )}
-                  </ul>
                 </div>
 
                 <div>
@@ -897,7 +902,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-mute mb-4">{isAr ? "ابدأ بفترة تجريبية مجانية لمدة 14 يوماً" : "Start with a free 14-day trial"}</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="border border-line p-5">
                     <p className="text-xs font-bold text-mute tracking-[1.5px] uppercase mb-1">{isAr ? "فردي" : "Individual"}</p>
                     <p className="text-2xl font-bold text-ink mb-1">$10<span className="text-sm font-normal text-mute">/mo</span></p>
@@ -937,6 +942,27 @@ export default function SettingsPage() {
                       {checkoutLoading === "organization" && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
                       {isAr ? "ابدأ التجربة المجانية" : "Start free trial"}
                     </button>
+                  </div>
+
+                  <div className="border border-accent-gold p-5 relative">
+                    <div className="absolute -top-3 left-4 bg-accent-gold text-white text-[10px] font-bold px-2.5 py-0.5 tracking-wider uppercase">
+                      {isAr ? "للمؤسسات" : "Multi-mosque"}
+                    </div>
+                    <p className="text-xs font-bold text-mute tracking-[1.5px] uppercase mb-1">{isAr ? "مؤسسة" : "Institution"}</p>
+                    <p className="text-2xl font-bold text-ink mb-1">{isAr ? "مخصص" : "Custom"}</p>
+                    <p className="text-xs text-mute mb-4">{isAr ? "لعدة مساجد" : "For multiple mosques"}</p>
+                    <ul className="space-y-1.5 mb-5">
+                      <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-primary text-sm">check</span> {isAr ? "كل ميزات المؤسسة" : "Everything in Organization"}</li>
+                      <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-accent-gold text-sm">check</span> {isAr ? "مساجد متعددة" : "Multiple mosques"}</li>
+                      <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-accent-gold text-sm">check</span> {isAr ? "إدارة مركزية" : "Centralized management"}</li>
+                    </ul>
+                    <a
+                      href="mailto:support@khutba.net?subject=Institution%20Plan%20Inquiry"
+                      className="w-full py-2.5 bg-accent-gold text-white text-sm font-semibold hover:opacity-90 transition-colors flex items-center justify-center gap-2 block text-center"
+                    >
+                      <span className="material-symbols-outlined text-base">mail</span>
+                      {isAr ? "تواصل معنا" : "Contact us"}
+                    </a>
                   </div>
                 </div>
               </>
@@ -1004,6 +1030,30 @@ export default function SettingsPage() {
                 </a>
               </div>
             </div>
+
+            {user?.role === "khatib" && (
+              <div className="mt-6 border-t border-line pt-6">
+                <p className="text-[10px] font-bold text-red-600 tracking-[1.5px] uppercase mb-2">{isAr ? "مغادرة المؤسسة" : "Leave Organization"}</p>
+                <p className="text-xs text-mute mb-3">{isAr ? "سيتم حذف تعييناتك المستقبلية وستصبح حساباً فردياً." : "Your future assignments will be cleared and your account will become individual."}</p>
+                <button
+                  onClick={async () => {
+                    const confirmed = confirm(isAr ? "هل أنت متأكد من مغادرة المؤسسة؟" : "Are you sure you want to leave this organization?");
+                    if (!confirmed) return;
+                    try {
+                      const res = await fetch("/api/org/leave", { method: "POST" });
+                      if (!res.ok) { const d = await res.json(); showToast(d.error || "Failed", "error"); return; }
+                      showToast(isAr ? "تمت المغادرة" : "You have left the organization");
+                      setTimeout(() => window.location.reload(), 800);
+                    } catch {
+                      showToast(isAr ? "فشلت المغادرة" : "Failed to leave organization", "error");
+                    }
+                  }}
+                  className="px-5 py-2 border border-red-300 bg-white text-red-600 text-sm font-medium hover:bg-red-50 transition-colors"
+                >
+                  {isAr ? "مغادرة المؤسسة" : "Leave Organization"}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

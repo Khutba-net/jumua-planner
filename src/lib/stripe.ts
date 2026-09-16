@@ -32,6 +32,11 @@ export const PLANS = {
     monthlyPrice: 5000,
     lookup: "org_monthly",
   },
+  institution: {
+    name: "Institution",
+    monthlyPrice: 10000,
+    lookup: "institution_monthly",
+  },
 } as const;
 
 export type PlanId = keyof typeof PLANS;
@@ -58,6 +63,33 @@ export async function getOrCreateCustomer(
   await exec("UPDATE users SET stripe_customer_id = $1 WHERE id = $2", [
     customer.id,
     userId,
+  ]);
+
+  return customer.id;
+}
+
+export async function getOrCreateOrgCustomer(
+  orgId: string,
+  adminEmail: string,
+  orgName: string
+): Promise<string> {
+  const { queryOne, exec } = await import("@/lib/db");
+
+  const org = await queryOne<{ stripe_customer_id: string }>(
+    "SELECT stripe_customer_id FROM organizations WHERE id = $1",
+    [orgId]
+  );
+  if (org?.stripe_customer_id) return org.stripe_customer_id;
+
+  const customer = await stripe.customers.create({
+    email: adminEmail,
+    name: orgName,
+    metadata: { organizationId: orgId },
+  });
+
+  await exec("UPDATE organizations SET stripe_customer_id = $1 WHERE id = $2", [
+    customer.id,
+    orgId,
   ]);
 
   return customer.id;

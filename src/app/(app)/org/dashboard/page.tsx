@@ -8,6 +8,7 @@ type KhatibStat = {
   member_id: string;
   name: string;
   user_id: string;
+  mosque_name: string | null;
   total_sermons: number;
   ready_sermons: number;
   delivered_sermons: number;
@@ -188,49 +189,75 @@ export default function OrgDashboardPage() {
             {t("org.inviteKhatibs")}
           </Link>
         </div>
+      ) : isInstitution ? (
+        (() => {
+          const grouped = new Map<string, KhatibStat[]>();
+          for (const k of khatibStats) {
+            const key = k.mosque_name || "Unassigned";
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key)!.push(k);
+          }
+          return (
+            <div className="space-y-5">
+              {Array.from(grouped.entries()).map(([mosqueName, khatibs]) => (
+                <div key={mosqueName}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="material-symbols-outlined text-base text-primary/60">mosque</span>
+                    <p className="text-xs font-bold text-ink/50 uppercase tracking-wider">{mosqueName}</p>
+                    <span className="text-[10px] text-mute">{khatibs.length} {khatibs.length === 1 ? "khatib" : "khatibs"}</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {khatibs.map((k) => {
+                      const progress = k.total_sermons > 0 ? Math.round((k.delivered_sermons / 52) * 100) : 0;
+                      return (
+                        <Link key={k.member_id} href={`/org/khatibs/${k.member_id}`} className="bg-white border border-line rounded-lg px-3 py-2.5 hover:border-primary/30 transition-colors flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                            {k.name[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-ink text-xs truncate">{k.name}</p>
+                            <p className="text-[10px] text-mute truncate">
+                              {k.total_sermons}s · {k.delivered_sermons}d · {progress}%
+                            </p>
+                          </div>
+                          {k.this_week_sermon ? (
+                            <span className={`material-symbols-outlined text-sm shrink-0 ${k.this_week_sermon.status === "ready" ? "text-emerald-500" : k.this_week_sermon.status === "delivered" ? "text-primary" : "text-amber-500"}`}>
+                              {k.this_week_sermon.status === "ready" ? "check_circle" : k.this_week_sermon.status === "delivered" ? "verified" : "edit_note"}
+                            </span>
+                          ) : (
+                            <span className="material-symbols-outlined text-sm text-ink/15 shrink-0">event_busy</span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {khatibStats.map((k) => {
             const progress = k.total_sermons > 0 ? Math.round((k.delivered_sermons / 52) * 100) : 0;
             return (
-              <Link key={k.member_id} href={`/org/khatibs/${k.member_id}`} className="bg-white border border-line rounded-xl p-5 hover:border-primary/30 transition-colors block">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                    {k.name[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-ink text-sm truncate">{k.name}</p>
-                    <p className="text-xs text-mute">{k.total_sermons} {t("org.sermons")} &middot; {k.delivered_sermons} {t("org.delivered")}</p>
-                  </div>
+              <Link key={k.member_id} href={`/org/khatibs/${k.member_id}`} className="bg-white border border-line rounded-lg px-3 py-2.5 hover:border-primary/30 transition-colors flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                  {k.name[0]}
                 </div>
-
-                {/* Progress bar */}
-                <div className="mb-3">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-mute">{t("org.yearProgress")}</span>
-                    <span className="font-semibold text-ink">{progress}%</span>
-                  </div>
-                  <div className="h-2 bg-surface rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-ink text-xs truncate">{k.name}</p>
+                  <p className="text-[10px] text-mute truncate">
+                    {k.mosque_name && <><span className="text-primary/70">{k.mosque_name}</span> · </>}
+                    {k.total_sermons}s · {k.delivered_sermons}d · {progress}%
+                  </p>
                 </div>
-
-                {/* This week */}
                 {k.this_week_sermon ? (
-                  <div className="bg-surface rounded-lg p-3 flex items-center gap-2">
-                    <span className={`material-symbols-outlined text-sm ${k.this_week_sermon.status === "ready" ? "text-emerald-500" : k.this_week_sermon.status === "delivered" ? "text-primary" : "text-amber-500"}`}>
-                      {k.this_week_sermon.status === "ready" ? "check_circle" : k.this_week_sermon.status === "delivered" ? "verified" : "edit_note"}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-ink truncate">{k.this_week_sermon.title}</p>
-                      <p className="text-[10px] text-mute">{t("org.thisWeek")}</p>
-                    </div>
-                  </div>
+                  <span className={`material-symbols-outlined text-sm shrink-0 ${k.this_week_sermon.status === "ready" ? "text-emerald-500" : k.this_week_sermon.status === "delivered" ? "text-primary" : "text-amber-500"}`}>
+                    {k.this_week_sermon.status === "ready" ? "check_circle" : k.this_week_sermon.status === "delivered" ? "verified" : "edit_note"}
+                  </span>
                 ) : (
-                  <div className="bg-surface rounded-lg p-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-ink/20">event_busy</span>
-                    <p className="text-xs text-mute">{t("org.noSermonThisWeek")}</p>
-                  </div>
+                  <span className="material-symbols-outlined text-sm text-ink/15 shrink-0">event_busy</span>
                 )}
               </Link>
             );

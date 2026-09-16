@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, cuid, toJSON, hashPassword, verifyPassword, withTransaction } from "@/lib/db";
 import { createSession, sessionCookieOptions } from "@/lib/session";
+import { createNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +10,8 @@ type Params = { params: Promise<{ code: string }> };
 export async function GET(_req: Request, { params }: Params) {
   const { code } = await params;
 
-  const member = await queryOne<{ id: string; name: string; email: string | null; status: string; invite_expires_at: string; org_name: string }>(
-    "SELECT m.id, m.name, m.email, m.status, m.invite_expires_at, o.name as org_name FROM org_members m JOIN organizations o ON o.id = m.organization_id WHERE m.invite_code = $1",
+  const member = await queryOne<{ id: string; name: string; email: string | null; status: string; invite_expires_at: string; org_name: string; org_type: string }>(
+    "SELECT m.id, m.name, m.email, m.status, m.invite_expires_at, o.name as org_name, o.type as org_type FROM org_members m JOIN organizations o ON o.id = m.organization_id WHERE m.invite_code = $1",
     [code]
   );
 
@@ -29,6 +30,7 @@ export async function GET(_req: Request, { params }: Params) {
   return NextResponse.json({
     khatib_name: member.name,
     org_name: member.org_name,
+    org_type: member.org_type,
     email: member.email || undefined,
   });
 }
@@ -43,8 +45,8 @@ export async function POST(req: Request, { params }: Params) {
   }
   const email = rawEmail.toLowerCase().trim();
 
-  const member = await queryOne<{ id: string; name: string; status: string; organization_id: string; invite_expires_at: string }>(
-    "SELECT m.id, m.name, m.status, m.organization_id, m.invite_expires_at FROM org_members m WHERE m.invite_code = $1",
+  const member = await queryOne<{ id: string; name: string; status: string; organization_id: string; invite_expires_at: string; org_type: string }>(
+    "SELECT m.id, m.name, m.status, m.organization_id, m.invite_expires_at, o.type as org_type FROM org_members m JOIN organizations o ON o.id = m.organization_id WHERE m.invite_code = $1",
     [code]
   );
 
@@ -77,8 +79,8 @@ export async function POST(req: Request, { params }: Params) {
         [userId, email, member.id]
       );
       await client.query(
-        "UPDATE users SET organization_id = $1, account_type = 'organization', role = 'khatib', updated_at = NOW() WHERE id = $2",
-        [member.organization_id, userId]
+        "UPDATE users SET organization_id = $1, account_type = $2, role = 'khatib', updated_at = NOW() WHERE id = $3",
+        [member.organization_id, member.org_type, userId]
       );
     });
   } else {
@@ -89,8 +91,8 @@ export async function POST(req: Request, { params }: Params) {
     const passwordHash = hashPassword(password);
     await withTransaction(async (client) => {
       await client.query(
-        "INSERT INTO users (id, email, name, password_hash, role, account_type, organization_id, onboarding_complete, planning_year) VALUES ($1, $2, $3, $4, 'khatib', 'organization', $5, 0, $6)",
-        [userId, email, name, passwordHash, member.organization_id, new Date().getFullYear()]
+        "INSERT INTO users (id, email, name, password_hash, role, account_type, organization_id, onboarding_complete, planning_year) VALUES ($1, $2, $3, $4, 'khatib', $5, $6, 0, $7)",
+        [userId, email, name, passwordHash, member.org_type, member.organization_id, new Date().getFullYear()]
       );
       await client.query(
         "UPDATE org_members SET user_id = $1, status = 'active', email = $2, updated_at = NOW() WHERE id = $3",
@@ -100,6 +102,20 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   const user = await queryOne("SELECT id, email, name, onboarding_complete FROM users WHERE id = $1", [userId]);
+
+  const admins = await query<{ user_id: string }>(
+    "SELECT user_id FROM org_members WHERE organization_id = $1 AND role = 'admin' AND user_id IS NOT NULL",
+    [member.organization_id]
+  );
+  for (const admin of admins) {
+    createNotification(
+      admin.user_id,
+      "invite_accepted",
+      "Khatib joined",
+      `${name || email} accepted the invite and joined the organization.`,
+      "/org/khatibs"
+    ).catch(() => {});
+  }
 
   const res = NextResponse.json({ user: toJSON(user) });
   const token = await createSession(userId);

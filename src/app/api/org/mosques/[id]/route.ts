@@ -4,6 +4,7 @@ import { query, queryOne, exec, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sendMosqueInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
+import { createNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -164,9 +165,33 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   );
   if (!existing) return NextResponse.json({ error: "Mosque not found" }, { status: 404 });
 
-  // Unlink members and assignments from this mosque
+  const mosque = await queryOne<{ admin_user_id: string | null; name: string }>(
+    "SELECT admin_user_id, name FROM mosques WHERE id = $1", [id]
+  );
+
   await exec("UPDATE org_members SET mosque_id = NULL WHERE mosque_id = $1", [id]);
   await exec("DELETE FROM friday_assignments WHERE mosque_id = $1", [id]);
+
+  if (mosque?.admin_user_id) {
+    await exec("DELETE FROM org_members WHERE user_id = $1 AND organization_id = $2", [mosque.admin_user_id, user.organization_id]);
+    const otherMemberships = await query(
+      "SELECT id FROM org_members WHERE user_id = $1", [mosque.admin_user_id]
+    );
+    if (otherMemberships.length === 0) {
+      await exec(
+        "UPDATE users SET organization_id = NULL, role = 'khatib', account_type = 'individual', updated_at = NOW() WHERE id = $1",
+        [mosque.admin_user_id]
+      );
+    }
+    createNotification(
+      mosque.admin_user_id,
+      "member_removed",
+      "Mosque deleted",
+      `${mosque.name} has been deleted by the institution admin. Your account is now individual.`,
+      "/settings"
+    ).catch(() => {});
+  }
+
   await exec("DELETE FROM mosques WHERE id = $1", [id]);
 
   return NextResponse.json({ ok: true });

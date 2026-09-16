@@ -18,6 +18,7 @@ const PUBLIC_PATHS = new Set([
   "/api/auth/verify-email",
   "/api/auth/resend-verification",
   "/api/auth/cleanup-sessions",
+  "/api/stripe/webhook",
 ]);
 
 const PUBLIC_PREFIXES = ["/api/invite/", "/invite/", "/api/mosque-invite/", "/mosque-invite/"];

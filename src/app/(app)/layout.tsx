@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { I18nProvider, useI18n } from "@/lib/i18n";
@@ -17,9 +17,27 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { t, lang, setLang, isAr } = useI18n();
-  const [user, setUser] = useState<{ name: string; account_type: string; role: string; id?: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; account_type: string; role: string; id?: string; is_platform_admin?: number } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [subStatus, setSubStatus] = useState<string | null>(null);
+  const [subPlan, setSubPlan] = useState<string | null>(null);
+  const [subIsOrgManaged, setSubIsOrgManaged] = useState(false);
+  const [subOrgName, setSubOrgName] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<{ id: string; type: string; title: string; body: string; link: string | null; read: number; created_at: string }[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const planLabel = subPlan?.includes("institution") ? "Institution"
+    : subPlan?.includes("organization") ? "Organization"
+    : subPlan?.includes("individual") ? "Individual"
+    : user?.account_type === "institution" ? "Institution"
+    : user?.account_type === "organization" ? "Organization"
+    : "Individual";
+
+  const planColor = planLabel === "Institution" ? "bg-violet-100 text-violet-700"
+    : planLabel === "Organization" ? "bg-blue-100 text-blue-700"
+    : "bg-emerald-100 text-emerald-700";
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -33,13 +51,48 @@ function AppShell({ children }: { children: React.ReactNode }) {
         if (r.status === 403) return r.json().then((d: { onboarding?: boolean }) => { if (d.onboarding === false) router.push("/setup"); return null; });
         return r.json();
       })
-      .then((d) => { if (d) { setUser(d.user); setSubStatus(d.subscription?.status ?? "none"); } })
+      .then((d) => { if (d) { setUser(d.user); setSubStatus(d.subscription?.status ?? "none"); setSubPlan(d.subscription?.plan ?? null); setSubIsOrgManaged(d.subscription?.isOrgManaged ?? false); setSubOrgName(d.subscription?.orgName ?? null); } })
       .catch(() => { router.push("/auth/login"); });
   }, []);
 
   useEffect(() => {
     setSidebarOpen(false);
+    setNotifOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    fetch("/api/notifications?limit=15")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) { setNotifications(d.notifications); setUnreadCount(d.unreadCount); } })
+      .catch(() => {});
+    const interval = setInterval(() => {
+      fetch("/api/notifications?limit=15")
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d) { setNotifications(d.notifications); setUnreadCount(d.unreadCount); } })
+        .catch(() => {});
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  async function markAllRead() {
+    await fetch("/api/notifications", { method: "PATCH" });
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: 1 })));
+    setUnreadCount(0);
+  }
+
+  async function markOneRead(id: string) {
+    await fetch(`/api/notifications/${id}`, { method: "PATCH" });
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: 1 } : n));
+    setUnreadCount((c) => Math.max(0, c - 1));
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -69,8 +122,19 @@ function AppShell({ children }: { children: React.ReactNode }) {
           </svg>
           <span className="text-base font-bold tracking-tight">Khutba</span>
         </button>
-        <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
-          {user?.name?.[0] ?? "?"}
+        <div className="flex items-center gap-2">
+          {user && (
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${planColor}`}>{planLabel}</span>
+          )}
+          <button onClick={() => setNotifOpen(!notifOpen)} className="relative text-primary">
+            <span className="material-symbols-outlined text-2xl">notifications</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unreadCount > 9 ? "9+" : unreadCount}</span>
+            )}
+          </button>
+          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
+            {user?.name?.[0] ?? "?"}
+          </div>
         </div>
       </div>
 
@@ -165,6 +229,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Bottom */}
         <div className="px-3 py-4 border-t border-line flex flex-col gap-1">
+          {/* Notifications */}
+          <button
+            onClick={() => setNotifOpen(!notifOpen)}
+            className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-mute hover:bg-surface hover:text-ink transition-all w-full text-start relative"
+          >
+            <span className="material-symbols-outlined text-xl">notifications</span>
+            {isAr ? "الإشعارات" : "Notifications"}
+            {unreadCount > 0 && (
+              <span className="ml-auto w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unreadCount > 9 ? "9+" : unreadCount}</span>
+            )}
+          </button>
           {/* Language toggle */}
           <button
             onClick={() => setLang(isAr ? "en" : "ar")}
@@ -173,6 +248,19 @@ function AppShell({ children }: { children: React.ReactNode }) {
             <span className="material-symbols-outlined text-xl">translate</span>
             {isAr ? "English" : "العربية"}
           </button>
+          {user?.is_platform_admin === 1 && (
+            <Link
+              href="/admin"
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                pathname.startsWith("/admin")
+                  ? "bg-primary/10 text-primary"
+                  : "text-mute hover:bg-surface hover:text-ink"
+              }`}
+            >
+              <span className="material-symbols-outlined text-xl">admin_panel_settings</span>
+              Admin
+            </Link>
+          )}
           <Link
             href="/settings"
             className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
@@ -197,7 +285,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex-1 min-w-0">
               <p data-sidebar-name className="text-sm font-semibold text-ink truncate">{user?.name ?? "Loading..."}</p>
-              <p className="text-xs text-mute truncate capitalize">{user?.account_type ?? ""}</p>
+              <div className="flex items-center gap-1.5">
+                {user && (
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${planColor}`}>{planLabel}</span>
+                )}
+                {subIsOrgManaged && user?.role !== "admin" && (
+                  <span className="text-[9px] text-mute">via {subOrgName || "org"}</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -205,24 +300,88 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <main data-app-main className={`flex-1 min-w-0 min-h-screen pt-14 lg:pt-0 ${isAr ? "font-[var(--font-arabic)]" : ""}`}>
-        {subStatus && subStatus !== "active" && subStatus !== "trialing" && user?.id !== "demo-user" && (
-          <div className="bg-accent-gold/10 border-b border-accent-gold/20 px-5 py-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="material-symbols-outlined text-accent-gold text-lg">info</span>
-              <span className="text-ink/80 font-medium">
-                {isAr ? "اشترك للوصول الكامل إلى جميع الميزات" : "Subscribe to unlock all features"}
-              </span>
+        {subStatus && subStatus !== "active" && subStatus !== "trialing" && !pathname.startsWith("/settings") && !pathname.startsWith("/admin") && (
+          <div className="fixed inset-0 z-40 bg-white/95 flex items-center justify-center p-6 lg:relative lg:inset-auto lg:min-h-[70vh]">
+            <div className="max-w-md text-center">
+              <div className="w-16 h-16 rounded-full bg-accent-gold/10 flex items-center justify-center mx-auto mb-5">
+                <span className="material-symbols-outlined text-accent-gold text-3xl">lock</span>
+              </div>
+              {subIsOrgManaged && user?.role !== "admin" ? (
+                <>
+                  <h2 className="text-xl font-bold text-ink mb-2">
+                    {isAr ? "الوصول محدود" : "Access Restricted"}
+                  </h2>
+                  <p className="text-ink/60 text-sm mb-6">
+                    {isAr
+                      ? `خطتك تدار بواسطة ${subOrgName || "مؤسستك"}. تواصل مع المسؤول لتجديد الاشتراك.`
+                      : `Your plan is managed by ${subOrgName || "your organization"}. Contact your admin to renew the subscription.`}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-bold text-ink mb-2">
+                    {isAr ? "اشترك للمتابعة" : "Subscribe to Continue"}
+                  </h2>
+                  <p className="text-ink/60 text-sm mb-6">
+                    {isAr
+                      ? "اشتراكك غير نشط. اشترك لاستعادة الوصول إلى جميع الميزات."
+                      : "Your subscription is inactive. Subscribe to regain access to all features."}
+                  </p>
+                  <Link
+                    href="/settings"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white text-sm font-bold rounded-full hover:bg-secondary transition-colors shadow-md"
+                  >
+                    <span className="material-symbols-outlined text-lg">credit_card</span>
+                    {isAr ? "إدارة الاشتراك" : "Manage Subscription"}
+                  </Link>
+                </>
+              )}
             </div>
-            <Link
-              href="/settings"
-              onClick={() => setTimeout(() => document.querySelector<HTMLButtonElement>('[data-section="subscription"]')?.click(), 100)}
-              className="shrink-0 px-4 py-1.5 bg-primary text-white text-xs font-semibold hover:bg-secondary transition-colors"
-            >
-              {isAr ? "الترقية" : "Upgrade"}
-            </Link>
           </div>
         )}
-        {children}
+        {(subStatus === "active" || subStatus === "trialing" || !subStatus || pathname.startsWith("/settings") || pathname.startsWith("/admin")) && children}
+
+        {/* Notification dropdown */}
+        {notifOpen && (
+          <div ref={notifRef} className={`fixed top-14 ${isAr ? "left-4" : "right-4"} lg:top-4 w-80 max-h-[28rem] bg-white border border-line shadow-xl z-50 flex flex-col`}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+              <p className="text-sm font-bold text-ink">{isAr ? "الإشعارات" : "Notifications"}</p>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-xs text-primary font-semibold hover:underline">
+                  {isAr ? "تحديد الكل كمقروء" : "Mark all read"}
+                </button>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <span className="material-symbols-outlined text-mute text-3xl mb-2 block">notifications_none</span>
+                  <p className="text-xs text-mute">{isAr ? "لا توجد إشعارات" : "No notifications yet"}</p>
+                </div>
+              ) : (
+                notifications.map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => {
+                      if (!n.read) markOneRead(n.id);
+                      if (n.link) { setNotifOpen(false); router.push(n.link); }
+                    }}
+                    className={`w-full text-start px-4 py-3 border-b border-line/50 hover:bg-surface transition-colors ${!n.read ? "bg-primary/5" : ""}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      {!n.read && <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-ink truncate">{n.title}</p>
+                        {n.body && <p className="text-xs text-mute mt-0.5 line-clamp-2">{n.body}</p>}
+                        <p className="text-[10px] text-mute/60 mt-1">{new Date(n.created_at).toLocaleDateString(isAr ? "ar-SA" : "en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

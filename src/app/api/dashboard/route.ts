@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
-import { getSubscriptionStatus } from "@/lib/subscription";
+import { getEffectiveSubscription } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +53,7 @@ export async function GET() {
   }
 
   const user = await queryOne<Record<string, unknown>>(
-    "SELECT id, name, email, account_type, role, organization_id, avatar_url, bio, phone, onboarding_complete, planning_year, created_at FROM users WHERE id = $1",
+    "SELECT id, name, email, account_type, role, organization_id, avatar_url, bio, phone, onboarding_complete, planning_year, created_at, is_platform_admin FROM users WHERE id = $1",
     [userId]
   );
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -261,7 +261,7 @@ export async function GET() {
     orgName,
     myAssignments,
     nextYearPrompt: null,
-    subscription: await getSubscriptionStatus(userId),
+    subscription: await getEffectiveSubscription(userId),
   };
 
   const currentYear = new Date().getFullYear();

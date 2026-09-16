@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, exec, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
-import { sendAssignmentNotification } from "@/lib/email";
-import { logger } from "@/lib/logger";
+import { createNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -153,21 +152,19 @@ export async function POST(req: Request) {
 
   const assignment = await queryOne("SELECT * FROM friday_assignments WHERE id = $1", [id]);
 
-  if (member_id && process.env.RESEND_API_KEY) {
+  if (member_id) {
     const member = await queryOne<{ name: string; user_id: string | null }>(
       "SELECT name, user_id FROM org_members WHERE id = $1", [member_id]
     );
     if (member?.user_id) {
-      const khatibUser = await queryOne<{ email: string }>("SELECT email FROM users WHERE id = $1", [member.user_id]);
-      if (khatibUser) {
-        const mosqueName = mosque_id
-          ? (await queryOne<{ name: string }>("SELECT name FROM mosques WHERE id = $1", [mosque_id]))?.name ?? "Mosque"
-          : (await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id]))?.name ?? "Organization";
-        const dateFormatted = new Date(friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-        await sendAssignmentNotification(khatibUser.email, member.name, notes || "Friday Khutbah", dateFormatted, mosqueName).catch((err) =>
-          logger.error("Failed to send assignment email", { error: String(err) })
-        );
-      }
+      const dateFormatted = new Date(friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+      createNotification(
+        member.user_id,
+        "assignment",
+        `Khutbah assigned – ${dateFormatted}`,
+        notes || "You have been assigned a Friday khutbah.",
+        "/org/schedule"
+      ).catch(() => {});
     }
   }
 
@@ -227,21 +224,19 @@ export async function PUT(req: Request) {
     [member_id || null, guest_name?.slice(0, 200) || null, swap_reason?.slice(0, 500) || null, notes?.slice(0, 1000) || null, id]
   );
 
-  if (member_id && member_id !== oldAssignment?.member_id && process.env.RESEND_API_KEY) {
+  if (member_id && member_id !== oldAssignment?.member_id) {
     const member = await queryOne<{ name: string; user_id: string | null }>(
       "SELECT name, user_id FROM org_members WHERE id = $1", [member_id]
     );
-    if (member?.user_id) {
-      const khatibUser = await queryOne<{ email: string }>("SELECT email FROM users WHERE id = $1", [member.user_id]);
-      if (khatibUser && oldAssignment) {
-        const mosqueName = oldAssignment.mosque_id
-          ? (await queryOne<{ name: string }>("SELECT name FROM mosques WHERE id = $1", [oldAssignment.mosque_id]))?.name ?? "Mosque"
-          : (await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id]))?.name ?? "Organization";
-        const dateFormatted = new Date(oldAssignment.friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-        await sendAssignmentNotification(khatibUser.email, member.name, swap_reason ? `Swap: ${swap_reason}` : "Friday Khutbah", dateFormatted, mosqueName).catch((err) =>
-          logger.error("Failed to send swap email", { error: String(err) })
-        );
-      }
+    if (member?.user_id && oldAssignment) {
+      const dateFormatted = new Date(oldAssignment.friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+      createNotification(
+        member.user_id,
+        "schedule_change",
+        `Schedule change – ${dateFormatted}`,
+        swap_reason || "Your Friday khutbah assignment has been updated.",
+        "/org/schedule"
+      ).catch(() => {});
     }
   }
 

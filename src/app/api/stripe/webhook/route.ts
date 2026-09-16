@@ -52,14 +52,15 @@ function getSubPeriod(sub: Stripe.Subscription) {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.userId;
   const plan = session.metadata?.plan || "individual";
+  const organizationId = session.metadata?.organizationId || null;
   if (!userId || !session.subscription) return;
 
   const sub = await stripe.subscriptions.retrieve(session.subscription as string);
   const period = getSubPeriod(sub);
 
   await exec(
-    `INSERT INTO subscriptions (id, user_id, stripe_subscription_id, plan, status, current_period_start, current_period_end, trial_end, cancel_at_period_end)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO subscriptions (id, user_id, stripe_subscription_id, plan, status, current_period_start, current_period_end, trial_end, cancel_at_period_end, organization_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (stripe_subscription_id) DO UPDATE SET
        status = EXCLUDED.status,
        current_period_start = EXCLUDED.current_period_start,
@@ -76,10 +77,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       new Date(period.end * 1000).toISOString(),
       sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
       sub.cancel_at_period_end ? 1 : 0,
+      organizationId,
     ]
   );
 
-  logger.info("Subscription created from checkout", { userId, plan, subId: sub.id });
+  logger.info("Subscription created from checkout", { userId, plan, organizationId, subId: sub.id });
 }
 
 async function handleSubscriptionChange(sub: Stripe.Subscription) {

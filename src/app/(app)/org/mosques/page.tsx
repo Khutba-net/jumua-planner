@@ -130,15 +130,15 @@ export default function MosquesPage() {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-ink/50 block mb-1.5">Mosque Admin Email</label>
+              <label className="text-xs font-semibold text-ink/50 block mb-1.5">Mosque Lead Email (optional)</label>
               <input
                 type="email"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="admin@mosque.com"
+                placeholder="lead@mosque.com"
                 className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-sm"
               />
-              <p className="text-[11px] text-mute mt-1">An invitation will be sent so they can manage this mosque</p>
+              <p className="text-[11px] text-mute mt-1">Optional — assign a lead khatib who can help manage this mosque</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
