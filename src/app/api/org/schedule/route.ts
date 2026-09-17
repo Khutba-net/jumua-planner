@@ -224,19 +224,37 @@ export async function PUT(req: Request) {
     [member_id || null, guest_name?.slice(0, 200) || null, swap_reason?.slice(0, 500) || null, notes?.slice(0, 1000) || null, id]
   );
 
-  if (member_id && member_id !== oldAssignment?.member_id) {
-    const member = await queryOne<{ name: string; user_id: string | null }>(
+  if (member_id && member_id !== oldAssignment?.member_id && oldAssignment) {
+    const dateFormatted = new Date(oldAssignment.friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+    // Notify the NEW khatib
+    const newMember = await queryOne<{ name: string; user_id: string | null }>(
       "SELECT name, user_id FROM org_members WHERE id = $1", [member_id]
     );
-    if (member?.user_id && oldAssignment) {
-      const dateFormatted = new Date(oldAssignment.friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    if (newMember?.user_id) {
       createNotification(
-        member.user_id,
-        "schedule_change",
-        `Schedule change – ${dateFormatted}`,
-        swap_reason || "Your Friday khutbah assignment has been updated.",
+        newMember.user_id,
+        "assignment",
+        `Khutbah assigned – ${dateFormatted}`,
+        swap_reason || "You have been assigned a Friday khutbah.",
         "/org/schedule"
       ).catch(() => {});
+    }
+
+    // Notify the OLD khatib that they've been replaced
+    if (oldAssignment.member_id) {
+      const oldMember = await queryOne<{ name: string; user_id: string | null }>(
+        "SELECT name, user_id FROM org_members WHERE id = $1", [oldAssignment.member_id]
+      );
+      if (oldMember?.user_id) {
+        createNotification(
+          oldMember.user_id,
+          "schedule_change",
+          `Assignment changed – ${dateFormatted}`,
+          swap_reason || "Your Friday khutbah assignment has been reassigned.",
+          "/org/schedule"
+        ).catch(() => {});
+      }
     }
   }
 
@@ -283,7 +301,37 @@ export async function PATCH(req: Request) {
     [to_member_id, user.organization_id, from_member_id, today]
   );
 
-  return NextResponse.json({ ok: true, updated: Array.isArray(result) ? result.length : 0 });
+  const updatedCount = Array.isArray(result) ? result.length : 0;
+
+  if (updatedCount > 0) {
+    const fromMemberData = await queryOne<{ name: string; user_id: string | null }>(
+      "SELECT name, user_id FROM org_members WHERE id = $1", [from_member_id]
+    );
+    const toMemberData = await queryOne<{ name: string; user_id: string | null }>(
+      "SELECT name, user_id FROM org_members WHERE id = $1", [to_member_id]
+    );
+
+    if (fromMemberData?.user_id) {
+      createNotification(
+        fromMemberData.user_id,
+        "schedule_change",
+        `${updatedCount} assignment${updatedCount > 1 ? "s" : ""} reassigned`,
+        `Your upcoming assignments have been reassigned to ${toMemberData?.name || "another khatib"}.`,
+        "/org/schedule"
+      ).catch(() => {});
+    }
+    if (toMemberData?.user_id) {
+      createNotification(
+        toMemberData.user_id,
+        "assignment",
+        `${updatedCount} new assignment${updatedCount > 1 ? "s" : ""}`,
+        `You have been assigned ${updatedCount} upcoming Friday khutbah${updatedCount > 1 ? "s" : ""} from ${fromMemberData?.name || "another khatib"}.`,
+        "/org/schedule"
+      ).catch(() => {});
+    }
+  }
+
+  return NextResponse.json({ ok: true, updated: updatedCount });
 }
 
 export async function DELETE(req: Request) {
@@ -307,8 +355,8 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Assignment ID is required" }, { status: 400 });
   }
 
-  const assignment = await queryOne(
-    "SELECT id FROM friday_assignments WHERE id = $1 AND organization_id = $2",
+  const assignment = await queryOne<{ id: string; member_id: string | null; friday_date: string; mosque_id: string | null }>(
+    "SELECT id, member_id, friday_date, mosque_id FROM friday_assignments WHERE id = $1 AND organization_id = $2",
     [id, user.organization_id]
   );
 
@@ -317,5 +365,22 @@ export async function DELETE(req: Request) {
   }
 
   await exec("DELETE FROM friday_assignments WHERE id = $1", [id]);
+
+  if (assignment.member_id) {
+    const member = await queryOne<{ name: string; user_id: string | null }>(
+      "SELECT name, user_id FROM org_members WHERE id = $1", [assignment.member_id]
+    );
+    if (member?.user_id) {
+      const dateFormatted = new Date(assignment.friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+      createNotification(
+        member.user_id,
+        "schedule_change",
+        `Assignment removed – ${dateFormatted}`,
+        "Your Friday khutbah assignment has been removed.",
+        "/org/schedule"
+      ).catch(() => {});
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }

@@ -39,7 +39,7 @@ export async function createNotification(
 
     if (!user?.email || !process.env.RESEND_API_KEY) return;
 
-    if (type === "assignment" && prefs?.email_assigned) {
+    if ((type === "assignment" || type === "schedule_change") && prefs?.email_assigned) {
       const { sendAssignmentNotification } = await import("@/lib/email");
       await sendAssignmentNotification(user.email, user.name, title, "", body);
     }
