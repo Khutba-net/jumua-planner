@@ -165,6 +165,19 @@ export async function POST(req: Request) {
         notes || "You have been assigned a Friday khutbah.",
         "/org/schedule"
       ).catch(() => {});
+
+      // Auto-create a planned sermon if one doesn't already exist for this khatib on this date
+      const existingSermon = await queryOne(
+        "SELECT id FROM sermons WHERE author_id = $1 AND scheduled_date = $2",
+        [member.user_id, friday_date]
+      );
+      if (!existingSermon) {
+        await exec(
+          `INSERT INTO sermons (id, title, status, scheduled_date, author_id, mosque_id, created_at, updated_at)
+           VALUES ($1, 'Untitled Sermon', 'planned', $2, $3, $4, NOW(), NOW())`,
+          [cuid(), friday_date, member.user_id, mosque_id || null]
+        );
+      }
     }
   }
 
@@ -242,10 +255,12 @@ export async function PUT(req: Request) {
     }
 
     // Notify the OLD khatib that they've been replaced
+    let oldUserId: string | null = null;
     if (oldAssignment.member_id) {
       const oldMember = await queryOne<{ name: string; user_id: string | null }>(
         "SELECT name, user_id FROM org_members WHERE id = $1", [oldAssignment.member_id]
       );
+      oldUserId = oldMember?.user_id || null;
       if (oldMember?.user_id) {
         createNotification(
           oldMember.user_id,
@@ -254,6 +269,40 @@ export async function PUT(req: Request) {
           swap_reason || "Your Friday khutbah assignment has been reassigned.",
           "/org/schedule"
         ).catch(() => {});
+      }
+    }
+
+    // Sync sermon: transfer from old khatib to new, or create one for new khatib
+    if (newMember?.user_id) {
+      if (oldUserId) {
+        const existingSermon = await queryOne<{ id: string }>(
+          "SELECT id FROM sermons WHERE author_id = $1 AND scheduled_date = $2",
+          [oldUserId, oldAssignment.friday_date]
+        );
+        if (existingSermon) {
+          await exec(
+            "UPDATE sermons SET author_id = $1, updated_at = NOW() WHERE id = $2",
+            [newMember.user_id, existingSermon.id]
+          );
+        } else {
+          await exec(
+            `INSERT INTO sermons (id, title, status, scheduled_date, author_id, mosque_id, created_at, updated_at)
+             VALUES ($1, 'Untitled Sermon', 'planned', $2, $3, $4, NOW(), NOW())`,
+            [cuid(), oldAssignment.friday_date, newMember.user_id, oldAssignment.mosque_id]
+          );
+        }
+      } else {
+        const existingSermon = await queryOne(
+          "SELECT id FROM sermons WHERE author_id = $1 AND scheduled_date = $2",
+          [newMember.user_id, oldAssignment.friday_date]
+        );
+        if (!existingSermon) {
+          await exec(
+            `INSERT INTO sermons (id, title, status, scheduled_date, author_id, mosque_id, created_at, updated_at)
+             VALUES ($1, 'Untitled Sermon', 'planned', $2, $3, $4, NOW(), NOW())`,
+            [cuid(), oldAssignment.friday_date, newMember.user_id, oldAssignment.mosque_id]
+          );
+        }
       }
     }
   }
@@ -329,6 +378,14 @@ export async function PATCH(req: Request) {
         "/org/schedule"
       ).catch(() => {});
     }
+
+    // Bulk transfer future sermons from old khatib to new khatib
+    if (fromMemberData?.user_id && toMemberData?.user_id) {
+      await exec(
+        "UPDATE sermons SET author_id = $1, updated_at = NOW() WHERE author_id = $2 AND scheduled_date >= $3 AND status IN ('planned', 'draft')",
+        [toMemberData.user_id, fromMemberData.user_id, today]
+      );
+    }
   }
 
   return NextResponse.json({ ok: true, updated: updatedCount });
@@ -379,6 +436,12 @@ export async function DELETE(req: Request) {
         "Your Friday khutbah assignment has been removed.",
         "/org/schedule"
       ).catch(() => {});
+
+      // Unschedule any planned sermon for this date (don't delete — khatib may want to reuse it)
+      await exec(
+        "UPDATE sermons SET scheduled_date = NULL, updated_at = NOW() WHERE author_id = $1 AND scheduled_date = $2 AND status = 'planned'",
+        [member.user_id, assignment.friday_date]
+      );
     }
   }
 
