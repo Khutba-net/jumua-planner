@@ -49,6 +49,7 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [website, setWebsite] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -69,10 +70,15 @@ export default function SignupPage() {
     }
 
     try {
+      if (website) {
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, _hp: website }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -125,6 +131,9 @@ export default function SignupPage() {
         )}
 
         <form onSubmit={handleSignup} className="flex flex-col gap-5">
+          <div className="absolute opacity-0 -z-10" aria-hidden="true" tabIndex={-1}>
+            <input type="text" name="website" autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} tabIndex={-1} />
+          </div>
           <div>
             <label className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
             <input

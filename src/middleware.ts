@@ -68,11 +68,11 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self'",
       "img-src 'self' data: blob:",
-      "connect-src 'self'",
+      "connect-src 'self' https://*.sentry.io https://*.vercel-insights.com https://*.vercel-analytics.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

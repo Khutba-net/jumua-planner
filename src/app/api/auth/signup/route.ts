@@ -17,6 +17,12 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
+
+  // Honeypot: bots fill hidden fields, real users don't
+  if (body._hp) {
+    return NextResponse.json({ user: { id: "ok" } });
+  }
+
   const parsed = parseBody(signupSchema, body);
   if ("error" in parsed) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });

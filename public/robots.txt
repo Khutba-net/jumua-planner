@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /org/
+Disallow: /settings
+Disallow: /auth/
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /sermons
+Disallow: /invite/

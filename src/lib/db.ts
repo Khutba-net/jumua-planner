@@ -13,7 +13,9 @@ let initialized = false;
 export async function getPool() {
   if (!initialized) {
     await runMigrations(pool, join(process.cwd(), "migrations"));
-    await seedDemoUser();
+    if (process.env.NODE_ENV !== "production") {
+      await seedDemoUser();
+    }
     initialized = true;
   }
   return pool;
