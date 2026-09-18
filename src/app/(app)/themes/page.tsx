@@ -749,8 +749,8 @@ export default function AnnualPlanPage() {
         const nextSeasonFull = nextSeasonSermons.length >= SLOTS_PER_SEASON;
         return (
           <>
-            <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50" onClick={() => { setSeasonFullModal(null); setOverwriteTarget(null); }} />
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50" onClick={() => { setSeasonFullModal(null); setOverwriteTarget(null); }} aria-hidden="true" />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={t("themes.seasonFullTitle")}>
               <div className="bg-white border border-line/40 shadow-xl max-w-md w-full p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <span className="w-10 h-10 bg-red-50 text-red-500 grid place-items-center">

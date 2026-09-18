@@ -179,8 +179,9 @@ function ResetPasswordForm() {
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               <div>
-                <label className="text-xs font-semibold text-ink/50 block mb-2">{c.password}</label>
+                <label htmlFor="reset-password" className="text-xs font-semibold text-ink/50 block mb-2">{c.password}</label>
                 <input
+                  id="reset-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -193,8 +194,9 @@ function ResetPasswordForm() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-ink/50 block mb-2">{c.confirm}</label>
+                <label htmlFor="reset-confirm" className="text-xs font-semibold text-ink/50 block mb-2">{c.confirm}</label>
                 <input
+                  id="reset-confirm"
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

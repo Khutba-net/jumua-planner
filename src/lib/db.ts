@@ -5,7 +5,11 @@ import { runMigrations } from "./migrate";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: true } : undefined,
+  max: 10,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 30000,
+  statement_timeout: 30000,
 });
 
 let initialized = false;

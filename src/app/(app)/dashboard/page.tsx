@@ -1044,11 +1044,11 @@ export default function DashboardPage() {
 
       {/* Emergency Swap Confirm Modal */}
       {showSwapConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" role="dialog" aria-modal="true" aria-labelledby="swap-modal-title">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
             <div className="flex items-center gap-2 mb-3">
               <span className="material-symbols-outlined text-red-500 text-xl">swap_horiz</span>
-              <h3 className="text-lg font-bold text-ink">{t("dash.swapSermon")}</h3>
+              <h3 id="swap-modal-title" className="text-lg font-bold text-ink">{t("dash.swapSermon")}</h3>
             </div>
             <p className="text-sm text-mute mb-5">{t("dash.swapDesc")}</p>
             <div className="flex gap-2">
@@ -1071,9 +1071,9 @@ export default function DashboardPage() {
       )}
 
       {feedbackSermonId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
-            <h3 className="text-lg font-bold text-ink mb-1">{t("dash.feedbackTitle")}</h3>
+            <h3 id="feedback-modal-title" className="text-lg font-bold text-ink mb-1">{t("dash.feedbackTitle")}</h3>
             <p className="text-xs text-mute mb-5">{t("dash.feedbackDesc")}</p>
 
             <div className="mb-4">

@@ -22,7 +22,7 @@ export async function PUT(req: Request, { params }: Params) {
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
 
-  if (!user?.organization_id || user.role !== "admin" && user.role !== "mosque_admin") {
+  if (!user?.organization_id || (user.role !== "admin" && user.role !== "mosque_admin")) {
     return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
   }
 
@@ -31,6 +31,16 @@ export async function PUT(req: Request, { params }: Params) {
   );
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
+  }
+
+  if (user.role === "mosque_admin") {
+    const adminMember = await queryOne<{ mosque_id: string | null }>(
+      "SELECT mosque_id FROM org_members WHERE user_id = $1 AND organization_id = $2",
+      [userId, user.organization_id]
+    );
+    if (adminMember?.mosque_id && member.mosque_id !== adminMember.mosque_id) {
+      return NextResponse.json({ error: "You can only manage members in your mosque" }, { status: 403 });
+    }
   }
 
   const body = await req.json();
@@ -106,7 +116,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
   );
 
-  if (!user?.organization_id || user.role !== "admin" && user.role !== "mosque_admin") {
+  if (!user?.organization_id || (user.role !== "admin" && user.role !== "mosque_admin")) {
     return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
   }
 
@@ -115,6 +125,16 @@ export async function DELETE(_req: Request, { params }: Params) {
   );
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
+  }
+
+  if (user.role === "mosque_admin") {
+    const adminMember = await queryOne<{ mosque_id: string | null }>(
+      "SELECT mosque_id FROM org_members WHERE user_id = $1 AND organization_id = $2",
+      [userId, user.organization_id]
+    );
+    if (adminMember?.mosque_id && member.mosque_id !== adminMember.mosque_id) {
+      return NextResponse.json({ error: "You can only manage members in your mosque" }, { status: 403 });
+    }
   }
 
   if (member.role === "admin") {

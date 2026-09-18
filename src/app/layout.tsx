@@ -18,6 +18,19 @@ const notoArabic = Noto_Naskh_Arabic({
 export const metadata: Metadata = {
   title: "Khutba",
   description: "Professional Khutbah Management Platform",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://khutba.net"),
+  openGraph: {
+    title: "Khutba",
+    description: "Professional Khutbah Management Platform for mosques and khatibs",
+    url: "https://khutba.net",
+    siteName: "Khutba",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Khutba",
+    description: "Professional Khutbah Management Platform for mosques and khatibs",
+  },
 };
 
 export default function RootLayout({

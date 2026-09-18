@@ -36,7 +36,8 @@ export async function GET(req: NextRequest) {
     const sermons = await query(sql, params);
     return NextResponse.json(toJSON(sermons));
   } catch (err) {
-    return NextResponse.json({ error: "Failed to load sermons", detail: String(err) }, { status: 500 });
+    console.error("Failed to load sermons", err);
+    return NextResponse.json({ error: "Failed to load sermons" }, { status: 500 });
   }
 }
 
@@ -75,7 +76,8 @@ export async function POST(req: NextRequest) {
       ]
     );
   } catch (err) {
-    return NextResponse.json({ error: "Failed to create sermon", detail: String(err) }, { status: 500 });
+    console.error("Failed to create sermon", err);
+    return NextResponse.json({ error: "Failed to create sermon" }, { status: 500 });
   }
 
   const sermon = await query("SELECT * FROM sermons WHERE id = $1", [id]);

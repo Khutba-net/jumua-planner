@@ -191,8 +191,9 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
         <form onSubmit={handleJoin} className="flex flex-col gap-5">
           {!existingAccount && (
             <div>
-              <label className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
+              <label htmlFor="invite-name" className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
               <input
+                id="invite-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -204,8 +205,9 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
           )}
 
           <div>
-            <label className="text-xs font-semibold text-ink/50 block mb-2">{c.email}</label>
+            <label htmlFor="invite-email" className="text-xs font-semibold text-ink/50 block mb-2">{c.email}</label>
             <input
+              id="invite-email"
               type="email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setExistingAccount(false); setError(""); }}
@@ -217,7 +219,7 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-ink/50">{c.password}</label>
+              <label htmlFor="invite-password" className="text-xs font-semibold text-ink/50">{c.password}</label>
               {existingAccount && (
                 <Link href="/auth/forgot-password" className="text-xs text-primary/60 hover:text-primary font-semibold transition-colors">
                   {isAr ? "نسيت كلمة المرور؟" : "Forgot password?"}
@@ -225,6 +227,7 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
               )}
             </div>
             <input
+              id="invite-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

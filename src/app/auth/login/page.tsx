@@ -167,8 +167,9 @@ function LoginForm() {
 
         <form onSubmit={handleLogin} className="flex flex-col gap-5">
           <div>
-            <label className="text-xs font-semibold text-ink/50 block mb-2">{c.email}</label>
+            <label htmlFor="login-email" className="text-xs font-semibold text-ink/50 block mb-2">{c.email}</label>
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -180,12 +181,13 @@ function LoginForm() {
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-ink/50">{c.password}</label>
+              <label htmlFor="login-password" className="text-xs font-semibold text-ink/50">{c.password}</label>
               <Link href="/auth/forgot-password" className="text-xs text-primary/60 hover:text-primary font-semibold transition-colors">
                 {c.forgot}
               </Link>
             </div>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

@@ -190,8 +190,9 @@ export default function MosqueInvitePage({ params }: { params: Promise<{ code: s
         <form onSubmit={handleJoin} className="flex flex-col gap-5">
           {!existingAccount && (
             <div>
-              <label className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
+              <label htmlFor="mosque-invite-name" className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
               <input
+                id="mosque-invite-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -203,8 +204,9 @@ export default function MosqueInvitePage({ params }: { params: Promise<{ code: s
           )}
 
           <div>
-            <label className="text-xs font-semibold text-ink/50 block mb-2">{c.email}</label>
+            <label htmlFor="mosque-invite-email" className="text-xs font-semibold text-ink/50 block mb-2">{c.email}</label>
             <input
+              id="mosque-invite-email"
               type="email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setExistingAccount(false); setError(""); }}
@@ -216,7 +218,7 @@ export default function MosqueInvitePage({ params }: { params: Promise<{ code: s
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-ink/50">{c.password}</label>
+              <label htmlFor="mosque-invite-password" className="text-xs font-semibold text-ink/50">{c.password}</label>
               {existingAccount && (
                 <Link href="/auth/forgot-password" className="text-xs text-primary/60 hover:text-primary font-semibold transition-colors">
                   {isAr ? "نسيت كلمة المرور؟" : "Forgot password?"}
@@ -224,6 +226,7 @@ export default function MosqueInvitePage({ params }: { params: Promise<{ code: s
               )}
             </div>
             <input
+              id="mosque-invite-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

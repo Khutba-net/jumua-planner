@@ -991,7 +991,7 @@ export default function SermonEditorPage({
 
       {/* Reference modal */}
       {showRefModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowRefModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowRefModal(false)} role="dialog" aria-modal="true" aria-label="Add reference">
           <div className="bg-white w-full max-w-md mx-4 border border-line shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className={`flex items-center gap-2 px-5 py-3 border-b border-line ${
               refType === "quran" ? "bg-green-50" : "bg-amber-50"

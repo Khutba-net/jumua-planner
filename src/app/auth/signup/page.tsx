@@ -135,8 +135,9 @@ export default function SignupPage() {
             <input type="text" name="website" autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} tabIndex={-1} />
           </div>
           <div>
-            <label className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
+            <label htmlFor="signup-name" className="text-xs font-semibold text-ink/50 block mb-2">{c.name}</label>
             <input
+              id="signup-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -147,8 +148,9 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-ink/50 block mb-2">{c.email}</label>
+            <label htmlFor="signup-email" className="text-xs font-semibold text-ink/50 block mb-2">{c.email}</label>
             <input
+              id="signup-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -159,8 +161,9 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-ink/50 block mb-2">{c.password}</label>
+            <label htmlFor="signup-password" className="text-xs font-semibold text-ink/50 block mb-2">{c.password}</label>
             <input
+              id="signup-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
