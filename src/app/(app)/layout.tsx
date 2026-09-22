@@ -98,6 +98,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
+    if (user.is_platform_admin === 1 && pathname === "/dashboard") {
+      router.replace("/admin");
+      return;
+    }
     const isOrgAdmin = (user.role === "admin" || user.role === "mosque_admin") && user.account_type !== "individual";
     const khatibOnlyRoutes = ["/sermons", "/themes", "/calendar", "/resources"];
     if (isOrgAdmin && khatibOnlyRoutes.some((r) => pathname.startsWith(r))) {
@@ -359,7 +363,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         )}
-        {(subStatus === "active" || subStatus === "trialing" || pathname.startsWith("/settings") || pathname.startsWith("/admin")) && children}
+        {(subStatus === "active" || subStatus === "trialing" || user?.is_platform_admin === 1 || pathname.startsWith("/settings") || pathname.startsWith("/admin")) && children}
 
         {/* Notification dropdown */}
         {notifOpen && (
