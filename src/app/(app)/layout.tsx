@@ -18,6 +18,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { t, lang, setLang, isAr } = useI18n();
   const [user, setUser] = useState<{ name: string; account_type: string; role: string; id?: string; is_platform_admin?: number } | null>(null);
+  const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [subStatus, setSubStatus] = useState<string | null>(null);
   const [subPlan, setSubPlan] = useState<string | null>(null);
@@ -52,7 +53,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
         return r.json();
       })
       .then((d) => { if (d) { setUser(d.user); setSubStatus(d.subscription?.status ?? "none"); setSubPlan(d.subscription?.plan ?? null); setSubIsOrgManaged(d.subscription?.isOrgManaged ?? false); setSubOrgName(d.subscription?.orgName ?? null); } })
-      .catch(() => { router.push("/auth/login"); });
+      .catch(() => { router.push("/auth/login"); })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -105,6 +107,22 @@ function AppShell({ children }: { children: React.ReactNode }) {
       router.push("/org/dashboard");
     }
   }, [user, pathname]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cream-bg flex items-center justify-center" dir={isAr ? "rtl" : "ltr"}>
+        <div className="flex flex-col items-center gap-4">
+          <svg width="44" height="44" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="1" width="11" height="11" rx="2" fill="#1a5c57" opacity="0.9"/>
+            <rect x="16" y="1" width="11" height="11" rx="2" fill="#1a5c57" opacity="0.6"/>
+            <rect x="1" y="16" width="11" height="11" rx="2" fill="#1a5c57" opacity="0.6"/>
+            <rect x="16" y="16" width="11" height="11" rx="2" fill="#C4A35A" opacity="0.8"/>
+          </svg>
+          <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cream-bg flex" dir={isAr ? "rtl" : "ltr"}>
@@ -341,7 +359,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         )}
-        {(subStatus === "active" || subStatus === "trialing" || !subStatus || pathname.startsWith("/settings") || pathname.startsWith("/admin")) && children}
+        {(subStatus === "active" || subStatus === "trialing" || pathname.startsWith("/settings") || pathname.startsWith("/admin")) && children}
 
         {/* Notification dropdown */}
         {notifOpen && (
