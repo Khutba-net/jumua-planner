@@ -527,46 +527,64 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.accountType")}</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { value: "individual", label: t("settings.typeIndividual"), desc: t("settings.typeIndividualDesc"), icon: "person" },
-                    { value: "organization", label: t("settings.typeOrganization"), desc: t("settings.typeOrganizationDesc"), icon: "mosque" },
-                    { value: "institution", label: t("settings.typeInstitution"), desc: t("settings.typeInstitutionDesc"), icon: "domain" },
-                  ] as const).map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setSelectedType(opt.value)}
-                      className={`flex flex-col items-center gap-1.5 p-3 border text-center transition-colors ${
-                        selectedType === opt.value
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-line bg-white text-mute hover:text-ink"
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-xl">{opt.icon}</span>
-                      <span className="text-xs font-semibold">{opt.label}</span>
-                      <span className="text-[10px] leading-tight">{opt.desc}</span>
-                    </button>
-                  ))}
-                </div>
-                {selectedType !== user?.account_type && selectedType !== "individual" && !isOrg && (
-                  <div className="mt-3">
-                    <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">
-                      {isAr ? "اسم المؤسسة" : "Organization Name"}
-                    </label>
-                    <input
-                      type="text"
-                      value={switchOrgName}
-                      onChange={(e) => setSwitchOrgName(e.target.value)}
-                      placeholder={isAr ? "مثال: مسجد النور" : "e.g. Masjid Al-Noor"}
-                      className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary"
-                    />
+                {isOrg ? (
+                  <div className="border border-line p-4 bg-surface">
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-primary text-xl">
+                        {user?.account_type === "institution" ? "domain" : "mosque"}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-ink capitalize">{user?.account_type}</p>
+                        <p className="text-xs text-mute">
+                          {isAr ? "لتغيير نوع حسابك، يجب مغادرة المؤسسة أولاً من إعدادات المؤسسة." : "To change your account type, leave your organization first from the Organization settings."}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                )}
-                {selectedType !== user?.account_type && (
-                  <div className="mt-3 bg-amber-50 border border-amber-200 p-3 flex items-start gap-2">
-                    <span className="material-symbols-outlined text-amber-600 text-base mt-0.5">info</span>
-                    <p className="text-xs text-amber-800">{t("settings.switchWarning")}</p>
-                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { value: "individual", label: t("settings.typeIndividual"), desc: t("settings.typeIndividualDesc"), icon: "person" },
+                        { value: "organization", label: t("settings.typeOrganization"), desc: t("settings.typeOrganizationDesc"), icon: "mosque" },
+                        { value: "institution", label: t("settings.typeInstitution"), desc: t("settings.typeInstitutionDesc"), icon: "domain" },
+                      ] as const).map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setSelectedType(opt.value)}
+                          className={`flex flex-col items-center gap-1.5 p-3 border text-center transition-colors ${
+                            selectedType === opt.value
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-line bg-white text-mute hover:text-ink"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-xl">{opt.icon}</span>
+                          <span className="text-xs font-semibold">{opt.label}</span>
+                          <span className="text-[10px] leading-tight">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {selectedType !== user?.account_type && selectedType !== "individual" && (
+                      <div className="mt-3">
+                        <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">
+                          {isAr ? "اسم المؤسسة" : "Organization Name"}
+                        </label>
+                        <input
+                          type="text"
+                          value={switchOrgName}
+                          onChange={(e) => setSwitchOrgName(e.target.value)}
+                          placeholder={isAr ? "مثال: مسجد النور" : "e.g. Masjid Al-Noor"}
+                          className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    )}
+                    {selectedType !== user?.account_type && (
+                      <div className="mt-3 bg-amber-50 border border-amber-200 p-3 flex items-start gap-2">
+                        <span className="material-symbols-outlined text-amber-600 text-base mt-0.5">info</span>
+                        <p className="text-xs text-amber-800">{t("settings.switchWarning")}</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -580,10 +598,10 @@ export default function SettingsPage() {
                 {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
                 {saving ? t("settings.saving") : t("settings.saveChanges")}
               </button>
-              {selectedType !== user?.account_type && (
+              {selectedType !== user?.account_type && !isOrg && (
                 <button
                   onClick={async () => {
-                    if (selectedType !== "individual" && !isOrg && !switchOrgName.trim()) {
+                    if (selectedType !== "individual" && !switchOrgName.trim()) {
                       showToast(t("settings.orgNameRequired"), "error");
                       return;
                     }

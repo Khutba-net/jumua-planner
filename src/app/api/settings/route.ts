@@ -93,6 +93,10 @@ export async function PUT(req: NextRequest) {
     );
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
+    if (user.organization_id && (user.account_type === "organization" || user.account_type === "institution") && user.role !== "admin") {
+      return NextResponse.json({ error: "Leave your organization first before changing account type" }, { status: 400 });
+    }
+
     let orgId = user.organization_id;
 
     if (newType === "individual" && orgId) {
