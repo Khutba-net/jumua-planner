@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         {
           price_data: {
             currency: "usd",
-            product_data: { name: PLANS[planId].name },
+            product_data: { name: PLANS[planId].name, tax_code: "txcd_10103001" },
             unit_amount: PLANS[planId].monthlyPrice,
             recurring: { interval: "month" },
           },
