@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 
 interface UserData {
@@ -76,7 +76,6 @@ function SettingsSkeleton() {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { t, isAr } = useI18n();
 
   const languageModes = [
@@ -159,9 +158,10 @@ export default function SettingsPage() {
   const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
-    const tab = searchParams.get("tab");
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
     if (tab) setActiveSection(tab);
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     fetch("/api/stripe/subscription")
