@@ -1,7 +1,11 @@
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import { queryOne, exec, cuid } from "@/lib/db";
 
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
 
 export async function createSession(userId: string): Promise<string> {
   const token = randomBytes(32).toString("hex");
@@ -10,7 +14,7 @@ export async function createSession(userId: string): Promise<string> {
 
   await exec(
     "INSERT INTO sessions (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)",
-    [id, userId, token, expiresAt.toISOString()]
+    [id, userId, hashToken(token), expiresAt.toISOString()]
   );
 
   return token;
@@ -21,13 +25,13 @@ export async function verifySession(token: string): Promise<string | null> {
 
   const session = await queryOne<{ user_id: string; expires_at: Date }>(
     "SELECT user_id, expires_at FROM sessions WHERE token = $1",
-    [token]
+    [hashToken(token)]
   );
 
   if (!session) return null;
 
   if (new Date(session.expires_at) < new Date()) {
-    await exec("DELETE FROM sessions WHERE token = $1", [token]);
+    await exec("DELETE FROM sessions WHERE token = $1", [hashToken(token)]);
     return null;
   }
 
@@ -36,7 +40,7 @@ export async function verifySession(token: string): Promise<string | null> {
 
 export async function deleteSession(token: string): Promise<void> {
   if (!token) return;
-  await exec("DELETE FROM sessions WHERE token = $1", [token]);
+  await exec("DELETE FROM sessions WHERE token = $1", [hashToken(token)]);
 }
 
 export async function deleteAllUserSessions(userId: string): Promise<void> {

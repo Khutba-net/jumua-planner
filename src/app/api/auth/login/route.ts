@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, exec, toJSON, verifyPassword, withTransaction } from "@/lib/db";
-import { rateLimitByIpAsync } from "@/lib/rate-limit";
+import { rateLimitByIpAsync, rateLimitAsync } from "@/lib/rate-limit";
 import { loginSchema, parseBody } from "@/lib/validations";
 import { createSession, sessionCookieOptions } from "@/lib/session";
 
@@ -20,6 +20,11 @@ export async function POST(req: Request) {
   }
   const { password } = parsed.data;
   const email = parsed.data.email.toLowerCase().trim();
+
+  const { allowed: emailAllowed } = await rateLimitAsync(`login-email:${email}`, 10, 3_600_000);
+  if (!emailAllowed) {
+    return NextResponse.json({ error: "This account is temporarily locked due to too many failed attempts. Try again in an hour." }, { status: 429 });
+  }
 
   const user = await queryOne<{ id: string; password_hash: string | null }>(
     "SELECT id, email, name, password_hash, account_type, onboarding_complete FROM users WHERE LOWER(email) = $1",
@@ -45,8 +50,8 @@ export async function POST(req: Request) {
 
   const { invite_code, mosque_invite_code } = parsed.data as { invite_code?: string; mosque_invite_code?: string };
   if (invite_code) {
-    const member = await queryOne<{ id: string; organization_id: string; status: string; invite_expires_at: string | null }>(
-      "SELECT id, organization_id, status, invite_expires_at FROM org_members WHERE invite_code = $1 AND status = 'invited'",
+    const member = await queryOne<{ id: string; organization_id: string; status: string; invite_expires_at: string | null; org_type: string }>(
+      "SELECT m.id, m.organization_id, m.status, m.invite_expires_at, o.type as org_type FROM org_members m JOIN organizations o ON o.id = m.organization_id WHERE m.invite_code = $1 AND m.status = 'invited'",
       [invite_code]
     );
 
@@ -57,8 +62,8 @@ export async function POST(req: Request) {
           [user.id, email, member.id]
         );
         await client.query(
-          "UPDATE users SET organization_id = $1, account_type = 'organization', role = 'khatib', updated_at = NOW() WHERE id = $2",
-          [member.organization_id, user.id]
+          "UPDATE users SET organization_id = $1, account_type = $2, role = 'khatib', updated_at = NOW() WHERE id = $3",
+          [member.organization_id, member.org_type, user.id]
         );
       });
     }

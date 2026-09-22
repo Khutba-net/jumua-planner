@@ -31,6 +31,31 @@ function isPublicRoute(pathname: string): boolean {
   return false;
 }
 
+const apiHits = new Map<string, { count: number; resetAt: number }>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of apiHits) {
+    if (entry.resetAt <= now) apiHits.delete(key);
+  }
+}, 30_000);
+
+const STRIPE_CHECKOUT_LIMIT = 3;
+const STRIPE_CHECKOUT_WINDOW = 60_000;
+const API_GLOBAL_LIMIT = 60;
+const API_GLOBAL_WINDOW = 60_000;
+
+function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = apiHits.get(key);
+  if (!entry || entry.resetAt <= now) {
+    apiHits.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= limit;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -48,6 +73,24 @@ export function middleware(request: NextRequest) {
     }
     const loginUrl = new URL("/auth/login", request.url);
     return addSecurityHeaders(NextResponse.redirect(loginUrl));
+  }
+
+  if (pathname.startsWith("/api/")) {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+
+    if (pathname === "/api/stripe/checkout") {
+      if (!checkRateLimit(`stripe:${ip}`, STRIPE_CHECKOUT_LIMIT, STRIPE_CHECKOUT_WINDOW)) {
+        return addSecurityHeaders(
+          NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 })
+        );
+      }
+    }
+
+    if (!checkRateLimit(`api:${ip}`, API_GLOBAL_LIMIT, API_GLOBAL_WINDOW)) {
+      return addSecurityHeaders(
+        NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 })
+      );
+    }
   }
 
   return addSecurityHeaders(NextResponse.next());

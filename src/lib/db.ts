@@ -6,7 +6,7 @@ import { runMigrations } from "./migrate";
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: true } : undefined,
-  max: 10,
+  max: 5,
   connectionTimeoutMillis: 5000,
   idleTimeoutMillis: 30000,
   statement_timeout: 30000,
@@ -17,9 +17,6 @@ let initialized = false;
 export async function getPool() {
   if (!initialized) {
     await runMigrations(pool, join(process.cwd(), "migrations"));
-    if (process.env.NODE_ENV !== "production") {
-      await seedDemoUser();
-    }
     initialized = true;
   }
   return pool;
@@ -87,13 +84,3 @@ export function toJSON(row: unknown): unknown {
   return JSON.parse(JSON.stringify(row, (_k, v) => typeof v === "bigint" ? Number(v) : v));
 }
 
-async function seedDemoUser() {
-  const existing = await pool.query("SELECT id FROM users WHERE id = $1", ["demo-user"]);
-  if (existing.rows.length === 0) {
-    const demoPasswordHash = hashPassword("demo1234");
-    await pool.query(
-      "INSERT INTO users (id, firebase_uid, email, name, password_hash, role, account_type, onboarding_complete) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-      ["demo-user", "demo-firebase-uid", "ahmed@example.com", "Ahmed", demoPasswordHash, "khatib", "individual", 1]
-    );
-  }
-}
