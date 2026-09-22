@@ -826,7 +826,7 @@ export default function SettingsPage() {
                 <Skeleton className="h-32 w-full" />
                 <Skeleton className="h-20 w-full" />
               </div>
-            ) : subscription?.isOrgManaged && user?.role !== "admin" ? (
+            ) : subscription?.isOrgManaged && user?.role !== "admin" && subscription.status !== "none" ? (
               <div className="bg-surface border border-line p-6 text-center">
                 <span className="material-symbols-outlined text-primary text-4xl mb-3 block">admin_panel_settings</span>
                 <p className="text-sm font-semibold text-ink mb-2">
@@ -846,7 +846,7 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
-            ) : subscription ? (
+            ) : subscription && subscription.status !== "none" ? (
               <>
                 <div className="border-2 border-primary/20 p-6 mb-6">
                   <div className="flex items-center justify-between mb-4">
