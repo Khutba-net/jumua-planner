@@ -66,8 +66,8 @@ export async function POST(req: NextRequest) {
         trial_period_days: 14,
         metadata,
       },
-      success_url: `${origin}/settings?billing=success`,
-      cancel_url: `${origin}/settings?billing=cancel`,
+      success_url: `${origin}/settings?tab=subscription&billing=success`,
+      cancel_url: `${origin}/settings?tab=subscription&billing=cancel`,
       metadata,
     });
 

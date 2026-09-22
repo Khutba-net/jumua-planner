@@ -330,7 +330,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                       : "Your subscription is inactive. Subscribe to regain access to all features."}
                   </p>
                   <Link
-                    href="/settings"
+                    href="/settings?tab=subscription"
                     className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white text-sm font-bold rounded-full hover:bg-secondary transition-colors shadow-md"
                   >
                     <span className="material-symbols-outlined text-lg">credit_card</span>

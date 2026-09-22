@@ -105,7 +105,13 @@ export default function SettingsPage() {
 
   const [user, setUser] = useState<UserData | null>(null);
   const [settings, setSettings] = useState<SettingsData | null>(null);
-  const [activeSection, setActiveSection] = useState("profile");
+  const [activeSection, setActiveSection] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("tab") || "profile";
+    }
+    return "profile";
+  });
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [loading, setLoading] = useState(true);
