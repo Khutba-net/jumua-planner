@@ -93,7 +93,7 @@ export default function SettingsPage() {
     { value: "7", label: t("reminder.7") },
   ];
 
-  const navSections = [
+  const allNavSections = [
     { id: "profile", label: t("settings.profile"), icon: "person" },
     { id: "sermon", label: t("settings.sermonDefaults"), icon: "edit_note" },
     { id: "notifications", label: t("settings.notifications"), icon: "notifications" },
@@ -162,6 +162,15 @@ export default function SettingsPage() {
     const tab = params.get("tab");
     if (tab) setActiveSection(tab);
   }, []);
+
+  useEffect(() => {
+    if (user && activeSection === "subscription") {
+      const uIsOrg = user.account_type === "organization" || user.account_type === "institution";
+      if (uIsOrg && user.role !== "admin") {
+        setActiveSection("profile");
+      }
+    }
+  }, [user, activeSection]);
 
   useEffect(() => {
     fetch("/api/stripe/subscription")
@@ -368,6 +377,9 @@ export default function SettingsPage() {
   }
 
   const isOrg = user?.account_type === "organization" || user?.account_type === "institution";
+  const isOrgAdmin = isOrg && (user?.role === "admin" || user?.role === "mosque_admin");
+  const showSubscriptionTab = !isOrg || user?.role === "admin";
+  const navSections = allNavSections.filter((s) => s.id !== "subscription" || showSubscriptionTab);
 
   if (loading) return <SettingsSkeleton />;
 
