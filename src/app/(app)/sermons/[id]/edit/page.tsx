@@ -4,14 +4,6 @@ import { useEffect, useState, useCallback, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 
-interface Reference {
-  id: string;
-  type: string;
-  title: string;
-  source: string | null;
-  content: string | null;
-}
-
 interface Sermon {
   id: string;
   title: string;
@@ -27,7 +19,6 @@ interface Sermon {
   language: string;
   translation_of: string | null;
   updated_at: string;
-  references: Reference[];
 }
 
 function wordCount(text: string | null) {
@@ -67,7 +58,6 @@ interface CheckContext {
   notes: string;
   words: number;
   estMinutes: number;
-  hasReferences: boolean;
 }
 
 const checklist: CheckItem[] = [
@@ -75,7 +65,6 @@ const checklist: CheckItem[] = [
   { key: "content", labelKey: "editor.contentWritten", check: (c) => c.content.length >= 50, required: true },
   { key: "date", labelKey: "editor.dateSet", check: (c) => c.scheduledDate.length > 0, required: true },
   { key: "length", labelKey: "editor.withinTarget", check: (c) => c.estMinutes >= 15 && c.estMinutes <= 25, required: false },
-  { key: "references", labelKey: "editor.refsAdded", check: (c) => c.hasReferences, required: false },
 ];
 
 const sectionCheckKeys = [
@@ -103,17 +92,8 @@ export default function SermonEditorPage({
   const [status, setStatus] = useState("draft");
   const [scheduledDate, setScheduledDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [sermonLang, setSermonLang] = useState("ar");
   const [mobilePanel, setMobilePanel] = useState<"editor" | "info" | "checklist">("editor");
-  const [userWordTarget, setUserWordTarget] = useState(2500);
   const [editorFontSize, setEditorFontSize] = useState(16);
-  const [references, setReferences] = useState<Reference[]>([]);
-  const [showRefModal, setShowRefModal] = useState(false);
-  const [refType, setRefType] = useState<"quran" | "hadith">("quran");
-  const [refTitle, setRefTitle] = useState("");
-  const [refSource, setRefSource] = useState("");
-  const [refContent, setRefContent] = useState("");
-  const [refSaving, setRefSaving] = useState(false);
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
   const [themes, setThemes] = useState<{ id: string; name: string }[]>([]);
   const [overrideThemeId, setOverrideThemeId] = useState("");
@@ -146,7 +126,6 @@ export default function SermonEditorPage({
       .then((r) => r.json())
       .then((data) => {
         if (data.settings) {
-          setUserWordTarget(data.settings.word_target || 2500);
           setEditorFontSize(data.settings.editor_font_size || 16);
         }
         if (data.user) {
@@ -178,9 +157,7 @@ export default function SermonEditorPage({
             : ""
         );
         setNotes(data.notes ?? "");
-        setSermonLang(data.language || "ar");
         setLastUpdatedAt(data.updated_at || null);
-        setReferences(data.references ?? []);
         setLoading(false);
         try {
           const saved = localStorage.getItem(`jp_draft_${id}`);
@@ -210,7 +187,6 @@ export default function SermonEditorPage({
           status: overrides?.status ?? status,
           scheduledDate: scheduledDate || null,
           notes,
-          language: sermonLang,
           lastUpdated: lastUpdatedAt,
         }),
       });
@@ -237,7 +213,7 @@ export default function SermonEditorPage({
       } catch {}
     }
     setSaving(false);
-  }, [id, title, content, status, scheduledDate, notes, sermonLang, lastUpdatedAt]);
+  }, [id, title, content, status, scheduledDate, notes, lastUpdatedAt]);
 
   const changeStatus = useCallback((newStatus: string) => {
     setStatus(newStatus);
@@ -251,22 +227,6 @@ export default function SermonEditorPage({
   }, [sermon, save]);
 
   const bothClosed = !leftOpen && !rightOpen;
-
-  function insertAtCursor(block: string) {
-    const textarea = editorRef.current;
-    if (textarea) {
-      const start = textarea.selectionStart ?? textarea.value.length;
-      const before = textarea.value.slice(0, start);
-      const after = textarea.value.slice(start);
-      setContent(before + block + after);
-      requestAnimationFrame(() => {
-        const newPos = start + block.length;
-        textarea.selectionStart = newPos;
-        textarea.selectionEnd = newPos;
-        textarea.focus();
-      });
-    }
-  }
 
   function wrapSelection(prefix: string, suffix: string) {
     const textarea = editorRef.current;
@@ -288,41 +248,6 @@ export default function SermonEditorPage({
       }
       textarea.focus();
     });
-  }
-
-  async function handleAddReference() {
-    if (!refTitle.trim()) return;
-    setRefSaving(true);
-    try {
-      const res = await fetch(`/api/sermons/${id}/references`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: refType,
-          title: refTitle.trim(),
-          source: refSource.trim() || null,
-          content: refContent.trim() || null,
-        }),
-      });
-      if (res.ok) {
-        const ref = await res.json();
-        setReferences((prev) => [...prev, ref]);
-        const label = refType === "quran" ? t("editor.quran") : t("editor.hadith");
-        insertAtCursor(`\n[${label} — ${refTitle.trim()}]\n`);
-        setRefTitle("");
-        setRefSource("");
-        setRefContent("");
-        setShowRefModal(false);
-      }
-    } catch {}
-    setRefSaving(false);
-  }
-
-  async function handleDeleteReference(refId: string) {
-    try {
-      await fetch(`/api/sermons/${id}/references?refId=${refId}`, { method: "DELETE" });
-      setReferences((prev) => prev.filter((r) => r.id !== refId));
-    } catch {}
   }
 
   async function handleDelete() {
@@ -361,7 +286,6 @@ export default function SermonEditorPage({
 
   const checkCtx: CheckContext = {
     title, content, scheduledDate, notes, words, estMinutes,
-    hasReferences: references.length > 0,
   };
 
   const passedChecks = checklist.filter((c) => c.check(checkCtx));
@@ -532,47 +456,6 @@ export default function SermonEditorPage({
           )}
 
           <div className="mb-2.5">
-            <p className="text-[10px] text-mute/60">{t("editor.language")}</p>
-            <select
-              value={sermonLang}
-              onChange={(e) => setSermonLang(e.target.value)}
-              className="text-xs font-medium text-ink bg-transparent border-none outline-none w-full"
-            >
-              <option value="ar">{t("editor.langAr")}</option>
-              <option value="en">{t("editor.langEn")}</option>
-              <option value="ur">{t("editor.langUrdu")}</option>
-              <option value="other">{t("editor.langOther")}</option>
-            </select>
-          </div>
-          {!sermon?.translation_of && (
-            <button
-              onClick={async () => {
-                const targetLang = sermonLang === "ar" ? "en" : "ar";
-                const res = await fetch(`/api/sermons/${id}/duplicate`, { method: "POST" });
-                if (res.ok) {
-                  const newSermon = await res.json();
-                  await fetch(`/api/sermons/${newSermon.id}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ language: targetLang, translationOf: id }),
-                  });
-                  router.push(`/sermons/${newSermon.id}/edit`);
-                }
-              }}
-              className="w-full mb-2.5 px-3 py-2 text-[11px] font-medium text-primary bg-primary/5 border border-primary/20 rounded hover:bg-primary/10 transition-colors flex items-center justify-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-[14px]">translate</span>
-              {t("editor.addTranslation")}
-            </button>
-          )}
-          {sermon?.translation_of && (
-            <div className="mb-2.5 px-3 py-2 bg-blue-50 border border-blue-200 rounded text-[11px] text-blue-700 flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[14px]">translate</span>
-              {t("editor.translationOf")}
-            </div>
-          )}
-
-          <div className="mb-2.5">
             <p className="text-[10px] text-mute/60">{t("editor.words")}</p>
             <p className="text-xs font-medium text-ink">{words}</p>
           </div>
@@ -661,21 +544,6 @@ export default function SermonEditorPage({
               <button onClick={() => wrapSelection("__", "__")} className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors underline shrink-0">U</button>
               <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
               <button onClick={() => wrapSelection("\n> ", "\n")} className="px-1.5 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors shrink-0"><span className="material-symbols-outlined text-[14px]">format_quote</span></button>
-              <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
-              <button
-                onClick={() => { setRefType("quran"); setShowRefModal(true); }}
-                className="flex items-center gap-1 px-2 py-1 border border-line bg-white text-ink/70 hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-colors shrink-0 text-[11px] font-medium"
-              >
-                <span className="material-symbols-outlined text-[14px]">menu_book</span>
-                <span className="hidden sm:inline">{t("editor.quran")}</span>
-              </button>
-              <button
-                onClick={() => { setRefType("hadith"); setShowRefModal(true); }}
-                className="flex items-center gap-1 px-2 py-1 border border-line bg-white text-ink/70 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors shrink-0 text-[11px] font-medium"
-              >
-                <span className="material-symbols-outlined text-[14px]">auto_stories</span>
-                <span className="hidden sm:inline">{t("editor.hadith")}</span>
-              </button>
             </div>
             <span className="text-[10px] text-mute shrink-0 ms-2">
               {saving
@@ -913,195 +781,10 @@ export default function SermonEditorPage({
             </div>
           )}
 
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2 mt-1">{t("editor.wordTarget")}</p>
-          <div className="mb-3">
-            <div className="flex items-baseline gap-1.5 mb-1">
-              <span className="text-lg font-bold text-ink">{words}</span>
-              <span className="text-[10px] text-mute">/ {userWordTarget.toLocaleString(locale)}</span>
-            </div>
-            <div className="w-full h-1 bg-surface overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all"
-                style={{ width: `${Math.min(100, (words / userWordTarget) * 100)}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="h-px bg-line my-2.5" />
-
-          <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">{t("editor.references")}</p>
-          {references.length > 0 ? (
-            <div className="flex flex-col gap-1.5">
-              {references.map((ref) => (
-                <div key={ref.id} className={`px-2.5 py-2 border text-[11px] ${
-                  ref.type === "quran"
-                    ? "bg-green-50/50 border-green-200"
-                    : "bg-amber-50/50 border-amber-200"
-                }`}>
-                  <div className="flex items-start justify-between gap-1">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <span className={`material-symbols-outlined text-[12px] ${
-                          ref.type === "quran" ? "text-green-600" : "text-amber-600"
-                        }`}>
-                          {ref.type === "quran" ? "menu_book" : "auto_stories"}
-                        </span>
-                        <span className={`text-[9px] font-bold uppercase tracking-wide ${
-                          ref.type === "quran" ? "text-green-600" : "text-amber-600"
-                        }`}>
-                          {ref.type === "quran" ? t("editor.quran") : t("editor.hadith")}
-                        </span>
-                      </div>
-                      <p className="font-medium text-ink leading-tight">{ref.title}</p>
-                      {ref.source && <p className="text-[10px] text-mute mt-0.5">{ref.source}</p>}
-                      {ref.content && <p className="text-[10px] text-ink/70 mt-1 italic leading-snug">{ref.content}</p>}
-                    </div>
-                    <button
-                      onClick={() => handleDeleteReference(ref.id)}
-                      className="text-mute/40 hover:text-red-500 transition-colors shrink-0"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">close</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[10px] text-mute/50">{t("editor.noRefs")}</p>
-          )}
-          <div className="flex gap-1 mt-2">
-            <button
-              onClick={() => { setRefType("quran"); setShowRefModal(true); }}
-              className="flex-1 text-[10px] font-medium py-1.5 border border-line text-mute hover:text-green-700 hover:border-green-200 hover:bg-green-50 transition-colors flex items-center justify-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[12px]">add</span>
-              {t("editor.quran")}
-            </button>
-            <button
-              onClick={() => { setRefType("hadith"); setShowRefModal(true); }}
-              className="flex-1 text-[10px] font-medium py-1.5 border border-line text-mute hover:text-amber-700 hover:border-amber-200 hover:bg-amber-50 transition-colors flex items-center justify-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[12px]">add</span>
-              {t("editor.hadith")}
-            </button>
-          </div>
           </div>
         </div>
       </div>
 
-      {/* Reference modal */}
-      {showRefModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowRefModal(false)} role="dialog" aria-modal="true" aria-label="Add reference">
-          <div className="bg-white w-full max-w-md mx-4 border border-line shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className={`flex items-center gap-2 px-5 py-3 border-b border-line ${
-              refType === "quran" ? "bg-green-50" : "bg-amber-50"
-            }`}>
-              <span className={`material-symbols-outlined text-lg ${
-                refType === "quran" ? "text-green-600" : "text-amber-600"
-              }`}>
-                {refType === "quran" ? "menu_book" : "auto_stories"}
-              </span>
-              <h3 className="text-sm font-bold text-ink">
-                {refType === "quran" ? t("editor.addQuranVerse") : t("editor.addHadith")}
-              </h3>
-              <div className={`flex ${isAr ? "me-auto" : "ms-auto"} gap-1`}>
-                <button
-                  onClick={() => setRefType("quran")}
-                  className={`text-[10px] px-2 py-0.5 font-medium transition-colors ${
-                    refType === "quran"
-                      ? "bg-green-600 text-white"
-                      : "bg-white border border-line text-mute hover:text-green-600"
-                  }`}
-                >
-                  {t("editor.quran")}
-                </button>
-                <button
-                  onClick={() => setRefType("hadith")}
-                  className={`text-[10px] px-2 py-0.5 font-medium transition-colors ${
-                    refType === "hadith"
-                      ? "bg-amber-600 text-white"
-                      : "bg-white border border-line text-mute hover:text-amber-600"
-                  }`}
-                >
-                  {t("editor.hadith")}
-                </button>
-              </div>
-            </div>
-
-            <div className="p-5 flex flex-col gap-3">
-              <div>
-                <label className="text-[10px] font-bold tracking-[1.5px] text-accent-gold uppercase block mb-1">
-                  {refType === "quran" ? t("editor.verseAyah") : t("editor.hadithText")}
-                </label>
-                <textarea
-                  value={refContent}
-                  onChange={(e) => setRefContent(e.target.value)}
-                  placeholder={refType === "quran"
-                    ? "إِنَّ مَعَ ٱلْعُسْرِ يُسْرًا"
-                    : "The Prophet ﷺ said..."
-                  }
-                  rows={3}
-                  className="w-full px-3 py-2 border border-line text-sm text-ink bg-surface focus:outline-none focus:border-primary transition-colors font-[var(--font-arabic)]"
-                  dir={refType === "quran" ? "rtl" : "ltr"}
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold tracking-[1.5px] text-accent-gold uppercase block mb-1">
-                  {refType === "quran" ? t("editor.reference") : t("editor.titleSummary")}
-                </label>
-                <input
-                  type="text"
-                  value={refTitle}
-                  onChange={(e) => setRefTitle(e.target.value)}
-                  placeholder={refType === "quran"
-                    ? "Surah Al-Sharh, Ayah 6"
-                    : "Patience in hardship"
-                  }
-                  className="w-full px-3 py-2 border border-line text-sm text-ink bg-surface focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold tracking-[1.5px] text-accent-gold uppercase block mb-1">
-                  {refType === "quran" ? t("editor.translationOpt") : t("editor.sourceLabel")}
-                </label>
-                <input
-                  type="text"
-                  value={refSource}
-                  onChange={(e) => setRefSource(e.target.value)}
-                  placeholder={refType === "quran"
-                    ? "Indeed, with hardship comes ease."
-                    : "Sahih Bukhari, Book 2, Hadith 14"
-                  }
-                  className="w-full px-3 py-2 border border-line text-sm text-ink bg-surface focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-line bg-surface">
-              <button
-                onClick={() => { setShowRefModal(false); setRefTitle(""); setRefSource(""); setRefContent(""); }}
-                className="text-xs px-4 py-2 border border-line text-mute hover:bg-white transition-colors"
-              >
-                {t("btn.cancel")}
-              </button>
-              <button
-                onClick={handleAddReference}
-                disabled={!refTitle.trim() || refSaving}
-                className={`text-xs px-4 py-2 font-bold text-white transition-colors flex items-center gap-1.5 ${
-                  refType === "quran"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : "bg-amber-600 hover:bg-amber-700"
-                } disabled:opacity-50`}
-              >
-                {refSaving && <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>}
-                {refType === "quran" ? t("editor.addVerse") : t("editor.addHadithBtn")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

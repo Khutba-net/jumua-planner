@@ -373,20 +373,15 @@ function EditorMockup({ lang = "en" }: { lang?: string }) {
   const sections = ar ? ["المقدمة", "الموضوع الرئيسي", "الخطبة الثانية"] : ["Opening", "Main theme", "Second khutbah"];
   const checklist = ar ? [
     { label: "تم تحديد العنوان", done: true },
-    { label: "كتابة المحتوى العربي", done: false, req: true },
-    { label: "الترجمة الإنجليزية", done: false, req: true },
+    { label: "كتابة المحتوى", done: false, req: true },
     { label: "تحديد التاريخ", done: false, req: true },
     { label: "ضمن المدة (١٥-٢٥ د)", done: false },
-    { label: "ذكر المراجع", done: false },
   ] : [
     { label: "Sermon title set", done: true },
-    { label: "Arabic content written", done: false, req: true },
-    { label: "English translation", done: false, req: true },
+    { label: "Content written", done: false, req: true },
     { label: "Scheduled date set", done: false, req: true },
     { label: "Within target (15-25 min)", done: false },
-    { label: "References cited", done: false },
   ];
-  const langModes = ar ? ["العربية أولاً", "الإنجليزية أولاً", "عربي فقط", "إنجليزي فقط"] : ["Arabic first", "English first", "AR only", "EN only"];
   return (
     <div className="flex-1 flex flex-col min-w-0" dir={ar ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#bcc9ca]/20 bg-white gap-2">
@@ -437,13 +432,6 @@ function EditorMockup({ lang = "en" }: { lang?: string }) {
           <div className="bg-[#f9f9fc] border border-[#bcc9ca]/20 p-1.5 text-[8px] text-[#bcc9ca]">{ar ? "ملاحظات خاصة..." : "Private notes..."}</div>
         </div>
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#bcc9ca]/20 bg-[#fdfcfa]">
-            <div className="flex bg-[#f3f0ea] p-0.5 gap-px">
-              {langModes.map((m, i) => (
-                <span key={m} className={`text-[8px] px-1.5 py-0.5 ${i === 0 ? "bg-white text-[#1a1c1e] border border-[#bcc9ca]/20" : "text-[#6d797a]"}`}>{m}</span>
-              ))}
-            </div>
-          </div>
           <div className="flex items-center gap-1 px-3 py-1 mx-3 mt-2 bg-[#fcfaf6] border border-[#bcc9ca]/20">
             <span className="text-[9px] px-1.5 py-0.5 border border-[#bcc9ca]/20 bg-white text-[#1a1c1e]/70 font-bold">B</span>
             <span className="text-[9px] px-1.5 py-0.5 border border-[#bcc9ca]/20 bg-white text-[#1a1c1e]/70 italic">I</span>
@@ -468,9 +456,6 @@ function EditorMockup({ lang = "en" }: { lang?: string }) {
                 </div>
               </div>
               <p className="text-[10px] text-[#bcc9ca] text-right" dir="rtl">اكتب خطبتك هنا...</p>
-              <div className="border-t border-[#f0ede7] mt-2 pt-2">
-                <p className="text-[9px] text-[#bcc9ca] italic">{ar ? "اكتب الترجمة الإنجليزية أو الملاحظات هنا..." : "Write the English translation or notes here..."}</p>
-              </div>
             </div>
           </div>
           <div className="flex items-center justify-between px-3 py-1 border-t border-[#bcc9ca]/20 bg-white text-[7px] text-[#6d797a]/60">
@@ -482,9 +467,9 @@ function EditorMockup({ lang = "en" }: { lang?: string }) {
           <p className="text-[7px] tracking-[2px] text-[#6d797a]/60 mb-1.5">{ar ? "الجاهزية" : "READINESS"}</p>
           <div className="flex items-center gap-1.5 mb-1.5">
             <div className="flex-1 h-1 bg-[#f9f9fc] overflow-hidden">
-              <div className="h-full bg-[#C4A35A] w-[16%]" />
+              <div className="h-full bg-[#C4A35A] w-[25%]" />
             </div>
-            <span className="text-[8px] font-bold text-[#6d797a]">{ar ? "١/٦" : "1/6"}</span>
+            <span className="text-[8px] font-bold text-[#6d797a]">{ar ? "١/٤" : "1/4"}</span>
           </div>
           {checklist.map((c) => (
             <div key={c.label} className={`flex items-start gap-1 text-[7px] px-1.5 py-1 mb-0.5 ${c.done ? "bg-green-50/50" : "bg-[#f9f9fc]"}`}>
@@ -500,14 +485,6 @@ function EditorMockup({ lang = "en" }: { lang?: string }) {
             {ar ? "إرسال للمراجعة" : "Submit for Review"}
           </div>
           <p className="text-[7px] text-red-400 mt-1">{ar ? "أكمل العناصر المطلوبة (*) أولاً" : "Complete required items (*) first"}</p>
-          <div className="h-px bg-[#bcc9ca]/20 my-2" />
-          <p className="text-[7px] tracking-[2px] text-[#6d797a]/60 mb-1">{ar ? "هدف الكلمات" : "WORD TARGET"}</p>
-          <div className="flex items-baseline gap-1 mb-1">
-            <span className="text-sm font-bold text-[#1a1c1e]">{ar ? "٠" : "0"}</span>
-            <span className="text-[8px] text-[#6d797a]">{ar ? "/ ١٥٠٠" : "/ 1500"}</span>
-          </div>
-          <div className="w-full h-1 bg-[#f9f9fc]"><div className="h-full bg-[#00666d] w-0" /></div>
-          <p className="text-[7px] text-[#6d797a]/60 mt-0.5">{ar ? "~٢٠ دقيقة هدف الخطبة" : "~20 min khutbah target"}</p>
         </div>
       </div>
     </div>

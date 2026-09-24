@@ -19,7 +19,6 @@ interface UserData {
 interface SettingsData {
   user_id: string;
   default_language: string;
-  word_target: number;
   theme_mode: string;
   editor_font_size: number;
   friday_reminder: string;
@@ -119,7 +118,6 @@ export default function SettingsPage() {
   const [uploading, setUploading] = useState(false);
 
   const [defaultLanguage, setDefaultLanguage] = useState("ar-first");
-  const [wordTarget, setWordTarget] = useState(2500);
 
   const [fridayReminder, setFridayReminder] = useState("3");
   const [emailAssigned, setEmailAssigned] = useState(true);
@@ -225,7 +223,6 @@ export default function SettingsPage() {
         setEmail(u.email);
         setAvatarUrl(u.avatar_url);
         setDefaultLanguage(s.default_language);
-        setWordTarget(s.word_target);
         setFridayReminder(s.friday_reminder);
         setEmailAssigned(!!s.email_assigned);
         setWeeklyDigest(!!s.weekly_digest);
@@ -671,23 +668,6 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.defaultWordTarget")}</label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="500"
-                    max="5000"
-                    step="100"
-                    value={wordTarget}
-                    onChange={(e) => setWordTarget(Number(e.target.value))}
-                    className="flex-1 accent-primary"
-                  />
-                  <span className="text-sm font-semibold text-ink w-16 text-end">{wordTarget.toLocaleString(isAr ? "ar-SA" : "en-US")}</span>
-                </div>
-                <p className="text-xs text-mute mt-1">{t("settings.wordTargetHint")}</p>
-              </div>
-
-              <div>
                 <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.statusFlow")}</label>
                 <div className="flex items-center gap-2 text-sm text-mute">
                   <span className="px-2.5 py-1 bg-surface border border-line text-xs font-bold">{t("status.draft").toUpperCase()}</span>
@@ -702,7 +682,7 @@ export default function SettingsPage() {
             </div>
 
             <button
-              onClick={() => saveSection("sermon", { default_language: defaultLanguage, word_target: wordTarget })}
+              onClick={() => saveSection("sermon", { default_language: defaultLanguage })}
               disabled={saving}
               className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2"
             >

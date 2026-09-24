@@ -27,7 +27,7 @@ function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return true;
   if (pathname.startsWith("/_next/") || pathname.startsWith("/favicon") || pathname.startsWith("/avatars/")) return true;
-  if (/\.(jpg|jpeg|png|gif|svg|ico|webp|woff2?|ttf|css|js|map)$/i.test(pathname)) return true;
+  if (/\.(jpg|jpeg|png|gif|svg|ico|webp|webmanifest|woff2?|ttf|css|js|map)$/i.test(pathname)) return true;
   return false;
 }
 
