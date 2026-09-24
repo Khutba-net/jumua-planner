@@ -783,8 +783,9 @@ export default function SettingsPage() {
                     </div>
                     <div className="text-end">
                       <p className="text-2xl font-bold text-ink">
-                        {subscription.plan === "institution" ? "$100" : subscription.plan === "organization" ? "$50" : "$10"}
-                        <span className="text-sm font-normal text-mute">/mo</span>
+                        {subscription.plan === "institution"
+                          ? (isAr ? "مخصص" : "Custom")
+                          : <>{subscription.plan === "organization" ? "$50" : "$10"}<span className="text-sm font-normal text-mute">/mo</span></>}
                       </p>
                     </div>
                   </div>
