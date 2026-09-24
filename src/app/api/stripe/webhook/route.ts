@@ -89,30 +89,68 @@ async function handleSubscriptionChange(sub: Stripe.Subscription) {
     "SELECT id FROM subscriptions WHERE stripe_subscription_id = $1",
     [sub.id]
   );
-  if (!rows[0]) return;
 
   const period = getSubPeriod(sub);
 
+  if (rows[0]) {
+    await exec(
+      `UPDATE subscriptions SET
+         status = $1,
+         current_period_start = $2,
+         current_period_end = $3,
+         cancel_at_period_end = $4,
+         trial_end = $5,
+         updated_at = NOW()
+       WHERE stripe_subscription_id = $6`,
+      [
+        sub.status,
+        new Date(period.start * 1000).toISOString(),
+        new Date(period.end * 1000).toISOString(),
+        sub.cancel_at_period_end ? 1 : 0,
+        sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+        sub.id,
+      ]
+    );
+    logger.info("Subscription updated", { subId: sub.id, status: sub.status });
+    return;
+  }
+
+  // No existing row — look up customer to find the user/org (for manually-created subscriptions)
+  const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  if (!customerId) return;
+
+  const org = await import("@/lib/db").then((db) =>
+    db.queryOne<{ id: string; type: string }>("SELECT id, type FROM organizations WHERE stripe_customer_id = $1", [customerId])
+  );
+  const user = await import("@/lib/db").then((db) =>
+    db.queryOne<{ id: string }>("SELECT id FROM users WHERE stripe_customer_id = $1", [customerId])
+  );
+
+  if (!org && !user) {
+    logger.warn("Subscription change for unknown customer", { customerId, subId: sub.id });
+    return;
+  }
+
+  const plan = org ? (org.type === "institution" ? "institution" : "organization") : "individual";
+
   await exec(
-    `UPDATE subscriptions SET
-       status = $1,
-       current_period_start = $2,
-       current_period_end = $3,
-       cancel_at_period_end = $4,
-       trial_end = $5,
-       updated_at = NOW()
-     WHERE stripe_subscription_id = $6`,
+    `INSERT INTO subscriptions (id, user_id, stripe_subscription_id, plan, status, current_period_start, current_period_end, trial_end, cancel_at_period_end, organization_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
+      cuid(),
+      user?.id || null,
+      sub.id,
+      plan,
       sub.status,
       new Date(period.start * 1000).toISOString(),
       new Date(period.end * 1000).toISOString(),
-      sub.cancel_at_period_end ? 1 : 0,
       sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
-      sub.id,
+      sub.cancel_at_period_end ? 1 : 0,
+      org?.id || null,
     ]
   );
 
-  logger.info("Subscription updated", { subId: sub.id, status: sub.status });
+  logger.info("Subscription created from manual Stripe sub", { subId: sub.id, plan, orgId: org?.id, userId: user?.id });
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
