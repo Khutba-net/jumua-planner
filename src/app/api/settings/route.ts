@@ -127,6 +127,11 @@ export async function PUT(req: NextRequest) {
         await exec("DELETE FROM friday_assignments WHERE member_id = $1 AND friday_date >= $2", [member.id, today]);
         await exec("DELETE FROM org_members WHERE id = $1", [member.id]);
       }
+      // Transfer org subscription back to user-level
+      await exec(
+        "UPDATE subscriptions SET organization_id = NULL WHERE organization_id = $1 AND user_id = $2",
+        [orgId, userId]
+      );
     }
 
     if (newType !== "individual" && !orgId) {
@@ -142,6 +147,11 @@ export async function PUT(req: NextRequest) {
       await exec(
         "INSERT INTO org_members (id, user_id, organization_id, name, email, role, status, created_at) VALUES ($1, $2, $3, $4, $5, 'admin', 'active', NOW())",
         [cuid(), userId, orgId, userRow?.name || "", userRow?.email || ""]
+      );
+      // Transfer the user's individual subscription to the new org
+      await exec(
+        "UPDATE subscriptions SET organization_id = $1 WHERE user_id = $2 AND organization_id IS NULL",
+        [orgId, userId]
       );
     }
 
