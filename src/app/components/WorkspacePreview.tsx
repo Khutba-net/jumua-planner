@@ -432,15 +432,7 @@ function EditorMockup({ lang = "en" }: { lang?: string }) {
           <div className="bg-[#f9f9fc] border border-[#bcc9ca]/20 p-1.5 text-[8px] text-[#bcc9ca]">{ar ? "ملاحظات خاصة..." : "Private notes..."}</div>
         </div>
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex items-center gap-1 px-3 py-1 mx-3 mt-2 bg-[#fcfaf6] border border-[#bcc9ca]/20">
-            <span className="text-[9px] px-1.5 py-0.5 border border-[#bcc9ca]/20 bg-white text-[#1a1c1e]/70 font-bold">B</span>
-            <span className="text-[9px] px-1.5 py-0.5 border border-[#bcc9ca]/20 bg-white text-[#1a1c1e]/70 italic">I</span>
-            <span className="text-[9px] px-1.5 py-0.5 border border-[#bcc9ca]/20 bg-white text-[#1a1c1e]/70 underline">U</span>
-            <div className="w-px h-3 bg-[#bcc9ca]/30 mx-0.5" />
-            <span className="material-symbols-outlined text-[12px] text-[#1a1c1e]/70 px-1 py-0.5 border border-[#bcc9ca]/20 bg-white">format_list_bulleted</span>
-            <span className="material-symbols-outlined text-[12px] text-[#1a1c1e]/70 px-1 py-0.5 border border-[#bcc9ca]/20 bg-white">format_quote</span>
-          </div>
-          <div className="px-3 pt-2">
+          <div className="px-3 pt-3">
             <p className="text-sm font-bold text-[#1a1c1e]">{ar ? "الاعتصام بحبل الله جميعاً" : "Holding fast to Allah’s rope together"}</p>
           </div>
           <div className="flex-1 px-3 pt-2">

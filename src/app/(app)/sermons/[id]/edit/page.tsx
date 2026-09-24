@@ -218,28 +218,6 @@ export default function SermonEditorPage({
 
   const bothClosed = !leftOpen && !rightOpen;
 
-  function wrapSelection(prefix: string, suffix: string) {
-    const textarea = editorRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = textarea.value.slice(start, end);
-    const before = textarea.value.slice(0, start);
-    const after = textarea.value.slice(end);
-    const wrapped = prefix + (selected || "text") + suffix;
-    setContent(before + wrapped + after);
-    requestAnimationFrame(() => {
-      if (selected) {
-        textarea.selectionStart = start + prefix.length;
-        textarea.selectionEnd = start + prefix.length + selected.length;
-      } else {
-        textarea.selectionStart = start + prefix.length;
-        textarea.selectionEnd = start + prefix.length + 4;
-      }
-      textarea.focus();
-    });
-  }
-
   async function handleDelete() {
     if (!confirm(t("editor.deleteConfirm"))) return;
     await fetch(`/api/sermons/${id}`, { method: "DELETE" });
@@ -527,15 +505,8 @@ export default function SermonEditorPage({
           )}
 
           {/* Toolbar */}
-          <div className="flex items-center justify-between px-3 sm:px-3.5 py-2 border-b border-line bg-[#fdfcfa]">
-            <div className="flex items-center gap-1.5 overflow-x-auto">
-              <button onClick={() => wrapSelection("**", "**")} className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors font-bold shrink-0">B</button>
-              <button onClick={() => wrapSelection("*", "*")} className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors italic shrink-0">I</button>
-              <button onClick={() => wrapSelection("__", "__")} className="text-[11px] px-2 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors underline shrink-0">U</button>
-              <div className="w-px h-4 bg-line mx-0.5 shrink-0" />
-              <button onClick={() => wrapSelection("\n> ", "\n")} className="px-1.5 py-1 border border-line bg-white text-ink/70 hover:bg-[#f3f0ea] transition-colors shrink-0"><span className="material-symbols-outlined text-[14px]">format_quote</span></button>
-            </div>
-            <span className="text-[10px] text-mute shrink-0 ms-2">
+          <div className="flex items-center justify-end px-3 sm:px-3.5 py-2 border-b border-line bg-[#fdfcfa]">
+            <span className="text-[10px] text-mute shrink-0">
               {saving
                 ? t("editor.saving")
                 : lastSaved
