@@ -135,6 +135,10 @@ export default function SettingsPage() {
   const [subLoading, setSubLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: "", email: "", orgName: "", mosqueCount: "", message: "" });
+  const [contactSending, setContactSending] = useState(false);
+  const [contactSent, setContactSent] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -187,6 +191,42 @@ export default function SettingsPage() {
       showToast(isAr ? "فشل فتح إدارة الاشتراك" : "Failed to open billing portal", "error");
     }
     setPortalLoading(false);
+  }
+
+  function openContactModal() {
+    setContactForm({
+      name: user?.name || "",
+      email: user?.email || "",
+      orgName: "",
+      mosqueCount: "",
+      message: "",
+    });
+    setContactSent(false);
+    setShowContactModal(true);
+  }
+
+  async function handleContactSubmit() {
+    if (!contactForm.name || !contactForm.email || !contactForm.orgName || !contactForm.message) {
+      showToast(isAr ? "يرجى ملء جميع الحقول المطلوبة" : "Please fill in all required fields", "error");
+      return;
+    }
+    setContactSending(true);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contactForm),
+      });
+      if (res.ok) {
+        setContactSent(true);
+      } else {
+        const data = await res.json();
+        showToast(data.error || "Failed to send", "error");
+      }
+    } catch {
+      showToast(isAr ? "فشل الإرسال" : "Failed to send", "error");
+    }
+    setContactSending(false);
   }
 
   useEffect(() => {
@@ -891,13 +931,13 @@ export default function SettingsPage() {
                       <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-accent-gold text-sm">check</span> {isAr ? "مساجد متعددة" : "Multiple mosques"}</li>
                       <li className="flex items-center gap-2 text-xs text-ink"><span className="material-symbols-outlined text-accent-gold text-sm">check</span> {isAr ? "إدارة مركزية" : "Centralized management"}</li>
                     </ul>
-                    <a
-                      href="mailto:support@khutba.net?subject=Institution%20Plan%20Inquiry"
-                      className="w-full py-2.5 bg-accent-gold text-white text-sm font-semibold hover:opacity-90 transition-colors flex items-center justify-center gap-2 block text-center"
+                    <button
+                      onClick={openContactModal}
+                      className="w-full py-2.5 bg-accent-gold text-white text-sm font-semibold hover:opacity-90 transition-colors flex items-center justify-center gap-2"
                     >
                       <span className="material-symbols-outlined text-base">mail</span>
                       {isAr ? "تواصل معنا" : "Contact us"}
-                    </a>
+                    </button>
                   </div>
                 </div>
               </>
@@ -1064,6 +1104,90 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Institution Contact Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowContactModal(false)}>
+          <div className="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+              <h3 className="text-lg font-bold text-ink">{isAr ? "استفسار خطة المؤسسة" : "Institution Plan Inquiry"}</h3>
+              <button onClick={() => setShowContactModal(false)} className="p-1 text-mute hover:text-ink">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {contactSent ? (
+              <div className="p-8 text-center">
+                <span className="material-symbols-outlined text-primary text-5xl mb-4 block">check_circle</span>
+                <h3 className="text-lg font-bold text-ink mb-2">{isAr ? "تم الإرسال!" : "Message Sent!"}</h3>
+                <p className="text-sm text-mute mb-6">{isAr ? "سنتواصل معك قريباً." : "We'll get back to you shortly."}</p>
+                <button onClick={() => setShowContactModal(false)} className="px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors">
+                  {isAr ? "إغلاق" : "Close"}
+                </button>
+              </div>
+            ) : (
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-mute block mb-1">{isAr ? "الاسم" : "Name"} *</label>
+                  <input
+                    type="text"
+                    value={contactForm.name}
+                    onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-line text-sm text-ink focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-mute block mb-1">{isAr ? "البريد الإلكتروني" : "Email"} *</label>
+                  <input
+                    type="email"
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-line text-sm text-ink focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-mute block mb-1">{isAr ? "اسم المؤسسة" : "Organization Name"} *</label>
+                  <input
+                    type="text"
+                    value={contactForm.orgName}
+                    onChange={(e) => setContactForm({ ...contactForm, orgName: e.target.value })}
+                    placeholder={isAr ? "مثال: مركز إسلامي" : "e.g. Islamic Center of Calgary"}
+                    className="w-full px-3 py-2 border border-line text-sm text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-mute block mb-1">{isAr ? "عدد المساجد" : "Number of Mosques"}</label>
+                  <input
+                    type="text"
+                    value={contactForm.mosqueCount}
+                    onChange={(e) => setContactForm({ ...contactForm, mosqueCount: e.target.value })}
+                    placeholder={isAr ? "مثال: 3-5" : "e.g. 3-5"}
+                    className="w-full px-3 py-2 border border-line text-sm text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-mute block mb-1">{isAr ? "الرسالة" : "Message"} *</label>
+                  <textarea
+                    value={contactForm.message}
+                    onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                    rows={4}
+                    placeholder={isAr ? "أخبرنا عن احتياجاتك..." : "Tell us about your needs..."}
+                    className="w-full px-3 py-2 border border-line text-sm text-ink placeholder:text-ink/25 focus:outline-none focus:border-primary resize-none"
+                  />
+                </div>
+                <button
+                  onClick={handleContactSubmit}
+                  disabled={contactSending}
+                  className="w-full py-2.5 bg-accent-gold text-white text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {contactSending && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+                  {isAr ? "إرسال" : "Send Message"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
