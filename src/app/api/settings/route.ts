@@ -131,14 +131,17 @@ export async function PUT(req: NextRequest) {
 
     if (newType !== "individual" && !orgId) {
       if (!d.org_name) return NextResponse.json({ error: "Organization name required" }, { status: 400 });
+      const userRow = await queryOne<{ name: string; email: string }>(
+        "SELECT name, email FROM users WHERE id = $1", [userId]
+      );
       orgId = cuid();
       await exec(
         "INSERT INTO organizations (id, name, type, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())",
         [orgId, d.org_name, newType]
       );
       await exec(
-        "INSERT INTO org_members (id, user_id, organization_id, role, created_at) VALUES ($1, $2, $3, 'admin', NOW())",
-        [cuid(), userId, orgId]
+        "INSERT INTO org_members (id, user_id, organization_id, name, email, role, status, created_at) VALUES ($1, $2, $3, $4, $5, 'admin', 'active', NOW())",
+        [cuid(), userId, orgId, userRow?.name || "", userRow?.email || ""]
       );
     }
 
