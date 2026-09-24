@@ -21,9 +21,7 @@ interface SettingsData {
   default_language: string;
   theme_mode: string;
   editor_font_size: number;
-  friday_reminder: string;
   email_assigned: number;
-  weekly_digest: number;
 }
 
 function Skeleton({ className = "" }: { className?: string }) {
@@ -77,20 +75,6 @@ export default function SettingsPage() {
   const router = useRouter();
   const { t, isAr } = useI18n();
 
-  const languageModes = [
-    { value: "ar-first", label: t("lang.arFirst") },
-    { value: "en-first", label: t("lang.enFirst") },
-    { value: "ar-only", label: t("lang.arOnly") },
-    { value: "en-only", label: t("lang.enOnly") },
-  ];
-
-  const reminderOptions = [
-    { value: "1", label: t("reminder.1") },
-    { value: "2", label: t("reminder.2") },
-    { value: "3", label: t("reminder.3") },
-    { value: "5", label: t("reminder.5") },
-    { value: "7", label: t("reminder.7") },
-  ];
 
   const allNavSections = [
     { id: "profile", label: t("settings.profile"), icon: "person" },
@@ -117,11 +101,8 @@ export default function SettingsPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const [defaultLanguage, setDefaultLanguage] = useState("ar-first");
 
-  const [fridayReminder, setFridayReminder] = useState("3");
   const [emailAssigned, setEmailAssigned] = useState(true);
-  const [weeklyDigest, setWeeklyDigest] = useState(true);
 
   const [themeMode, setThemeMode] = useState("light");
   const [editorFontSize, setEditorFontSize] = useState("16");
@@ -222,10 +203,7 @@ export default function SettingsPage() {
         setName(u.name);
         setEmail(u.email);
         setAvatarUrl(u.avatar_url);
-        setDefaultLanguage(s.default_language);
-        setFridayReminder(s.friday_reminder);
         setEmailAssigned(!!s.email_assigned);
-        setWeeklyDigest(!!s.weekly_digest);
         setThemeMode(s.theme_mode);
         setEditorFontSize(String(s.editor_font_size));
         setSelectedType(u.account_type);
@@ -649,25 +627,6 @@ export default function SettingsPage() {
 
             <div className="space-y-5">
               <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.defaultLang")}</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {languageModes.map((mode) => (
-                    <button
-                      key={mode.value}
-                      onClick={() => setDefaultLanguage(mode.value)}
-                      className={`px-4 py-2.5 text-sm font-medium border transition-colors ${
-                        defaultLanguage === mode.value
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-line bg-white text-mute hover:text-ink"
-                      }`}
-                    >
-                      {mode.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
                 <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.statusFlow")}</label>
                 <div className="flex items-center gap-2 text-sm text-mute">
                   <span className="px-2.5 py-1 bg-surface border border-line text-xs font-bold">{t("status.draft").toUpperCase()}</span>
@@ -680,15 +639,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-
-            <button
-              onClick={() => saveSection("sermon", { default_language: defaultLanguage })}
-              disabled={saving}
-              className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-              {saving ? t("settings.saving") : t("settings.saveChanges")}
-            </button>
           </div>
         )}
 
@@ -699,26 +649,6 @@ export default function SettingsPage() {
             <p className="text-sm text-mute mb-6">{t("settings.howReminded")}</p>
 
             <div className="space-y-6">
-              <div>
-                <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.fridayReminder")}</label>
-                <p className="text-xs text-mute mb-2">{t("settings.fridayReminderDesc")}</p>
-                <div className="flex flex-wrap gap-2">
-                  {reminderOptions.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setFridayReminder(opt.value)}
-                      className={`px-4 py-2 text-sm font-medium border transition-colors ${
-                        fridayReminder === opt.value
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-line bg-white text-mute hover:text-ink"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <div className="space-y-3">
                 <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block">{t("settings.emailNotifications")}</label>
 
@@ -734,24 +664,11 @@ export default function SettingsPage() {
                     <div className={`w-5 h-5 bg-white shadow transition-transform ${emailAssigned ? "translate-x-4" : "translate-x-0"}`} />
                   </button>
                 </div>
-
-                <div className="flex items-center justify-between py-3 border-b border-line">
-                  <div>
-                    <p className="text-sm text-ink font-medium">{t("settings.weeklyDigest")}</p>
-                    <p className="text-xs text-mute">{t("settings.weeklyDigestDesc")}</p>
-                  </div>
-                  <button
-                    onClick={() => setWeeklyDigest(!weeklyDigest)}
-                    className={`w-10 h-6 flex items-center px-0.5 transition-colors ${weeklyDigest ? "bg-primary" : "bg-line"}`}
-                  >
-                    <div className={`w-5 h-5 bg-white shadow transition-transform ${weeklyDigest ? "translate-x-4" : "translate-x-0"}`} />
-                  </button>
-                </div>
               </div>
             </div>
 
             <button
-              onClick={() => saveSection("notifications", { friday_reminder: fridayReminder, email_assigned: emailAssigned, weekly_digest: weeklyDigest })}
+              onClick={() => saveSection("notifications", { friday_reminder: "3", email_assigned: emailAssigned, weekly_digest: false })}
               disabled={saving}
               className="mt-6 px-6 py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2"
             >
