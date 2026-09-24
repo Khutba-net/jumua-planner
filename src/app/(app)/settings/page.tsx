@@ -131,6 +131,12 @@ export default function SettingsPage() {
     trialEnd: string | null;
     isOrgManaged?: boolean;
     orgName?: string | null;
+    institutionDetails?: {
+      customPriceCents: number | null;
+      maxMosques: number | null;
+      maxKhatibs: number | null;
+      billingStatus: string | null;
+    };
   } | null>(null);
   const [subLoading, setSubLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
@@ -815,22 +821,42 @@ export default function SettingsPage() {
               </div>
             ) : subscription && (subscription.status === "active" || subscription.status === "trialing") ? (
               <>
-                <div className="border-2 border-primary/20 p-6 mb-6">
+                <div className={`border-2 ${subscription.plan === "institution" ? "border-accent-gold/30" : "border-primary/20"} p-6 mb-6`}>
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase">{t("settings.currentPlan")}</p>
-                      <p className="text-xl font-bold text-primary mt-1 capitalize">{subscription.plan}</p>
+                      <p className={`text-xl font-bold mt-1 capitalize ${subscription.plan === "institution" ? "text-accent-gold" : "text-primary"}`}>{subscription.plan}</p>
                     </div>
                     <div className="text-end">
                       <p className="text-2xl font-bold text-ink">
-                        {subscription.plan === "institution"
-                          ? (isAr ? "مخصص" : "Custom")
-                          : <>{subscription.plan === "organization" ? "$50" : "$10"}<span className="text-sm font-normal text-mute">/mo</span></>}
+                        {subscription.plan === "institution" && subscription.institutionDetails?.customPriceCents
+                          ? <>${(subscription.institutionDetails.customPriceCents / 100).toLocaleString()}<span className="text-sm font-normal text-mute">/mo</span></>
+                          : subscription.plan === "institution"
+                            ? (isAr ? "مخصص" : "Custom")
+                            : <>{subscription.plan === "organization" ? "$50" : "$10"}<span className="text-sm font-normal text-mute">/mo</span></>}
                       </p>
                     </div>
                   </div>
+
+                  {subscription.plan === "institution" && subscription.institutionDetails && (
+                    <div className="grid grid-cols-2 gap-3 mb-4 py-3 border-t border-b border-line">
+                      <div>
+                        <p className="text-[10px] font-bold text-mute tracking-[1px] uppercase">{isAr ? "المساجد" : "Mosques"}</p>
+                        <p className="text-sm font-semibold text-ink mt-0.5">
+                          {isAr ? `حتى ${subscription.institutionDetails.maxMosques ?? 20}` : `Up to ${subscription.institutionDetails.maxMosques ?? 20}`}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-mute tracking-[1px] uppercase">{isAr ? "الخطباء" : "Khatibs"}</p>
+                        <p className="text-sm font-semibold text-ink mt-0.5">
+                          {isAr ? `حتى ${subscription.institutionDetails.maxKhatibs ?? 10}` : `Up to ${subscription.institutionDetails.maxKhatibs ?? 10}`}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2 text-xs text-mute">
-                    <span className="material-symbols-outlined text-sm text-primary">check_circle</span>
+                    <span className={`material-symbols-outlined text-sm ${subscription.plan === "institution" ? "text-accent-gold" : "text-primary"}`}>check_circle</span>
                     {subscription.status === "trialing" ? (
                       isAr ? `فترة تجريبية — تنتهي ${new Date(subscription.trialEnd!).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
                       `Trial — ends ${new Date(subscription.trialEnd!).toLocaleDateString()}`
