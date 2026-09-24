@@ -275,6 +275,20 @@ export default function KhatibsPage() {
                   </button>
                 </>
               )}
+              {m.status === "active" && m.role !== "admin" && (
+                <button
+                  onClick={() => {
+                    if (confirm(isAr ? `هل تريد نقل صلاحيات المسؤول إلى ${m.name}؟ ستفقد صلاحيات المسؤول.` : `Transfer admin role to ${m.name}? You will lose admin privileges.`)) {
+                      handleAction(m.id, "transfer_admin");
+                    }
+                  }}
+                  disabled={actionLoading === m.id}
+                  className="p-1.5 rounded-lg text-mute hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+                  title={isAr ? "نقل صلاحيات المسؤول" : "Transfer admin"}
+                >
+                  <span className="material-symbols-outlined text-lg">admin_panel_settings</span>
+                </button>
+              )}
               {m.status === "active" && (
                 <button
                   onClick={() => handleAction(m.id, "deactivate")}
