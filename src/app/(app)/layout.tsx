@@ -10,6 +10,7 @@ const navKeys = [
   { href: "/sermons", key: "nav.sermons", icon: "description" },
   { href: "/themes", key: "nav.annualPlan", icon: "calendar_month" },
   { href: "/calendar", key: "nav.calendar", icon: "event" },
+  { href: "/resources", key: "nav.resources", icon: "menu_book" },
 ];
 
 function AppShell({ children }: { children: React.ReactNode }) {
@@ -102,7 +103,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       return;
     }
     const isOrgAdmin = (user.role === "admin" || user.role === "mosque_admin") && user.account_type !== "individual";
-    const khatibOnlyRoutes = ["/sermons", "/themes", "/calendar"];
+    const khatibOnlyRoutes = ["/sermons", "/themes", "/calendar", "/resources"];
     if (isOrgAdmin && khatibOnlyRoutes.some((r) => pathname.startsWith(r))) {
       router.push("/dashboard");
     }
