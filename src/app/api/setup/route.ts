@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   let userId: string;
-  try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  try { userId = await getUserId({ skipSubscriptionCheck: true }); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   const user = await queryOne("SELECT id, name, account_type, role, organization_id, onboarding_complete, planning_year FROM users WHERE id = $1", [userId]);
@@ -20,8 +20,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   let userId: string;
-  try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  try { userId = await getUserId({ skipSubscriptionCheck: true }); } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   const user = await queryOne<{ id: string; name: string; organization_id: string | null; role: string }>(

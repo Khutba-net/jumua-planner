@@ -22,7 +22,7 @@ async function getInstAdmin() {
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await getInstAdmin(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
@@ -57,7 +57,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await getInstAdmin(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
@@ -95,7 +95,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await getInstAdmin(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
@@ -153,7 +153,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await getInstAdmin(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });

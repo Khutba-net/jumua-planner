@@ -5,7 +5,7 @@ import { getEffectiveSubscription } from "@/lib/subscription";
 
 export async function GET() {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId({ skipSubscriptionCheck: true });
     const sub = await getEffectiveSubscription(userId);
 
     return NextResponse.json({

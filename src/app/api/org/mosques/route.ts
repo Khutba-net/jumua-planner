@@ -22,7 +22,7 @@ async function getInstAdmin() {
 export async function GET() {
   let user;
   try { user = await getInstAdmin(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
       "SELECT id, organization_id, role, account_type, name FROM users WHERE id = $1", [userId]
     );
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   if (!user?.organization_id || user.role !== "admin" || user.account_type !== "institution") {

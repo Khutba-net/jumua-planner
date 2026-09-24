@@ -6,7 +6,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(_req: Request, { params }: Params) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId({ skipSubscriptionCheck: true });
     const { id } = await params;
 
     await exec(
@@ -16,7 +16,7 @@ export async function PATCH(_req: Request, { params }: Params) {
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
 }

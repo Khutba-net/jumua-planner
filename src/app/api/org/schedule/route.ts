@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   let userId: string;
   try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
@@ -74,7 +74,7 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 export async function POST(req: Request) {
   let userId: string;
   try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
@@ -187,7 +187,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   let userId: string;
   try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
@@ -314,7 +314,7 @@ export async function PUT(req: Request) {
 export async function PATCH(req: Request) {
   let userId: string;
   try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
@@ -394,7 +394,7 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   let userId: string;
   try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(

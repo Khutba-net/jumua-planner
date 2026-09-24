@@ -6,7 +6,7 @@ import { stripe, getOrCreateCustomer, getOrCreateOrgCustomer, PLANS, PlanId } fr
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId({ skipSubscriptionCheck: true });
     const { plan } = (await req.json()) as { plan: string };
 
     if (!plan || !(plan in PLANS)) {

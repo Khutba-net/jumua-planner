@@ -31,7 +31,7 @@ async function getAdminUser() {
 export async function GET() {
   let user;
   try { user = await getAdminUser(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
@@ -55,7 +55,7 @@ export async function GET() {
 export async function POST(req: Request) {
   let user;
   try { user = await getAdminUser(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an org admin" }, { status: 403 });

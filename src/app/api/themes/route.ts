@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   let userId: string;
   try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
 
@@ -46,7 +46,7 @@ export async function GET() {
 export async function POST(req: Request) {
   let userId: string;
   try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
 

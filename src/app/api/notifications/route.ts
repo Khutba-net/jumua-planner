@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId({ skipSubscriptionCheck: true });
     const url = new URL(req.url);
     const limit = Math.min(Number(url.searchParams.get("limit") || 20), 50);
     const offset = Number(url.searchParams.get("offset") || 0);
@@ -19,21 +19,21 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ notifications, unreadCount });
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
 }
 
 export async function PATCH() {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId({ skipSubscriptionCheck: true });
     await exec(
       "UPDATE notifications SET read = 1 WHERE user_id = $1 AND read = 0",
       [userId]
     );
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
 }

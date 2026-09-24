@@ -6,7 +6,7 @@ import { stripe } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId({ skipSubscriptionCheck: true });
 
     const user = await queryOne<{ role: string; organization_id: string | null; account_type: string; stripe_customer_id: string | null }>(
       "SELECT role, organization_id, account_type, stripe_customer_id FROM users WHERE id = $1",

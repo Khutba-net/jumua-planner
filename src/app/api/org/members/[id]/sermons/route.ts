@@ -10,7 +10,7 @@ export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
   let userId: string;
   try { userId = await getUserId(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
   const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
