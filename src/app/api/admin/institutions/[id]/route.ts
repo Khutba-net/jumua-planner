@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, exec } from "@/lib/db";
+import { queryOne, exec, cuid } from "@/lib/db";
 import { requirePlatformAdmin } from "@/lib/admin";
 import { logger } from "@/lib/logger";
 
@@ -82,6 +82,47 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       id,
     ]
   );
+
+  // When billing_status changes to active/trial, create or update subscription row
+  if (billing_status === "active" || billing_status === "trial") {
+    const existingSub = await queryOne<{ id: string }>(
+      "SELECT id FROM subscriptions WHERE organization_id = $1 LIMIT 1",
+      [id]
+    );
+
+    const orgData = await queryOne<{ type: string }>(
+      "SELECT type FROM organizations WHERE id = $1", [id]
+    );
+    const plan = orgData?.type === "institution" ? "institution" : "organization";
+    const status = billing_status === "trial" ? "trialing" : "active";
+    const periodEnd = new Date();
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+    if (existingSub) {
+      await exec(
+        `UPDATE subscriptions SET status = $1, plan = $2, current_period_start = NOW(), current_period_end = $3, updated_at = NOW() WHERE id = $4`,
+        [status, plan, periodEnd.toISOString(), existingSub.id]
+      );
+    } else {
+      // Find the admin user for user_id
+      const admin = await queryOne<{ user_id: string }>(
+        "SELECT user_id FROM org_members WHERE organization_id = $1 AND role = 'admin' LIMIT 1",
+        [id]
+      );
+      await exec(
+        `INSERT INTO subscriptions (id, user_id, stripe_subscription_id, plan, status, current_period_start, current_period_end, organization_id)
+         VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)`,
+        [cuid(), admin?.user_id || null, `manual_${id}`, plan, status, periodEnd.toISOString(), id]
+      );
+    }
+    logger.info("Admin: activated subscription for org", { id, status, plan });
+  } else if (billing_status === "cancelled") {
+    await exec(
+      "UPDATE subscriptions SET status = 'canceled', updated_at = NOW() WHERE organization_id = $1 AND status IN ('active', 'trialing')",
+      [id]
+    );
+    logger.info("Admin: cancelled subscription for org", { id });
+  }
 
   logger.info("Admin: updated institution", { id, ...body });
 
