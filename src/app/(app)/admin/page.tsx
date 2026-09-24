@@ -490,13 +490,40 @@ export default function AdminPage() {
                           className="w-full px-3 py-2 border border-line rounded text-sm focus:outline-none focus:border-primary resize-none"
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-2 flex items-center gap-3">
                         <button
                           onClick={handleSave}
                           disabled={saving}
                           className="px-6 py-2 bg-primary text-white text-sm font-semibold rounded hover:bg-secondary transition-colors disabled:opacity-50"
                         >
                           {saving ? "Saving..." : "Save Changes"}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm("This will create a Stripe subscription and send an invoice to the org admin. Continue?")) return;
+                            setSaving(true);
+                            try {
+                              const res = await fetch(`/api/admin/institutions/${selected!.id}`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "create_stripe_subscription" }),
+                              });
+                              const data = await res.json();
+                              if (res.ok) {
+                                alert("Stripe subscription created! Invoice sent to org admin.");
+                                const detail = await fetch(`/api/admin/institutions/${selected!.id}`).then(r => r.json());
+                                setSelected({ ...detail.institution, mosques: detail.mosques, members: detail.members });
+                              } else {
+                                alert(data.error || "Failed");
+                              }
+                            } catch { alert("Failed to create subscription"); }
+                            setSaving(false);
+                          }}
+                          disabled={saving || !selected?.custom_price_cents}
+                          className="px-6 py-2 bg-accent-gold text-white text-sm font-semibold rounded hover:opacity-90 transition-colors disabled:opacity-50"
+                          title={!selected?.custom_price_cents ? "Set a custom price first" : ""}
+                        >
+                          Activate via Stripe
                         </button>
                       </div>
                     </div>

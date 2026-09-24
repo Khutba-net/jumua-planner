@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, exec, cuid } from "@/lib/db";
+import { queryOne, query, exec, cuid } from "@/lib/db";
 import { requirePlatformAdmin } from "@/lib/admin";
 import { logger } from "@/lib/logger";
+import { stripe, getOrCreateOrgCustomer } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -127,4 +128,73 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   logger.info("Admin: updated institution", { id, ...body });
 
   return NextResponse.json({ ok: true });
+}
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await requirePlatformAdmin();
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await params;
+  const body = await req.json();
+  const { action } = body;
+
+  if (action === "create_stripe_subscription") {
+    const org = await queryOne<{ id: string; name: string; custom_price_cents: number | null; type: string; stripe_customer_id: string | null }>(
+      "SELECT id, name, custom_price_cents, type, stripe_customer_id FROM organizations WHERE id = $1",
+      [id]
+    );
+    if (!org) return NextResponse.json({ error: "Org not found" }, { status: 404 });
+    if (!org.custom_price_cents) return NextResponse.json({ error: "Set a custom price first" }, { status: 400 });
+
+    const admin = await queryOne<{ user_id: string; email: string }>(
+      `SELECT om.user_id, u.email FROM org_members om JOIN users u ON u.id = om.user_id
+       WHERE om.organization_id = $1 AND om.role = 'admin' LIMIT 1`,
+      [id]
+    );
+    if (!admin) return NextResponse.json({ error: "No admin found for this org" }, { status: 400 });
+
+    // Check for existing active Stripe subscription
+    const existingSub = await queryOne<{ stripe_subscription_id: string }>(
+      "SELECT stripe_subscription_id FROM subscriptions WHERE organization_id = $1 AND status IN ('active', 'trialing') LIMIT 1",
+      [id]
+    );
+    if (existingSub && !existingSub.stripe_subscription_id.startsWith("manual_")) {
+      return NextResponse.json({ error: "Already has an active Stripe subscription" }, { status: 400 });
+    }
+
+    const customerId = await getOrCreateOrgCustomer(id, admin.email, org.name);
+
+    const plan = org.type === "institution" ? "institution" : "organization";
+
+    const price = await stripe.prices.create({
+      currency: "usd",
+      unit_amount: org.custom_price_cents,
+      recurring: { interval: "month" },
+      product_data: { name: `${org.name} — ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan` },
+    });
+
+    const sub = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: price.id }],
+      collection_method: "send_invoice",
+      days_until_due: 30,
+      metadata: { organizationId: id, plan },
+    });
+
+    // The webhook will handle creating/updating the subscription row
+    // But also update billing_status on the org
+    await exec(
+      "UPDATE organizations SET billing_status = 'invoice_sent', updated_at = NOW() WHERE id = $1",
+      [id]
+    );
+
+    logger.info("Admin: created Stripe subscription for org", { id, subId: sub.id, price: org.custom_price_cents });
+
+    return NextResponse.json({ ok: true, subscriptionId: sub.id });
+  }
+
+  return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }
