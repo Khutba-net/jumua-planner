@@ -93,6 +93,25 @@ export async function PUT(req: NextRequest) {
     );
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
+    if (newType === user.account_type) {
+      return NextResponse.json({ error: "Already on this account type" }, { status: 400 });
+    }
+
+    // Block switching if there's an active subscription — must wait until current period ends
+    const activeSub = await queryOne<{ current_period_end: string; status: string }>(
+      user.organization_id
+        ? "SELECT current_period_end, status FROM subscriptions WHERE organization_id = $1 AND status IN ('active', 'trialing') LIMIT 1"
+        : "SELECT current_period_end, status FROM subscriptions WHERE user_id = $1 AND organization_id IS NULL AND status IN ('active', 'trialing') LIMIT 1",
+      [user.organization_id || userId]
+    );
+    if (activeSub) {
+      const endDate = new Date(activeSub.current_period_end).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      return NextResponse.json(
+        { error: `You have an active subscription until ${endDate}. You can switch your plan after your current billing period ends.` },
+        { status: 400 }
+      );
+    }
+
     if (user.organization_id && (user.account_type === "organization" || user.account_type === "institution") && user.role !== "admin") {
       return NextResponse.json({ error: "Leave your organization first before changing account type" }, { status: 400 });
     }
@@ -127,11 +146,6 @@ export async function PUT(req: NextRequest) {
         await exec("DELETE FROM friday_assignments WHERE member_id = $1 AND friday_date >= $2", [member.id, today]);
         await exec("DELETE FROM org_members WHERE id = $1", [member.id]);
       }
-      // Transfer org subscription back to user-level
-      await exec(
-        "UPDATE subscriptions SET organization_id = NULL WHERE organization_id = $1 AND user_id = $2",
-        [orgId, userId]
-      );
     }
 
     if (newType !== "individual" && !orgId) {
@@ -147,11 +161,6 @@ export async function PUT(req: NextRequest) {
       await exec(
         "INSERT INTO org_members (id, user_id, organization_id, name, email, role, status, created_at) VALUES ($1, $2, $3, $4, $5, 'admin', 'active', NOW())",
         [cuid(), userId, orgId, userRow?.name || "", userRow?.email || ""]
-      );
-      // Transfer the user's individual subscription to the new org
-      await exec(
-        "UPDATE subscriptions SET organization_id = $1 WHERE user_id = $2 AND organization_id IS NULL",
-        [orgId, userId]
       );
     }
 
