@@ -48,6 +48,13 @@ export async function POST(req: NextRequest) {
     const metadata: Record<string, string> = { userId, plan: planId };
     if (organizationId) metadata.organizationId = organizationId;
 
+    const hadPriorSub = await queryOne(
+      organizationId
+        ? "SELECT id FROM subscriptions WHERE organization_id = $1 LIMIT 1"
+        : "SELECT id FROM subscriptions WHERE user_id = $1 AND organization_id IS NULL LIMIT 1",
+      [organizationId || userId]
+    );
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
@@ -63,7 +70,7 @@ export async function POST(req: NextRequest) {
         },
       ],
       subscription_data: {
-        trial_period_days: 14,
+        ...(!hadPriorSub ? { trial_period_days: 14 } : {}),
         metadata,
       },
       success_url: `${origin}/settings?tab=subscription&billing=success`,

@@ -325,7 +325,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <main data-app-main className={`flex-1 min-w-0 min-h-screen pt-14 lg:pt-0 ${isAr ? "font-[var(--font-arabic)]" : ""}`}>
         {subStatus && subStatus !== "active" && subStatus !== "trialing" && !pathname.startsWith("/settings") && !pathname.startsWith("/admin") && user?.is_platform_admin !== 1 && (
-          <div className="fixed inset-0 z-40 bg-white/95 flex items-center justify-center p-6 lg:relative lg:inset-auto lg:min-h-[70vh]">
+          <div className="fixed inset-0 z-40 bg-white/95 flex items-center justify-center p-6">
             <div className="max-w-md text-center">
               <div className="w-16 h-16 rounded-full bg-accent-gold/10 flex items-center justify-center mx-auto mb-5">
                 <span className="material-symbols-outlined text-accent-gold text-3xl">lock</span>

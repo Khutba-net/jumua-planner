@@ -773,7 +773,7 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
-            ) : subscription && subscription.status !== "none" ? (
+            ) : subscription && (subscription.status === "active" || subscription.status === "trialing") ? (
               <>
                 <div className="border-2 border-primary/20 p-6 mb-6">
                   <div className="flex items-center justify-between mb-4">
@@ -789,23 +789,16 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-mute">
-                    <span className={`material-symbols-outlined text-sm ${
-                      subscription.status === "active" || subscription.status === "trialing" ? "text-primary" : "text-red-500"
-                    }`}>
-                      {subscription.status === "active" || subscription.status === "trialing" ? "check_circle" : "error"}
-                    </span>
+                    <span className="material-symbols-outlined text-sm text-primary">check_circle</span>
                     {subscription.status === "trialing" ? (
                       isAr ? `فترة تجريبية — تنتهي ${new Date(subscription.trialEnd!).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
                       `Trial — ends ${new Date(subscription.trialEnd!).toLocaleDateString()}`
-                    ) : subscription.status === "active" ? (
-                      subscription.cancelAtPeriodEnd
-                        ? (isAr ? `ملغى — ينتهي ${new Date(subscription.currentPeriodEnd).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
-                           `Cancels ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`)
-                        : (isAr ? `نشط — يُجدد ${new Date(subscription.currentPeriodEnd).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
-                           `Active — renews ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`)
+                    ) : subscription.cancelAtPeriodEnd ? (
+                      isAr ? `ملغى — ينتهي ${new Date(subscription.currentPeriodEnd).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
+                      `Cancels ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
                     ) : (
-                      isAr ? `${subscription.status} — انتهى ${new Date(subscription.currentPeriodEnd).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
-                      `${subscription.status} — ended ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
+                      isAr ? `نشط — يُجدد ${new Date(subscription.currentPeriodEnd).toLocaleDateString(isAr ? "ar-SA" : "en-US")}` :
+                      `Active — renews ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
                     )}
                   </div>
                 </div>
@@ -832,7 +825,11 @@ export default function SettingsPage() {
                 <div className="bg-surface border border-line p-6 mb-6 text-center">
                   <span className="material-symbols-outlined text-primary text-4xl mb-3 block">credit_card_off</span>
                   <p className="text-sm font-semibold text-ink mb-1">{isAr ? "لا يوجد اشتراك نشط" : "No active subscription"}</p>
-                  <p className="text-xs text-mute mb-4">{isAr ? "ابدأ بفترة تجريبية مجانية لمدة 14 يوماً" : "Start with a free 14-day trial"}</p>
+                  <p className="text-xs text-mute mb-4">
+                    {subscription && subscription.status !== "none"
+                      ? (isAr ? "اشتراكك منتهي. اختر خطة لإعادة التفعيل." : "Your subscription has ended. Choose a plan to reactivate.")
+                      : (isAr ? "ابدأ بفترة تجريبية مجانية لمدة 14 يوماً" : "Start with a free 14-day trial")}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -851,7 +848,9 @@ export default function SettingsPage() {
                       className="w-full py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {checkoutLoading === "individual" && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-                      {isAr ? "ابدأ التجربة المجانية" : "Start free trial"}
+                      {subscription && subscription.status !== "none"
+                        ? (isAr ? "اشترك الآن" : "Subscribe now")
+                        : (isAr ? "ابدأ التجربة المجانية" : "Start free trial")}
                     </button>
                   </div>
 
@@ -873,7 +872,9 @@ export default function SettingsPage() {
                       className="w-full py-2.5 bg-primary text-white text-sm font-semibold hover:bg-secondary transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {checkoutLoading === "organization" && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-                      {isAr ? "ابدأ التجربة المجانية" : "Start free trial"}
+                      {subscription && subscription.status !== "none"
+                        ? (isAr ? "اشترك الآن" : "Subscribe now")
+                        : (isAr ? "ابدأ التجربة المجانية" : "Start free trial")}
                     </button>
                   </div>
 
