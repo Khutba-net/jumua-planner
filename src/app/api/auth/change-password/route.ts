@@ -3,6 +3,7 @@ import { queryOne, hashPassword, verifyPassword } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { deleteAllUserSessions, createSession, sessionCookieOptions } from "@/lib/session";
 import { rateLimitByIpAsync } from "@/lib/rate-limit";
+import { changePasswordSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -19,17 +20,12 @@ export async function POST(req: Request) {
     throw e;
   }
 
-  const { currentPassword, newPassword } = await req.json();
-
-  if (!currentPassword || typeof currentPassword !== "string") {
-    return NextResponse.json({ error: "Current password is required" }, { status: 400 });
+  const body = await req.json();
+  const parsed = parseBody(changePasswordSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  if (!newPassword || typeof newPassword !== "string" || newPassword.length < 8) {
-    return NextResponse.json({ error: "New password must be at least 8 characters" }, { status: 400 });
-  }
-  if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
-    return NextResponse.json({ error: "Password must include uppercase, lowercase, number, and special character" }, { status: 400 });
-  }
+  const { currentPassword, newPassword } = parsed.data;
 
   const user = await queryOne<{ password_hash: string | null }>(
     "SELECT password_hash FROM users WHERE id = $1", [userId]

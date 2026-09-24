@@ -4,6 +4,7 @@ import { query, queryOne, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sendInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
+import { orgMemberCreateSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -71,13 +72,11 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, mosque_id: bodyMosqueId, email: inviteEmail } = body;
-  if (!name?.trim() || typeof name !== "string") {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  const parsed = parseBody(orgMemberCreateSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  if (name.trim().length > 100) {
-    return NextResponse.json({ error: "Name is too long" }, { status: 400 });
-  }
+  const { name, mosque_id: bodyMosqueId, email: inviteEmail } = parsed.data as { name: string; mosque_id?: string; email?: string };
 
   const effectiveMosqueId = user.mosqueId || bodyMosqueId || null;
 

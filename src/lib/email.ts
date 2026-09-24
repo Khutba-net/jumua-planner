@@ -9,6 +9,10 @@ function getResend() {
 const FROM = process.env.EMAIL_FROM || "Khutba <onboarding@resend.dev>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
 
+function esc(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 function baseHtml(content: string) {
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -46,7 +50,7 @@ export async function sendPasswordReset(email: string, name: string, resetUrl: s
     subject: "Reset your Khutba password",
     html: baseHtml(`
       <h1>Reset your password</h1>
-      <p>Assalamu alaykom ${name},</p>
+      <p>Assalamu alaykom ${esc(name)},</p>
       <p>We received a request to reset your password. Click the button below to choose a new one:</p>
       <p><a href="${resetUrl}" class="btn">Reset Password</a></p>
       <p class="muted">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
@@ -59,11 +63,11 @@ export async function sendInvitation(email: string, inviterName: string, orgName
   return getResend().emails.send({
     from: FROM,
     to: email,
-    subject: `You're invited to join ${orgName} on Khutba`,
+    subject: `You're invited to join ${esc(orgName)} on Khutba`,
     html: baseHtml(`
       <h1>You've been invited!</h1>
       <p>Assalamu alaykom,</p>
-      <p><strong>${inviterName}</strong> has invited you to join <strong>${orgName}</strong> on Khutba — a platform for planning coherent, year-long khutbah series.</p>
+      <p><strong>${esc(inviterName)}</strong> has invited you to join <strong>${esc(orgName)}</strong> on Khutba — a platform for planning coherent, year-long khutbah series.</p>
       <p><a href="${inviteUrl}" class="btn">Accept Invitation</a></p>
       <p class="muted">This invitation expires in 30 days.</p>
       <p class="muted" style="margin-top:16px;word-break:break-all">Or copy this link: ${inviteUrl}</p>
@@ -75,12 +79,12 @@ export async function sendSermonReminder(email: string, name: string, sermonTitl
   return getResend().emails.send({
     from: FROM,
     to: email,
-    subject: `Reminder: "${sermonTitle}" this Friday`,
+    subject: `Reminder: "${esc(sermonTitle)}" this Friday`,
     html: baseHtml(`
       <h1>Friday Khutbah Reminder</h1>
-      <p>Assalamu alaykom ${name},</p>
-      <p>Your upcoming khutbah is scheduled for <strong>${date}</strong>:</p>
-      <p style="font-size:18px;font-weight:600;color:#1a2a2c;margin:16px 0;">"${sermonTitle}"</p>
+      <p>Assalamu alaykom ${esc(name)},</p>
+      <p>Your upcoming khutbah is scheduled for <strong>${esc(date)}</strong>:</p>
+      <p style="font-size:18px;font-weight:600;color:#1a2a2c;margin:16px 0;">"${esc(sermonTitle)}"</p>
       <p><a href="${APP_URL}/sermons" class="btn">View Sermon</a></p>
       <p class="muted">May Allah grant you clarity and sincerity in your delivery.</p>
     `),
@@ -91,13 +95,13 @@ export async function sendAssignmentNotification(email: string, name: string, se
   return getResend().emails.send({
     from: FROM,
     to: email,
-    subject: `New assignment: "${sermonTitle}" at ${mosqueName}`,
+    subject: `New assignment: "${esc(sermonTitle)}" at ${esc(mosqueName)}`,
     html: baseHtml(`
       <h1>New Sermon Assignment</h1>
-      <p>Assalamu alaykom ${name},</p>
+      <p>Assalamu alaykom ${esc(name)},</p>
       <p>You have been assigned a khutbah:</p>
-      <p style="font-size:18px;font-weight:600;color:#1a2a2c;margin:16px 0;">"${sermonTitle}"</p>
-      <p><strong>Date:</strong> ${date}<br><strong>Mosque:</strong> ${mosqueName}</p>
+      <p style="font-size:18px;font-weight:600;color:#1a2a2c;margin:16px 0;">"${esc(sermonTitle)}"</p>
+      <p><strong>Date:</strong> ${esc(date)}<br><strong>Mosque:</strong> ${esc(mosqueName)}</p>
       <p><a href="${APP_URL}/sermons" class="btn">View Assignment</a></p>
     `),
   });
@@ -107,12 +111,12 @@ export async function sendApprovalRequest(email: string, adminName: string, khat
   return getResend().emails.send({
     from: FROM,
     to: email,
-    subject: `Sermon review requested: "${sermonTitle}"`,
+    subject: `Sermon review requested: "${esc(sermonTitle)}"`,
     html: baseHtml(`
       <h1>Review Requested</h1>
-      <p>Assalamu alaykom ${adminName},</p>
-      <p><strong>${khatibName}</strong> has submitted a sermon for your review:</p>
-      <p style="font-size:18px;font-weight:600;color:#1a2a2c;margin:16px 0;">"${sermonTitle}"</p>
+      <p>Assalamu alaykom ${esc(adminName)},</p>
+      <p><strong>${esc(khatibName)}</strong> has submitted a sermon for your review:</p>
+      <p style="font-size:18px;font-weight:600;color:#1a2a2c;margin:16px 0;">"${esc(sermonTitle)}"</p>
       <p><a href="${reviewUrl}" class="btn">Review Sermon</a></p>
     `),
   });
@@ -123,12 +127,12 @@ export async function sendApprovalResult(email: string, name: string, sermonTitl
   return getResend().emails.send({
     from: FROM,
     to: email,
-    subject: `Sermon ${status}: "${sermonTitle}"`,
+    subject: `Sermon ${status}: "${esc(sermonTitle)}"`,
     html: baseHtml(`
       <h1>Sermon ${approved ? "Approved" : "Needs Revision"}</h1>
-      <p>Assalamu alaykom ${name},</p>
-      <p>Your sermon <strong>"${sermonTitle}"</strong> has been ${status}.</p>
-      ${feedback ? `<p style="background:#f8f7f5;border-left:3px solid #00666d;padding:12px 16px;margin:16px 0;font-size:14px;color:#3d4f51;">${feedback}</p>` : ""}
+      <p>Assalamu alaykom ${esc(name)},</p>
+      <p>Your sermon <strong>"${esc(sermonTitle)}"</strong> has been ${status}.</p>
+      ${feedback ? `<p style="background:#f8f7f5;border-left:3px solid #00666d;padding:12px 16px;margin:16px 0;font-size:14px;color:#3d4f51;">${esc(feedback)}</p>` : ""}
       <p><a href="${APP_URL}/sermons" class="btn">View Sermon</a></p>
     `),
   });
@@ -138,11 +142,11 @@ export async function sendMosqueInvitation(email: string, inviterName: string, m
   return getResend().emails.send({
     from: FROM,
     to: email,
-    subject: `You're invited to manage ${mosqueName} on Khutba`,
+    subject: `You're invited to manage ${esc(mosqueName)} on Khutba`,
     html: baseHtml(`
       <h1>Manage your mosque on Khutba</h1>
       <p>Assalamu alaykom,</p>
-      <p><strong>${inviterName}</strong> from <strong>${orgName}</strong> has invited you to manage <strong>${mosqueName}</strong> on Khutba — a platform for planning coherent, year-long khutbah series.</p>
+      <p><strong>${esc(inviterName)}</strong> from <strong>${esc(orgName)}</strong> has invited you to manage <strong>${esc(mosqueName)}</strong> on Khutba — a platform for planning coherent, year-long khutbah series.</p>
       <p>As a mosque admin, you'll be able to:</p>
       <ul style="font-size:14px;color:#3d4f51;line-height:1.8;margin:8px 0 16px;">
         <li>Add and manage khatibs for your mosque</li>
@@ -162,7 +166,7 @@ export async function sendWelcomeVerified(email: string, name: string) {
     to: email,
     subject: "You're all set — welcome to Khutba!",
     html: baseHtml(`
-      <h1>Jazakallahu khairan, ${name}!</h1>
+      <h1>Jazakallahu khairan, ${esc(name)}!</h1>
       <p>Assalamu alaykom,</p>
       <p>Your email has been verified and your Khutba account is ready. Here's what you can do now:</p>
       <ul style="font-size:14px;color:#3d4f51;line-height:1.8;margin:8px 0 16px;">
@@ -183,7 +187,7 @@ export async function sendPasswordChanged(email: string, name: string) {
     subject: "Your Khutba password was changed",
     html: baseHtml(`
       <h1>Password changed</h1>
-      <p>Assalamu alaykom ${name},</p>
+      <p>Assalamu alaykom ${esc(name)},</p>
       <p>Your password was successfully changed. You can now sign in with your new password.</p>
       <p><a href="${APP_URL}/auth/login" class="btn">Sign In</a></p>
       <p class="muted">If you didn't make this change, please <a href="${APP_URL}/auth/forgot-password" style="color:#00666d;">reset your password immediately</a>.</p>
@@ -198,7 +202,7 @@ export async function sendAccountDeleted(email: string, name: string) {
     subject: "Your Khutba account has been deleted",
     html: baseHtml(`
       <h1>Account deleted</h1>
-      <p>Assalamu alaykom ${name},</p>
+      <p>Assalamu alaykom ${esc(name)},</p>
       <p>Your Khutba account and all associated data have been permanently deleted as requested.</p>
       <p class="muted">If this was a mistake or you'd like to return, you can always create a new account at <a href="${APP_URL}" style="color:#00666d;">khutba.net</a>.</p>
       <p class="muted">May Allah bless you in all your endeavours.</p>
@@ -213,9 +217,9 @@ export async function sendEmailVerification(email: string, name: string, code: s
     subject: `${code} — Verify your Khutba email`,
     html: baseHtml(`
       <h1>Verify your email</h1>
-      <p>Assalamu alaykom ${name},</p>
+      <p>Assalamu alaykom ${esc(name)},</p>
       <p>Enter this verification code to confirm your email address:</p>
-      <div class="code">${code}</div>
+      <div class="code">${esc(code)}</div>
       <p class="muted">This code expires in 24 hours. If you didn't create an account, you can safely ignore this.</p>
     `),
   });

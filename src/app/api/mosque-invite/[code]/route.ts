@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, cuid, toJSON, hashPassword, verifyPassword, withTransaction } from "@/lib/db";
 import { createSession, sessionCookieOptions } from "@/lib/session";
 import { createNotification } from "@/lib/notifications";
+import { mosqueInviteSignupSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -39,12 +40,12 @@ export async function GET(_req: Request, { params }: Params) {
 export async function POST(req: Request, { params }: Params) {
   const { code } = await params;
   const body = await req.json();
-  const { name, email: rawEmail, password } = body as { name?: string; email?: string; password?: string };
-
-  if (!rawEmail || !password) {
-    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+  const parsed = parseBody(mosqueInviteSignupSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const email = rawEmail.toLowerCase().trim();
+  const { name, password } = parsed.data;
+  const email = parsed.data.email.toLowerCase().trim();
 
   const mosque = await queryOne<{ id: string; name: string; invite_status: string; organization_id: string; invite_expires_at: string }>(
     "SELECT id, name, invite_status, organization_id, invite_expires_at FROM mosques WHERE invite_code = $1",

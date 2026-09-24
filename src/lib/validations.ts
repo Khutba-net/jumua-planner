@@ -114,6 +114,41 @@ export const settingsUpdateSchema = z.discriminatedUnion("section", [
   settingsOrgSwitchSchema,
 ]);
 
+export const inviteSignupSchema = z.object({
+  name: z.string().max(100).optional(),
+  email: z.string().email("Invalid email format").max(255),
+  password: strongPassword,
+});
+
+export const mosqueInviteSignupSchema = z.object({
+  name: z.string().max(100).optional(),
+  email: z.string().email("Invalid email format").max(255),
+  password: strongPassword,
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email format").max(255),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required").max(128),
+  newPassword: strongPassword,
+});
+
+export const orgMemberCreateSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  email: z.string().email().max(255).optional().or(z.literal("")),
+  mosque_id: z.string().max(50).optional(),
+});
+
+export const orgMosqueCreateSchema = z.object({
+  name: z.string().min(1, "Mosque name is required").max(200),
+  address: z.string().max(500).optional(),
+  city: z.string().max(100).optional(),
+  country: z.string().max(100).optional(),
+  admin_email: z.string().email().max(255).optional(),
+});
+
 export const referenceSchema = z.object({
   type: z.enum(["quran", "hadith", "book", "article", "other"]),
   title: z.string().min(1, "Title is required").max(500),

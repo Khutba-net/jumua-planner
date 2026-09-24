@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, cuid, toJSON, hashPassword, verifyPassword, withTransaction } from "@/lib/db";
 import { createSession, sessionCookieOptions } from "@/lib/session";
 import { createNotification } from "@/lib/notifications";
+import { inviteSignupSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +39,12 @@ export async function GET(_req: Request, { params }: Params) {
 export async function POST(req: Request, { params }: Params) {
   const { code } = await params;
   const body = await req.json();
-  const { name, email: rawEmail, password } = body as { name?: string; email?: string; password?: string };
-
-  if (!rawEmail || !password) {
-    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+  const parsed = parseBody(inviteSignupSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const email = rawEmail.toLowerCase().trim();
+  const { name, password } = parsed.data;
+  const email = parsed.data.email.toLowerCase().trim();
 
   const member = await queryOne<{ id: string; name: string; status: string; organization_id: string; invite_expires_at: string; org_type: string }>(
     "SELECT m.id, m.name, m.status, m.organization_id, m.invite_expires_at, o.type as org_type FROM org_members m JOIN organizations o ON o.id = m.organization_id WHERE m.invite_code = $1",

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { queryOne, exec, hashPassword } from "@/lib/db";
 import { deleteAllUserSessions } from "@/lib/session";
 import { rateLimitByIpAsync } from "@/lib/rate-limit";
@@ -22,9 +23,10 @@ export async function POST(req: Request) {
   }
   const { token, password } = parsed.data;
 
+  const hashedToken = createHash("sha256").update(token).digest("hex");
   const resetToken = await queryOne<{ id: string; user_id: string; expires_at: string; used: number }>(
     "SELECT id, user_id, expires_at, used FROM password_reset_tokens WHERE token = $1",
-    [token]
+    [hashedToken]
   );
 
   if (!resetToken) {

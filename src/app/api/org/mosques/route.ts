@@ -4,6 +4,7 @@ import { query, queryOne, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sendMosqueInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
+import { orgMosqueCreateSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -55,14 +56,12 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, address, city, country, capacity, admin_email } = body;
-
-  if (!name?.trim() || typeof name !== "string") {
-    return NextResponse.json({ error: "Mosque name is required" }, { status: 400 });
+  const parsed = parseBody(orgMosqueCreateSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  if (name.trim().length > 200) {
-    return NextResponse.json({ error: "Name is too long" }, { status: 400 });
-  }
+  const { name, address, city, country, admin_email } = parsed.data;
+  const { capacity } = body;
 
   const org = await queryOne<{ max_mosques: number | null }>(
     "SELECT max_mosques FROM organizations WHERE id = $1", [user.organization_id]

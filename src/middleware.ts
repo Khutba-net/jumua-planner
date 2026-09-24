@@ -31,36 +31,60 @@ function isPublicRoute(pathname: string): boolean {
   return false;
 }
 
-const apiHits = new Map<string, { count: number; resetAt: number }>();
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of apiHits) {
-    if (entry.resetAt <= now) apiHits.delete(key);
-  }
-}, 30_000);
-
 const STRIPE_CHECKOUT_LIMIT = 3;
 const STRIPE_CHECKOUT_WINDOW = 60_000;
 const API_GLOBAL_LIMIT = 60;
 const API_GLOBAL_WINDOW = 60_000;
 
-function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
+const memHits = new Map<string, { count: number; resetAt: number }>();
+
+async function checkRateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (upstashUrl && upstashToken) {
+    const windowSec = Math.ceil(windowMs / 1000);
+    const redisKey = `rl:${key}`;
+    try {
+      const res = await fetch(`${upstashUrl}/pipeline`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${upstashToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify([["INCR", redisKey], ["EXPIRE", redisKey, windowSec]]),
+      });
+      const data = await res.json() as { result: number }[];
+      const count = data[0]?.result ?? 1;
+      return count <= limit;
+    } catch {
+      // Fall through to in-memory on Redis failure
+    }
+  }
+
   const now = Date.now();
-  const entry = apiHits.get(key);
+  const entry = memHits.get(key);
   if (!entry || entry.resetAt <= now) {
-    apiHits.set(key, { count: 1, resetAt: now + windowMs });
+    memHits.set(key, { count: 1, resetAt: now + windowMs });
     return true;
   }
   entry.count++;
   return entry.count <= limit;
 }
 
-export function middleware(request: NextRequest) {
+function generateNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes));
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const nonce = generateNonce();
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
 
   if (isPublicRoute(pathname)) {
-    return addSecurityHeaders(NextResponse.next());
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    return addSecurityHeaders(response, nonce);
   }
 
   const token = request.cookies.get("session")?.value;
@@ -68,35 +92,36 @@ export function middleware(request: NextRequest) {
   if (!token || token.length !== 64) {
     if (pathname.startsWith("/api/")) {
       return addSecurityHeaders(
-        NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+        NextResponse.json({ error: "Not authenticated" }, { status: 401 }), nonce
       );
     }
     const loginUrl = new URL("/auth/login", request.url);
-    return addSecurityHeaders(NextResponse.redirect(loginUrl));
+    return addSecurityHeaders(NextResponse.redirect(loginUrl), nonce);
   }
 
   if (pathname.startsWith("/api/")) {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
     if (pathname === "/api/stripe/checkout") {
-      if (!checkRateLimit(`stripe:${ip}`, STRIPE_CHECKOUT_LIMIT, STRIPE_CHECKOUT_WINDOW)) {
+      if (!(await checkRateLimit(`stripe:${ip}`, STRIPE_CHECKOUT_LIMIT, STRIPE_CHECKOUT_WINDOW))) {
         return addSecurityHeaders(
-          NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 })
+          NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 }), nonce
         );
       }
     }
 
-    if (!checkRateLimit(`api:${ip}`, API_GLOBAL_LIMIT, API_GLOBAL_WINDOW)) {
+    if (!(await checkRateLimit(`api:${ip}`, API_GLOBAL_LIMIT, API_GLOBAL_WINDOW))) {
       return addSecurityHeaders(
-        NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 })
+        NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 }), nonce
       );
     }
   }
 
-  return addSecurityHeaders(NextResponse.next());
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  return addSecurityHeaders(response, nonce);
 }
 
-function addSecurityHeaders(response: NextResponse): NextResponse {
+function addSecurityHeaders(response: NextResponse, nonce: string): NextResponse {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-XSS-Protection", "1; mode=block");
@@ -111,11 +136,11 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'nonce-${nonce}'`,
       "style-src 'self' 'unsafe-inline'",
-      "font-src 'self'",
+      "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
-      "connect-src 'self' https://*.sentry.io https://*.vercel-insights.com https://*.vercel-analytics.com",
+      "connect-src 'self' https://*.stripe.com https://*.sentry.io https://*.vercel-insights.com https://*.vercel-analytics.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

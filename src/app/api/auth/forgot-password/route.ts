@@ -1,9 +1,10 @@
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import { queryOne, exec, cuid } from "@/lib/db";
 import { rateLimitByIpAsync } from "@/lib/rate-limit";
 import { sendPasswordReset } from "@/lib/email";
+import { forgotPasswordSchema, parseBody } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Too many requests. Try again in a minute." }, { status: 429 });
   }
 
-  const { email } = await req.json();
-  if (!email || typeof email !== "string") {
-    return NextResponse.json({ error: "Email is required" }, { status: 400 });
+  const body = await req.json();
+  const parsed = parseBody(forgotPasswordSchema, body);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
+  const { email } = parsed.data;
 
   const user = await queryOne<{ id: string; name: string }>(
     "SELECT id, name FROM users WHERE LOWER(email) = $1", [email.toLowerCase().trim()]
@@ -35,9 +38,10 @@ export async function POST(req: Request) {
   const id = cuid();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+  const hashedToken = createHash("sha256").update(token).digest("hex");
   await exec(
     "INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)",
-    [id, user.id, token, expiresAt.toISOString()]
+    [id, user.id, hashedToken, expiresAt.toISOString()]
   );
 
   // In production, send email with reset link. For now, log it and return the token in dev.
