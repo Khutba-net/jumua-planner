@@ -56,15 +56,12 @@ interface CheckContext {
   content: string;
   scheduledDate: string;
   notes: string;
-  words: number;
-  estMinutes: number;
 }
 
 const checklist: CheckItem[] = [
   { key: "title", labelKey: "editor.titleSet", check: (c) => c.title.length > 0 && c.title !== "Untitled Sermon", required: true },
   { key: "content", labelKey: "editor.contentWritten", check: (c) => c.content.length >= 50, required: true },
   { key: "date", labelKey: "editor.dateSet", check: (c) => c.scheduledDate.length > 0, required: true },
-  { key: "length", labelKey: "editor.withinTarget", check: (c) => c.estMinutes >= 15 && c.estMinutes <= 25, required: false },
 ];
 
 const sectionCheckKeys = [
@@ -285,7 +282,7 @@ export default function SermonEditorPage({
   const estMinutes = Math.max(1, Math.round(words / 130));
 
   const checkCtx: CheckContext = {
-    title, content, scheduledDate, notes, words, estMinutes,
+    title, content, scheduledDate, notes,
   };
 
   const passedChecks = checklist.filter((c) => c.check(checkCtx));
