@@ -33,7 +33,7 @@ function isPublicRoute(pathname: string): boolean {
 
 const STRIPE_CHECKOUT_LIMIT = 3;
 const STRIPE_CHECKOUT_WINDOW = 60_000;
-const API_GLOBAL_LIMIT = 60;
+const API_GLOBAL_LIMIT = 200;
 const API_GLOBAL_WINDOW = 60_000;
 
 const memHits = new Map<string, { count: number; resetAt: number }>();
