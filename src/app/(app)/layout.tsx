@@ -46,7 +46,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    fetch("/api/dashboard")
+    fetch("/api/me")
       .then((r) => {
         if (r.status === 401) { router.push("/auth/login"); return null; }
         if (r.status === 403) return r.json().then((d: { onboarding?: boolean }) => { if (d.onboarding === false) router.push("/setup"); return null; });
