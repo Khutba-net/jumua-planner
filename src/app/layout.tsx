@@ -17,20 +17,36 @@ const notoArabic = Noto_Naskh_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "Khutba",
-  description: "Professional Khutbah Management Platform",
+  title: {
+    default: "Khutba — Plan a Year of Khutbahs That Hold Together",
+    template: "%s | Khutba",
+  },
+  description: "Khutba is a planning and scheduling platform for Friday khatibs, mosques, and Islamic institutions. Build a coherent annual khutbah plan, assign khatibs, and manage multiple mosques from one place.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://khutba.net"),
+  keywords: ["khutbah", "khutba", "Friday sermon", "mosque management", "khatib", "Islamic", "sermon planner", "jumua"],
+  authors: [{ name: "Khutba" }],
+  creator: "Khutba",
   openGraph: {
-    title: "Khutba",
-    description: "Professional Khutbah Management Platform for mosques and khatibs",
+    title: "Khutba — Plan a Year of Khutbahs That Hold Together",
+    description: "A planning and scheduling platform for Friday khatibs, mosques, and Islamic institutions.",
     url: "https://khutba.net",
     siteName: "Khutba",
     type: "website",
+    locale: "en_US",
+    images: [{ url: "/logo.svg", width: 100, height: 100, alt: "Khutba logo" }],
   },
   twitter: {
     card: "summary",
-    title: "Khutba",
-    description: "Professional Khutbah Management Platform for mosques and khatibs",
+    title: "Khutba — Plan a Year of Khutbahs That Hold Together",
+    description: "A planning and scheduling platform for Friday khatibs, mosques, and Islamic institutions.",
+    images: ["/logo.svg"],
+  },
+  icons: {
+    icon: "/logo.svg",
+    apple: "/logo.svg",
+  },
+  alternates: {
+    canonical: "https://khutba.net",
   },
 };
 
@@ -48,6 +64,28 @@ export default async function RootLayout({
     >
       <head>
         <meta name="theme-color" content="#00666d" />
+        <script
+          nonce={nonce}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "Khutba",
+              url: "https://khutba.net",
+              applicationCategory: "BusinessApplication",
+              operatingSystem: "Web",
+              description: "A planning and scheduling platform for Friday khatibs, mosques, and Islamic institutions.",
+              offers: {
+                "@type": "AggregateOffer",
+                priceCurrency: "USD",
+                lowPrice: "10",
+                highPrice: "50",
+                offerCount: "3",
+              },
+            }),
+          }}
+        />
         <script
           nonce={nonce}
           dangerouslySetInnerHTML={{

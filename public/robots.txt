@@ -9,3 +9,9 @@ Disallow: /dashboard
 Disallow: /calendar
 Disallow: /sermons
 Disallow: /invite/
+Disallow: /mosque-invite/
+Disallow: /setup
+Disallow: /themes
+Disallow: /resources
+
+Sitemap: https://khutba.net/sitemap.xml

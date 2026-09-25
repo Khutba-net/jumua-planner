@@ -65,7 +65,7 @@ export async function DELETE() {
       );
       if (remainingMembers.rows.length === 0) {
         await client.query("DELETE FROM friday_assignments WHERE organization_id = $1", [user.organization_id]);
-        await client.query("UPDATE mosques SET organization_id = NULL WHERE organization_id = $1", [user.organization_id]);
+        await client.query("DELETE FROM mosques WHERE organization_id = $1", [user.organization_id]);
         await client.query("DELETE FROM subscriptions WHERE organization_id = $1", [user.organization_id]);
         await client.query("DELETE FROM organizations WHERE id = $1", [user.organization_id]);
       }

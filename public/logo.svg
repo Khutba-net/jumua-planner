@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <!-- Top-Left: Dark Teal -->
+  <rect x="10" y="10" width="36" height="36" rx="8" ry="8" fill="#167980" />
+  
+  <!-- Top-Right: Medium Teal -->
+  <rect x="54" y="10" width="36" height="36" rx="8" ry="8" fill="#5F9EA0" />
+  
+  <!-- Bottom-Left: Medium Teal -->
+  <rect x="10" y="54" width="36" height="36" rx="8" ry="8" fill="#5F9EA0" />
+  
+  <!-- Bottom-Right: Warm Gold/Tan -->
+  <rect x="54" y="54" width="36" height="36" rx="8" ry="8" fill="#D4B26F" />
+</svg>
