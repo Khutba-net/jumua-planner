@@ -135,7 +135,14 @@ async function handleSubscriptionChange(sub: Stripe.Subscription) {
 
   await exec(
     `INSERT INTO subscriptions (id, user_id, stripe_subscription_id, plan, status, current_period_start, current_period_end, trial_end, cancel_at_period_end, organization_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (stripe_subscription_id) DO UPDATE SET
+       status = EXCLUDED.status,
+       current_period_start = EXCLUDED.current_period_start,
+       current_period_end = EXCLUDED.current_period_end,
+       trial_end = EXCLUDED.trial_end,
+       cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+       updated_at = NOW()`,
     [
       cuid(),
       user?.id || null,

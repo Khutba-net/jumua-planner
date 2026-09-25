@@ -111,8 +111,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         [id]
       );
       await exec(
-        `INSERT INTO subscriptions (id, user_id, stripe_subscription_id, plan, status, current_period_start, current_period_end, organization_id)
-         VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)`,
+        `INSERT INTO subscriptions (id, user_id, stripe_subscription_id, plan, status, current_period_start, current_period_end, cancel_at_period_end, organization_id)
+         VALUES ($1, $2, $3, $4, $5, NOW(), $6, 0, $7)`,
         [cuid(), admin?.user_id || null, `manual_${id}`, plan, status, periodEnd.toISOString(), id]
       );
     }
