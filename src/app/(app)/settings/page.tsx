@@ -136,6 +136,7 @@ export default function SettingsPage() {
       maxMosques: number | null;
       maxKhatibs: number | null;
       billingStatus: string | null;
+      hasStripeAccount: boolean;
     };
   } | null>(null);
   const [subLoading, setSubLoading] = useState(true);
@@ -873,17 +874,29 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase mb-3">{t("settings.billing")}</p>
                   <div className="space-y-3">
-                    <button
-                      onClick={handlePortal}
-                      disabled={portalLoading}
-                      className="w-full flex items-center justify-between py-3 px-4 border border-line hover:bg-surface transition-colors disabled:opacity-50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-mute text-lg">credit_card</span>
-                        <p className="text-sm text-ink font-medium">{isAr ? "إدارة الاشتراك والفواتير" : "Manage subscription & invoices"}</p>
+                    {subscription.plan === "institution" && !subscription.institutionDetails?.hasStripeAccount ? (
+                      <div className="py-3 px-4 border border-line bg-surface">
+                        <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined text-accent-gold text-lg">info</span>
+                          <div>
+                            <p className="text-sm text-ink font-medium">{isAr ? "الفوترة تُدار بواسطة خطبة" : "Billing managed by Khutba"}</p>
+                            <p className="text-xs text-mute mt-0.5">{isAr ? "سيتم إرسال الفاتورة إلى بريدك الإلكتروني." : "An invoice will be sent to your email when ready."}</p>
+                          </div>
+                        </div>
                       </div>
-                      <span className="material-symbols-outlined text-mute text-base">{isAr ? "arrow_back" : "arrow_forward"}</span>
-                    </button>
+                    ) : (
+                      <button
+                        onClick={handlePortal}
+                        disabled={portalLoading}
+                        className="w-full flex items-center justify-between py-3 px-4 border border-line hover:bg-surface transition-colors disabled:opacity-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined text-mute text-lg">credit_card</span>
+                          <p className="text-sm text-ink font-medium">{isAr ? "إدارة الاشتراك والفواتير" : "Manage subscription & invoices"}</p>
+                        </div>
+                        <span className="material-symbols-outlined text-mute text-base">{isAr ? "arrow_back" : "arrow_forward"}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </>

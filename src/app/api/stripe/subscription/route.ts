@@ -21,8 +21,9 @@ export async function GET() {
           max_mosques: number | null;
           max_khatibs: number | null;
           billing_status: string | null;
+          stripe_customer_id: string | null;
         }>(
-          "SELECT custom_price_cents, max_mosques, max_khatibs, billing_status FROM organizations WHERE id = $1",
+          "SELECT custom_price_cents, max_mosques, max_khatibs, billing_status, stripe_customer_id FROM organizations WHERE id = $1",
           [user.organization_id]
         );
         if (org) {
@@ -31,6 +32,7 @@ export async function GET() {
             maxMosques: org.max_mosques,
             maxKhatibs: org.max_khatibs,
             billingStatus: org.billing_status,
+            hasStripeAccount: !!org.stripe_customer_id,
           };
         }
       }
