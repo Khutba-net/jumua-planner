@@ -100,6 +100,22 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/api/")) {
+    if (pathname !== "/api/stripe/webhook") {
+      const method = request.method;
+      if (method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") {
+        const origin = request.headers.get("origin");
+        const host = request.headers.get("host");
+        if (origin && host) {
+          const originHost = new URL(origin).host;
+          if (originHost !== host) {
+            return addSecurityHeaders(
+              NextResponse.json({ error: "Forbidden" }, { status: 403 }), nonce
+            );
+          }
+        }
+      }
+    }
+
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
     if (pathname === "/api/stripe/checkout") {

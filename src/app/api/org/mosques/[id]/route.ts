@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { query, queryOne, exec, toJSON } from "@/lib/db";
+import { query, queryOne, exec, toJSON, withTransaction } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sendMosqueInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
@@ -169,20 +169,27 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     "SELECT admin_user_id, name FROM mosques WHERE id = $1", [id]
   );
 
-  await exec("UPDATE org_members SET mosque_id = NULL WHERE mosque_id = $1", [id]);
-  await exec("DELETE FROM friday_assignments WHERE mosque_id = $1", [id]);
+  await withTransaction(async (client) => {
+    await client.query("UPDATE org_members SET mosque_id = NULL WHERE mosque_id = $1", [id]);
+    await client.query("DELETE FROM friday_assignments WHERE mosque_id = $1", [id]);
+
+    if (mosque?.admin_user_id) {
+      await client.query("DELETE FROM org_members WHERE user_id = $1 AND organization_id = $2", [mosque.admin_user_id, user.organization_id]);
+      const otherMemberships = await client.query(
+        "SELECT id FROM org_members WHERE user_id = $1", [mosque.admin_user_id]
+      );
+      if (otherMemberships.rows.length === 0) {
+        await client.query(
+          "UPDATE users SET organization_id = NULL, role = 'khatib', account_type = 'individual', updated_at = NOW() WHERE id = $1",
+          [mosque.admin_user_id]
+        );
+      }
+    }
+
+    await client.query("DELETE FROM mosques WHERE id = $1", [id]);
+  });
 
   if (mosque?.admin_user_id) {
-    await exec("DELETE FROM org_members WHERE user_id = $1 AND organization_id = $2", [mosque.admin_user_id, user.organization_id]);
-    const otherMemberships = await query(
-      "SELECT id FROM org_members WHERE user_id = $1", [mosque.admin_user_id]
-    );
-    if (otherMemberships.length === 0) {
-      await exec(
-        "UPDATE users SET organization_id = NULL, role = 'khatib', account_type = 'individual', updated_at = NOW() WHERE id = $1",
-        [mosque.admin_user_id]
-      );
-    }
     createNotification(
       mosque.admin_user_id,
       "member_removed",
@@ -191,8 +198,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       "/settings"
     ).catch(() => {});
   }
-
-  await exec("DELETE FROM mosques WHERE id = $1", [id]);
 
   return NextResponse.json({ ok: true });
 }

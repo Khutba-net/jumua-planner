@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query, queryOne, exec, cuid, toJSON } from "@/lib/db";
+import { query, queryOne, exec, cuid, toJSON, withTransaction } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { themeUpdateSchema, parseBody } from "@/lib/validations";
 
@@ -118,8 +118,10 @@ export async function DELETE(
   const existing = await queryOne("SELECT id FROM themes WHERE id = $1 AND owner_id = $2", [id, userId]);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await exec("UPDATE sermons SET theme_id = NULL, sub_topic_id = NULL WHERE theme_id = $1", [id]);
-  await exec("DELETE FROM sub_topics WHERE theme_id = $1", [id]);
-  await exec("DELETE FROM themes WHERE id = $1 AND owner_id = $2", [id, userId]);
+  await withTransaction(async (client) => {
+    await client.query("UPDATE sermons SET theme_id = NULL, sub_topic_id = NULL WHERE theme_id = $1", [id]);
+    await client.query("DELETE FROM sub_topics WHERE theme_id = $1", [id]);
+    await client.query("DELETE FROM themes WHERE id = $1 AND owner_id = $2", [id, userId]);
+  });
   return NextResponse.json({ ok: true });
 }

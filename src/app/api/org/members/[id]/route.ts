@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { queryOne, query, exec, toJSON } from "@/lib/db";
+import { queryOne, query, exec, toJSON, withTransaction } from "@/lib/db";
 import { deleteAllUserSessions } from "@/lib/session";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sendInvitation } from "@/lib/email";
@@ -145,20 +145,25 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Deactivate the member before removing them" }, { status: 400 });
   }
 
-  await exec("DELETE FROM friday_assignments WHERE member_id = $1", [id]);
-  await exec("DELETE FROM org_members WHERE id = $1", [id]);
+  await withTransaction(async (client) => {
+    await client.query("DELETE FROM friday_assignments WHERE member_id = $1", [id]);
+    await client.query("DELETE FROM org_members WHERE id = $1", [id]);
 
-  if (member.user_id) {
-    const otherMemberships = await query(
-      "SELECT id FROM org_members WHERE user_id = $1",
-      [member.user_id]
-    );
-    if (otherMemberships.length === 0) {
-      await exec(
-        "UPDATE users SET organization_id = NULL, role = 'khatib', account_type = 'individual', updated_at = NOW() WHERE id = $1",
+    if (member.user_id) {
+      const otherMemberships = await client.query(
+        "SELECT id FROM org_members WHERE user_id = $1",
         [member.user_id]
       );
+      if (otherMemberships.rows.length === 0) {
+        await client.query(
+          "UPDATE users SET organization_id = NULL, role = 'khatib', account_type = 'individual', updated_at = NOW() WHERE id = $1",
+          [member.user_id]
+        );
+      }
     }
+  });
+
+  if (member.user_id) {
     createNotification(
       member.user_id as string,
       "member_removed",

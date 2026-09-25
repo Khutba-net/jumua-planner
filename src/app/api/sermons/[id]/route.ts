@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, exec, toJSON } from "@/lib/db";
+import { query, queryOne, exec, toJSON, withTransaction } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sermonUpdateSchema, parseBody } from "@/lib/validations";
 
@@ -127,8 +127,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await exec("DELETE FROM references_ WHERE sermon_id = $1", [id]);
-  await exec("DELETE FROM feedback WHERE sermon_id = $1", [id]);
-  await exec("DELETE FROM sermons WHERE id = $1 AND author_id = $2", [id, userId]);
+  await withTransaction(async (client) => {
+    await client.query("DELETE FROM references_ WHERE sermon_id = $1", [id]);
+    await client.query("DELETE FROM feedback WHERE sermon_id = $1", [id]);
+    await client.query("DELETE FROM sermons WHERE id = $1 AND author_id = $2", [id, userId]);
+  });
   return NextResponse.json({ ok: true });
 }

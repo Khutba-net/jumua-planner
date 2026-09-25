@@ -49,9 +49,12 @@ export function cuid() {
   return randomBytes(12).toString("hex");
 }
 
+const SCRYPT_PARAMS = { N: 32768, r: 8, p: 2, maxmem: 64 * 1024 * 1024 };
+const SCRYPT_LEGACY = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, 64).toString("hex");
+  const hash = scryptSync(password, salt, 64, SCRYPT_PARAMS).toString("hex");
   return `${salt}:${hash}`;
 }
 
@@ -59,8 +62,10 @@ export function verifyPassword(password: string, stored: string): boolean {
   const [salt, hash] = stored.split(":");
   if (!salt || !hash) return false;
   const hashBuffer = Buffer.from(hash, "hex");
-  const supplied = scryptSync(password, salt, 64);
-  return timingSafeEqual(hashBuffer, supplied);
+  const supplied = scryptSync(password, salt, 64, SCRYPT_PARAMS);
+  if (timingSafeEqual(hashBuffer, supplied)) return true;
+  const legacy = scryptSync(password, salt, 64, SCRYPT_LEGACY);
+  return timingSafeEqual(hashBuffer, legacy);
 }
 
 export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
