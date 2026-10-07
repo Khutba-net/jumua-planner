@@ -275,7 +275,7 @@ export default function CalendarPage() {
             {day.getDate()}
           </span>
           {hijri && (
-            <span className="text-[8px] text-[#C4A35A]/60 font-medium">{hijri.day}</span>
+            <span className="text-[9px] text-[#8B7225] font-bold">{hijri.day}</span>
           )}
         </div>
 
@@ -340,7 +340,7 @@ export default function CalendarPage() {
               {view === "month" ? `${t(`month.${month}`)} ${year}` : `${t("nav.calendar")} — ${year}`}
             </h1>
             {view === "month" && currentHijri && (
-              <p className="text-[12px] text-[#C4A35A] mt-0.5 font-medium">
+              <p className="text-[12px] text-[#8B7225] mt-0.5 font-medium">
                 {isAr ? HIJRI_MONTHS_AR[hijriMonth - 1] : HIJRI_MONTHS[hijriMonth - 1]} {hijriYear} AH
               </p>
             )}
@@ -409,7 +409,7 @@ export default function CalendarPage() {
               <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">{t("cal.notStarted")}</div>
             </div>
             <div className="flex-1 min-w-[72px] px-3 py-2.5 text-center">
-              <div className="text-xl font-bold text-[#C4A35A]">{monthHijriEvents.length}</div>
+              <div className="text-xl font-bold text-[#8B7225]">{monthHijriEvents.length}</div>
               <div className="text-[8px] font-bold tracking-[1px] text-[#6d797a] uppercase">{t("cal.hijriEvents")}</div>
             </div>
           </div>
@@ -432,7 +432,7 @@ export default function CalendarPage() {
                 <span className="material-symbols-outlined text-[16px]">calendar_today</span>
                 {t(`month.${month}`)} {year}
               </h2>
-              <h2 className="text-sm font-bold text-[#C4A35A] flex items-center gap-1.5">
+              <h2 className="text-sm font-bold text-[#8B7225] flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px]">brightness_2</span>
                 {isAr ? HIJRI_MONTHS_AR[hijriMonth - 1] : HIJRI_MONTHS[hijriMonth - 1]} {hijriYear} AH
               </h2>
