@@ -169,7 +169,7 @@ export default function SermonEditorPage({
       .catch(() => setLoading(false));
   }, [id]);
 
-  const save = useCallback(async (overrides?: { status?: string }) => {
+  const save = useCallback(async (overrides?: { status?: string; force?: boolean }) => {
     setSaving(true);
     try {
       const res = await fetch(`/api/sermons/${id}`, {
@@ -182,11 +182,20 @@ export default function SermonEditorPage({
           status: overrides?.status ?? status,
           scheduledDate: scheduledDate || null,
           notes,
-          lastUpdated: lastUpdatedAt,
+          lastUpdated: overrides?.force ? undefined : lastUpdatedAt,
         }),
       });
       if (res.status === 409) {
-        setConflictDetected(true);
+        const conflict = await res.json();
+        if (overrides?.force) {
+          // Force save failed — shouldn't happen, but handle gracefully
+          setConflictDetected(true);
+        } else {
+          setConflictDetected(true);
+          if (conflict.serverUpdatedAt) {
+            setLastUpdatedAt(conflict.serverUpdatedAt);
+          }
+        }
         setSaving(false);
         return;
       }
@@ -533,6 +542,10 @@ export default function SermonEditorPage({
               <div className="mx-5 sm:mx-8 mt-4 flex items-center gap-2 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg text-[13px] text-orange-800">
                 <span className="material-symbols-outlined text-orange-500 text-lg">sync_problem</span>
                 <span className="flex-1">{t("editor.conflict")}</span>
+                <button onClick={() => { save({ force: true }); }}
+                  className="px-3 py-1 border border-orange-300 text-orange-700 text-[11px] font-medium rounded hover:bg-orange-100 transition-colors">
+                  {t("editor.saveAnyway") || "Save anyway"}
+                </button>
                 <button onClick={() => window.location.reload()}
                   className="px-3 py-1 bg-orange-600 text-white text-[11px] font-medium rounded hover:bg-orange-700 transition-colors">
                   {t("editor.reloadLatest")}

@@ -68,7 +68,7 @@ export default function RichEditor({ content, onChange, placeholder, fontSize = 
       },
     },
     onCreate: () => {
-      initialized.current = true;
+      setTimeout(() => { initialized.current = true; }, 100);
     },
     onUpdate: ({ editor }) => {
       if (initialized.current) {
