@@ -4,7 +4,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 interface RichEditorProps {
   content: string;
@@ -49,6 +49,7 @@ function ToolbarDivider() {
 }
 
 export default function RichEditor({ content, onChange, placeholder, fontSize = 15, dir }: RichEditorProps) {
+  const initialized = useRef(false);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -66,8 +67,13 @@ export default function RichEditor({ content, onChange, placeholder, fontSize = 
         dir: dir || "auto",
       },
     },
+    onCreate: () => {
+      initialized.current = true;
+    },
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      if (initialized.current) {
+        onChange(editor.getHTML());
+      }
     },
   });
 

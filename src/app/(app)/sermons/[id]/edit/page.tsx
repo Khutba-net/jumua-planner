@@ -102,6 +102,7 @@ export default function SermonEditorPage({
   const [sessionExpired, setSessionExpired] = useState(false);
   const [conflictDetected, setConflictDetected] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
   const [recoveredDraft, setRecoveredDraft] = useState<{ title: string; content: string; notes: string } | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -199,6 +200,7 @@ export default function SermonEditorPage({
       setLastSaved(new Date());
       setLastUpdatedAt(new Date().toISOString());
       setConflictDetected(false);
+      setDirty(false);
       try { localStorage.removeItem(`jp_draft_${id}`); } catch {}
     } catch {
       try {
@@ -215,9 +217,9 @@ export default function SermonEditorPage({
 
   useEffect(() => {
     if (!sermon) return;
-    const timer = setInterval(() => save(), 30000);
+    const timer = setInterval(() => { if (dirty) { save(); setDirty(false); } }, 30000);
     return () => clearInterval(timer);
-  }, [sermon, save]);
+  }, [sermon, save, dirty]);
 
   const bothClosed = !leftOpen && !rightOpen;
 
@@ -466,7 +468,7 @@ export default function SermonEditorPage({
           <p className="text-[9px] tracking-[2px] text-mute/60 mb-2">{t("editor.notes")}</p>
           <textarea
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) => { setNotes(e.target.value); setDirty(true); }}
             placeholder={t("editor.privateNotes")}
             rows={4}
             className="w-full text-[11px] text-ink bg-surface border border-line p-2 resize-none outline-none focus:border-primary transition-colors"
@@ -555,7 +557,7 @@ export default function SermonEditorPage({
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
                 placeholder={t("editor.titlePlaceholder")}
                 className="w-full text-xl sm:text-2xl font-bold text-ink placeholder:text-line bg-transparent border-none outline-none"
               />
@@ -566,7 +568,7 @@ export default function SermonEditorPage({
               <Suspense fallback={<div className="px-8 py-4 text-mute/40 text-sm">Loading editor…</div>}>
                 <RichEditor
                   content={content}
-                  onChange={setContent}
+                  onChange={(html) => { setContent(html); setDirty(true); }}
                   placeholder={t("editor.contentPlaceholder")}
                   fontSize={editorFontSize}
                   dir="auto"
