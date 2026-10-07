@@ -324,6 +324,7 @@ export default function AnnualPlanPage() {
 
   const fridays = useMemo(() => fridaysInYear(year), [year]);
   const weeks = useMemo(() => weeksInYear(year), [year]);
+  const yearHijriEvents = useMemo(() => hijriEventsForYear(year), [year]);
   const takenDates = useMemo(() => {
     const m = new Map<string, Sermon>();
     for (const s of yearSermons) if (s.scheduled_date) m.set(s.scheduled_date.slice(0, 10), s);
@@ -451,11 +452,7 @@ export default function AnnualPlanPage() {
     setAddingKey(key);
     setAddTitleText("");
     setAddType(type);
-    if (type === "friday") {
-      setAddDate(nextDateForTheme(theme) ?? "");
-    } else {
-      setAddDate("");
-    }
+    setAddDate(nextDateForTheme(theme) ?? "");
     setAddSubTopicId(subTopicId);
   }
   function cancelAddTitle() {
@@ -700,10 +697,15 @@ export default function AnnualPlanPage() {
                     submitAddTitle={submitAddTitle}
                     addBusy={addBusy}
                     addType={addType}
+                    setAddType={setAddType}
                     onToggleType={toggleSermonType}
                     onSeasonFull={(theme) => setSeasonFullModal({ seasonN: sg.n, theme })}
                     deliveryCounts={deliveryCounts}
                     onCycleDelivery={cycleDelivery}
+                    hijriEvents={yearHijriEvents.filter((ev) => {
+                      const m = ev.date.getMonth() + 1;
+                      return m >= sg.startMonth && m <= sg.startMonth + 2;
+                    })}
                   />
                 </section>
               ))}
@@ -906,7 +908,8 @@ function SeasonBlock({
   season, allSeasons, themeSermons, onEditTheme, onAddThemeToSeason,
   addingKey, onStartAdd, onCancelAdd, addTitleText, setAddTitleText,
   addDate, setAddDate, dateOptionsFor, seasonRangeFor, submitAddTitle, addBusy,
-  addType, onToggleType, onSeasonFull, deliveryCounts, onCycleDelivery,
+  addType, setAddType, onToggleType, onSeasonFull, deliveryCounts, onCycleDelivery,
+  hijriEvents,
 }: {
   season: { n: number; label: string; ar: string; range: string; startMonth: number; themes: Theme[] };
   allSeasons: { n: number; label: string; ar: string; range: string; startMonth: number; themes: Theme[] }[];
@@ -923,12 +926,14 @@ function SeasonBlock({
   dateOptionsFor: (t: Theme) => string[];
   seasonRangeFor: (t: Theme) => { min: string; max: string };
   addType: string;
+  setAddType: (v: string) => void;
   submitAddTitle: (t: Theme) => void;
   addBusy: boolean;
   onToggleType: (sermon: Sermon) => void;
   onSeasonFull: (theme: Theme) => void;
   deliveryCounts: Record<string, number>;
   onCycleDelivery: (sermonId: string) => void;
+  hijriEvents: { key: string; icon: string; color: string; date: Date; hijriYear: number; hMonth: number; hDay: number }[];
 }) {
   const { t, isAr } = useI18n();
   const STATUS_MAP = useStatusMap();
@@ -1069,8 +1074,7 @@ function SeasonBlock({
                   );
                   const slotCount = merged.length;
                   const key = `${theme.id}:${si}`;
-                  const isAdding = addingKey === key;
-                  const isAddingOccasion = addingKey === `occasion:${season.n}:${si}`;
+                  const isAdding = addingKey === key || addingKey === `occasion:${season.n}:${si}`;
                   const hasSubTopic = sub !== null;
 
                   const isHeavy = slotCount >= 6;
@@ -1180,46 +1184,78 @@ function SeasonBlock({
                             })}
 
                             {isAdding ? (
-                              <div className="mt-1.5 flex flex-col gap-2 bg-primary/[0.02] border border-primary/15 p-2.5">
+                              <div className={`mt-1.5 flex flex-col gap-2 p-2.5 border ${
+                                addType === "eid" ? "bg-accent-gold/[0.04] border-accent-gold/20"
+                                : "bg-primary/[0.02] border-primary/15"
+                              }`}>
+                                {/* Type selector */}
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {([
+                                    { value: "friday", label: t("type.friday"), icon: "mosque", color: "primary" },
+                                    { value: "eid", label: t("type.eid"), icon: "auto_awesome", color: "accent-gold" },
+                                    { value: "talk", label: t("type.talk"), icon: "mic", color: "primary" },
+                                    { value: "other", label: t("type.other"), icon: "note", color: "primary" },
+                                  ] as const).map((opt) => (
+                                    <button key={opt.value} type="button"
+                                      onClick={() => { setAddType(opt.value); if (opt.value !== "eid") setAddDate(addDate || ""); }}
+                                      className={`flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded-full transition-all ${
+                                        addType === opt.value
+                                          ? opt.color === "accent-gold"
+                                            ? "bg-accent-gold/15 text-accent-gold border border-accent-gold/30"
+                                            : "bg-primary/15 text-primary border border-primary/30"
+                                          : "text-mute/50 hover:text-ink border border-transparent hover:border-line/60"
+                                      }`}>
+                                      <span className="material-symbols-outlined text-[12px]">{opt.icon}</span>
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {/* Hijri event quick-pick */}
+                                {addType === "eid" && hijriEvents.length > 0 && (
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    <span className="text-[9px] text-mute/50 shrink-0">{t("themes.quickPick") || "Quick pick"}:</span>
+                                    {hijriEvents.map((ev) => (
+                                      <button key={ev.key + ev.date.toISOString()} type="button"
+                                        onClick={() => {
+                                          setAddTitleText(t(ev.key));
+                                          setAddDate(toISODate(ev.date));
+                                        }}
+                                        className="flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-medium rounded-full border border-accent-gold/20 text-accent-gold/80 hover:bg-accent-gold/10 hover:text-accent-gold transition-colors"
+                                        title={`${toISODate(ev.date)}`}>
+                                        <span className="material-symbols-outlined text-[10px]">{ev.icon}</span>
+                                        {t(ev.key)}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+
                                 <input autoFocus value={addTitleText} disabled={addBusy}
                                   onChange={(e) => setAddTitleText(e.target.value)}
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") submitAddTitle(theme);
                                     if (e.key === "Escape") onCancelAdd();
                                   }}
-                                  placeholder={t("themes.sermonTitlePlaceholder")}
-                                  className="text-[12.5px] text-ink font-medium bg-white border border-line/60 px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
+                                  placeholder={addType === "eid" ? t("themes.occasionPlaceholder") : t("themes.sermonTitlePlaceholder")}
+                                  className={`text-[12.5px] text-ink font-medium bg-white border border-line/60 px-3 py-2 outline-none transition-all duration-200 placeholder:text-mute/40 ${
+                                    addType === "eid" ? "focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/10" : "focus:border-primary focus:ring-2 focus:ring-primary/10"
+                                  }`} />
                                 <div className="flex items-center gap-1.5">
                                   <span className="material-symbols-outlined text-[14px] text-mute/50 shrink-0">event</span>
                                   {(() => { const range = seasonRangeFor(theme); return (
                                     <input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
                                       min={range.min} max={range.max}
-                                      className="flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200" />
+                                      className={`flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none transition-all duration-200 ${
+                                        addType === "eid" ? "focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/10" : "focus:border-primary focus:ring-2 focus:ring-primary/10"
+                                      }`} />
                                   ); })()}
                                   <button onClick={() => submitAddTitle(theme)} disabled={!addTitleText.trim() || addBusy}
                                     className={`text-[11px] font-bold px-3 py-1.5 transition-all duration-200 ${
-                                      addTitleText.trim() && !addBusy ? "bg-primary text-white hover:bg-secondary" : "bg-ink/[0.06] text-mute cursor-not-allowed"
-                                    }`}>{addBusy ? "…" : t("themes.add")}</button>
-                                  <button onClick={onCancelAdd} className="text-[11px] font-medium text-mute/60 hover:text-ink px-1.5 py-1.5 transition-colors duration-200">{t("sermons.cancel")}</button>
-                                </div>
-                              </div>
-                            ) : isAddingOccasion ? (
-                              <div className="mt-1.5 flex flex-col gap-2 bg-accent-gold/[0.04] border border-accent-gold/20 p-2.5">
-                                <input autoFocus value={addTitleText} disabled={addBusy}
-                                  onChange={(e) => setAddTitleText(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") submitAddTitle(theme);
-                                    if (e.key === "Escape") onCancelAdd();
-                                  }}
-                                  placeholder={t("themes.occasionPlaceholder")}
-                                  className="text-[12.5px] text-ink font-medium bg-white border border-line/60 px-3 py-2 outline-none focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/10 transition-all duration-200 placeholder:text-mute/40" />
-                                <div className="flex items-center gap-1.5">
-                                  <span className="material-symbols-outlined text-[14px] text-mute/50 shrink-0">event</span>
-                                  <input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
-                                    className="flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none focus:border-accent-gold transition-all duration-200" />
-                                  <button onClick={() => submitAddTitle(theme)} disabled={!addTitleText.trim() || addBusy}
-                                    className={`text-[11px] font-bold px-3 py-1.5 transition-all duration-200 ${
-                                      addTitleText.trim() && !addBusy ? "bg-accent-gold text-white hover:bg-accent-gold/80" : "bg-ink/[0.06] text-mute cursor-not-allowed"
+                                      addTitleText.trim() && !addBusy
+                                        ? addType === "eid"
+                                          ? "bg-accent-gold text-white hover:bg-accent-gold/80"
+                                          : "bg-primary text-white hover:bg-secondary"
+                                        : "bg-ink/[0.06] text-mute cursor-not-allowed"
                                     }`}>{addBusy ? "…" : t("themes.add")}</button>
                                   <button onClick={onCancelAdd} className="text-[11px] font-medium text-mute/60 hover:text-ink px-1.5 py-1.5 transition-colors duration-200">{t("sermons.cancel")}</button>
                                 </div>
@@ -1236,10 +1272,6 @@ function SeasonBlock({
                                   <button onClick={() => onStartAdd(theme, key, sub.id)}
                                     className="self-start text-[11px] font-medium text-mute/50 hover:text-primary transition-all duration-200 flex items-center gap-0.5 py-1">
                                     <span className="material-symbols-outlined text-[13px]">add</span> {t("themes.addTitle")}
-                                  </button>
-                                  <button onClick={() => onStartAdd(theme, `occasion:${season.n}:${si}`, null, "eid")}
-                                    className="self-start text-[11px] font-medium text-accent-gold/50 hover:text-accent-gold transition-all duration-200 flex items-center gap-0.5 py-1">
-                                    <span className="material-symbols-outlined text-[13px]">star</span> {t("themes.addOccasion")}
                                   </button>
                                 </div>
                               </>
