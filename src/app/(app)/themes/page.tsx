@@ -516,6 +516,15 @@ export default function AnnualPlanPage() {
     fetchAll();
   }
 
+  async function assignHijriEvent(sermonId: string, ev: { key: string; date: Date }) {
+    await fetch(`/api/sermons/${sermonId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: t(ev.key), type: "eid", scheduledDate: toISODate(ev.date) }),
+    });
+    fetchAll();
+  }
+
   async function pushToNextSeason(currentSeasonN: number, theme: Theme) {
     const nextSeason = SEASONS.find((s) => s.n === currentSeasonN + 1);
     if (!nextSeason) return;
@@ -706,6 +715,7 @@ export default function AnnualPlanPage() {
                       const m = ev.date.getMonth() + 1;
                       return m >= sg.startMonth && m <= sg.startMonth + 2;
                     })}
+                    onAssignHijriEvent={assignHijriEvent}
                   />
                 </section>
               ))}
@@ -909,7 +919,7 @@ function SeasonBlock({
   addingKey, onStartAdd, onCancelAdd, addTitleText, setAddTitleText,
   addDate, setAddDate, dateOptionsFor, seasonRangeFor, submitAddTitle, addBusy,
   addType, setAddType, onToggleType, onSeasonFull, deliveryCounts, onCycleDelivery,
-  hijriEvents,
+  hijriEvents, onAssignHijriEvent,
 }: {
   season: { n: number; label: string; ar: string; range: string; startMonth: number; themes: Theme[] };
   allSeasons: { n: number; label: string; ar: string; range: string; startMonth: number; themes: Theme[] }[];
@@ -934,9 +944,11 @@ function SeasonBlock({
   deliveryCounts: Record<string, number>;
   onCycleDelivery: (sermonId: string) => void;
   hijriEvents: { key: string; icon: string; color: string; date: Date; hijriYear: number; hMonth: number; hDay: number }[];
+  onAssignHijriEvent: (sermonId: string, ev: { key: string; date: Date }) => void;
 }) {
   const { t, isAr } = useI18n();
   const STATUS_MAP = useStatusMap();
+  const [hijriPickerSermonId, setHijriPickerSermonId] = useState<string | null>(null);
   const ss = season.themes.flatMap((t) => themeSermons(t.id));
   const fridayCount = ss.filter((s) => !s.type || s.type === "friday").length;
   const occasionCount = ss.filter((s) => s.type && s.type !== "friday").length;
@@ -1141,9 +1153,11 @@ function SeasonBlock({
                                       </span>
                                     )}
                                     {isOccasion && !eidOnFridayPair ? (
-                                      <span className="text-[9px] font-semibold px-1.5 py-[2px] bg-accent-gold/10 text-accent-gold whitespace-nowrap">
+                                      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setHijriPickerSermonId(hijriPickerSermonId === sr.id ? null : sr.id); }}
+                                        className="text-[9px] font-semibold px-1.5 py-[2px] bg-accent-gold/10 text-accent-gold whitespace-nowrap hover:bg-accent-gold/20 transition-colors cursor-pointer flex items-center gap-0.5">
+                                        <span className="material-symbols-outlined text-[10px]">swap_horiz</span>
                                         {sr.type === "eid" ? t("themes.eid") : t("themes.occasion")}
-                                      </span>
+                                      </button>
                                     ) : !isOccasion && !fridayWithEid ? (
                                       <span className="text-[9.5px] font-semibold px-1.5 py-[3px] whitespace-nowrap"
                                         style={{ backgroundColor: st.bg, color: st.text }}>{st.label}</span>
@@ -1154,6 +1168,23 @@ function SeasonBlock({
                                       </span>
                                     )}
                                   </Link>
+                                  {/* Hijri event picker dropdown */}
+                                  {hijriPickerSermonId === sr.id && hijriEvents.length > 0 && (
+                                    <div className="flex items-center gap-1 flex-wrap px-2 py-1.5 bg-accent-gold/[0.04] border border-accent-gold/15 -mt-0.5 mb-1">
+                                      <span className="text-[9px] text-accent-gold/60 font-medium shrink-0">{t("themes.assignEvent")}:</span>
+                                      {hijriEvents.map((ev) => (
+                                        <button key={ev.key + ev.date.toISOString()} type="button"
+                                          onClick={() => { onAssignHijriEvent(sr.id, ev); setHijriPickerSermonId(null); }}
+                                          className="flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-medium rounded-full border border-accent-gold/20 text-accent-gold/80 hover:bg-accent-gold/15 hover:text-accent-gold transition-colors"
+                                          title={toISODate(ev.date)}>
+                                          <span className="material-symbols-outlined text-[10px]">{ev.icon}</span>
+                                          {t(ev.key)}
+                                        </button>
+                                      ))}
+                                      <button type="button" onClick={() => setHijriPickerSermonId(null)}
+                                        className="text-[9px] text-mute/40 hover:text-ink ml-auto">✕</button>
+                                    </div>
+                                  )}
                                   <div className="flex items-center gap-1 -mt-1 mb-0.5 px-2">
                                     {isOccasion && (
                                       <span className="text-[8px] text-mute/40 italic" title={t("themes.moonSighting")}>
@@ -1170,6 +1201,27 @@ function SeasonBlock({
                                         <span className="material-symbols-outlined text-[10px]">content_copy</span>
                                         {(deliveryCounts[sr.id] ?? 1) > 1 ? `×${deliveryCounts[sr.id]}` : t("themes.addDelivery")}
                                       </button>
+                                    )}
+                                    {!isOccasion && hijriEvents.length > 0 && (
+                                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setHijriPickerSermonId(hijriPickerSermonId === sr.id ? null : sr.id); }}
+                                        className="text-[8px] text-mute/30 hover:text-accent-gold transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-0.5"
+                                        title={t("themes.assignEvent")}>
+                                        <span className="material-symbols-outlined text-[10px]">event_note</span>
+                                        {t("themes.assignEvent")}
+                                      </button>
+                                    )}
+                                    {!isOccasion && hijriPickerSermonId === sr.id && hijriEvents.length > 0 && (
+                                      <div className="flex items-center gap-1 flex-wrap basis-full mt-0.5">
+                                        {hijriEvents.map((ev) => (
+                                          <button key={ev.key + ev.date.toISOString()} type="button"
+                                            onClick={() => { onAssignHijriEvent(sr.id, ev); setHijriPickerSermonId(null); }}
+                                            className="flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-medium rounded-full border border-accent-gold/20 text-accent-gold/80 hover:bg-accent-gold/15 hover:text-accent-gold transition-colors"
+                                            title={toISODate(ev.date)}>
+                                            <span className="material-symbols-outlined text-[10px]">{ev.icon}</span>
+                                            {t(ev.key)}
+                                          </button>
+                                        ))}
+                                      </div>
                                     )}
                                     {(isOccasion || eidOnFridayPair || fridayWithEid) && (
                                       <button onClick={(e) => { e.preventDefault(); onToggleType(sr); }}
