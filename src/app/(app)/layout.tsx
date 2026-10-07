@@ -7,8 +7,8 @@ import { I18nProvider, useI18n } from "@/lib/i18n";
 
 const navKeys = [
   { href: "/dashboard", key: "nav.dashboard", icon: "dashboard" },
-  { href: "/sermons", key: "nav.sermons", icon: "description" },
   { href: "/themes", key: "nav.annualPlan", icon: "calendar_month" },
+  { href: "/sermons", key: "nav.sermons", icon: "description" },
   { href: "/calendar", key: "nav.calendar", icon: "event" },
   { href: "/resources", key: "nav.resources", icon: "menu_book" },
 ];
