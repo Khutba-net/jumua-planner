@@ -517,10 +517,18 @@ export default function AnnualPlanPage() {
   }
 
   async function assignHijriEvent(sermonId: string, ev: { key: string; date: Date }) {
+    const evMonth = ev.date.getMonth() + 1;
+    const evSeasonIdx = Math.floor((evMonth - 1) / 3);
+    const targetTheme = yearThemes.find((t) => seasonIndexOf(t.month) === evSeasonIdx);
+    const body: Record<string, unknown> = { title: t(ev.key), type: "eid", scheduledDate: toISODate(ev.date) };
+    if (targetTheme) {
+      body.themeId = targetTheme.id;
+      body.subTopicId = targetTheme.sub_topics[0]?.id ?? null;
+    }
     await fetch(`/api/sermons/${sermonId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: t(ev.key), type: "eid", scheduledDate: toISODate(ev.date) }),
+      body: JSON.stringify(body),
     });
     fetchAll();
   }
