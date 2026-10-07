@@ -519,7 +519,7 @@ export default function SermonEditorPage({
           </div>
 
           {/* Title + Editor wrapper */}
-          <div className="flex-1 flex flex-col min-h-0 bg-white">
+          <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-white overflow-hidden">
             {sessionExpired && (
               <div className="mx-5 sm:mx-8 mt-4 flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-800">
                 <span className="material-symbols-outlined text-amber-500 text-lg">warning</span>
@@ -562,7 +562,7 @@ export default function SermonEditorPage({
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
               <Suspense fallback={<div className="px-8 py-4 text-mute/40 text-sm">Loading editor…</div>}>
                 <RichEditor
                   content={content}
