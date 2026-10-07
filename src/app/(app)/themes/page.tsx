@@ -466,10 +466,25 @@ export default function AnnualPlanPage() {
     if (!title || addBusy) { if (!title) cancelAddTitle(); return; }
     setAddBusy(true);
     try {
+      let targetThemeId = theme.id;
+      let targetSubTopicId = addSubTopicId;
+      const scheduledDate = addDate || (addType === "friday" ? nextDateForTheme(theme) : null);
+      if (scheduledDate) {
+        const dateMonth = new Date(scheduledDate + "T00:00:00").getMonth() + 1;
+        const dateSeason = Math.floor((dateMonth - 1) / 3);
+        const themeSeason = seasonIndexOf(theme.month);
+        if (dateSeason !== themeSeason) {
+          const correctTheme = yearThemes.find((t) => seasonIndexOf(t.month) === dateSeason);
+          if (correctTheme) {
+            targetThemeId = correctTheme.id;
+            targetSubTopicId = correctTheme.sub_topics[0]?.id ?? null;
+          }
+        }
+      }
       const res = await fetch("/api/sermons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, themeId: theme.id, subTopicId: addSubTopicId, type: addType, status: "draft", scheduledDate: addDate || (addType === "friday" ? nextDateForTheme(theme) : null) }),
+        body: JSON.stringify({ title, themeId: targetThemeId, subTopicId: targetSubTopicId, type: addType, status: "draft", scheduledDate }),
       });
       if (!res.ok) { setAddBusy(false); return; }
       setAddTitleText("");
@@ -685,7 +700,7 @@ export default function AnnualPlanPage() {
           {loading ? (
             <SkeletonSeasons />
           ) : view === "hijri" ? (
-            <HijriEventsTab year={year} onSermonCreated={fetchAll} />
+            <HijriEventsTab year={year} yearThemes={yearThemes} onSermonCreated={fetchAll} />
           ) : view === "grid" ? (
             <YearGrid weeks={fridays} taken={takenDates} year={year}
               gridAddIso={gridAddIso} gridAddText={gridAddText} setGridAddText={setGridAddText}
@@ -1505,7 +1520,7 @@ function EmptyWizard({ year, onStart, onImport, importing }: { year: number; onS
 }
 
 /* ── Hijri Events tab ── */
-function HijriEventsTab({ year, onSermonCreated }: { year: number; onSermonCreated: () => void }) {
+function HijriEventsTab({ year, yearThemes, onSermonCreated }: { year: number; yearThemes: Theme[]; onSermonCreated: () => void }) {
   const router = useRouter();
   const { t, isAr } = useI18n();
   const events = useMemo(() => hijriEventsForYear(year), [year]);
@@ -1536,10 +1551,17 @@ function HijriEventsTab({ year, onSermonCreated }: { year: number; onSermonCreat
     try {
       const title = t(ev.key);
       const isoDate = toISODate(ev.date);
+      const evSeasonIdx = Math.floor(ev.date.getMonth() / 3);
+      const targetTheme = yearThemes.find((th) => seasonIndexOf(th.month) === evSeasonIdx);
+      const body: Record<string, unknown> = { title, type: "eid", status: "draft", scheduledDate: isoDate };
+      if (targetTheme) {
+        body.themeId = targetTheme.id;
+        body.subTopicId = targetTheme.sub_topics[0]?.id ?? null;
+      }
       const res = await fetch("/api/sermons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, type: "eid", status: "draft", scheduledDate: isoDate }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         const sermon = await res.json();
