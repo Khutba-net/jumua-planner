@@ -92,27 +92,24 @@ export async function POST(req: NextRequest) {
         );
         if (subs.length > 0) subTopicId = subs[0].id;
 
-        // Auto-assign a date if none given
+        // Auto-assign the next available date after today
         if (!scheduledDate) {
           const seasonEnd = new Date(currentYear, seasonStartMonth + 2, 0);
-          // Find existing dates in this theme to avoid collisions
           const existing = await query(
             `SELECT scheduled_date FROM sermons WHERE theme_id = $1 AND scheduled_date IS NOT NULL`,
             [themeId]
           );
           const taken = new Set(existing.map((r) => (r.scheduled_date as string)?.slice(0, 10)));
 
-          // Start from next Friday (or today if Friday)
           const d2 = new Date(now);
-          d2.setDate(d2.getDate() + ((5 - d2.getDay() + 7) % 7 || 7));
-          // Find next available Friday
+          d2.setDate(d2.getDate() + 1);
           while (d2 <= seasonEnd) {
             const iso = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
             if (!taken.has(iso)) {
               scheduledDate = iso;
               break;
             }
-            d2.setDate(d2.getDate() + 7);
+            d2.setDate(d2.getDate() + 1);
           }
         }
       }
