@@ -144,16 +144,61 @@ function fridaysInYear(year: number): Date[] {
   return out;
 }
 
+function weeksInYear(year: number): Date[] {
+  const out: Date[] = [];
+  const d = new Date(year, 0, 1);
+  while (d.getFullYear() === year) {
+    out.push(new Date(d));
+    d.setDate(d.getDate() + 7);
+  }
+  return out;
+}
+
+function seasonDateRange(seasonIndex: number, year: number): { min: string; max: string } {
+  const startMonth = seasonIndex * 3;
+  const endMonth = startMonth + 3;
+  const minDate = new Date(year, startMonth, 1);
+  const maxDate = new Date(year, endMonth, 0);
+  return { min: toISODate(minDate), max: toISODate(maxDate) };
+}
+
+function autoAllocateDates(seasonIndex: number, year: number, count: number, taken: Set<string>): string[] {
+  const startMonth = seasonIndex * 3;
+  const start = new Date(year, startMonth, 1);
+  const end = new Date(year, startMonth + 3, 0);
+  const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+  const gap = Math.max(1, Math.floor(totalDays / Math.max(count, 1)));
+  const out: string[] = [];
+  const d = new Date(start);
+  for (let i = 0; i < count && d <= end; i++) {
+    let iso = toISODate(d);
+    let tries = 0;
+    while (taken.has(iso) && tries < 7) {
+      d.setDate(d.getDate() + 1);
+      if (d > end) break;
+      iso = toISODate(d);
+      tries++;
+    }
+    if (d <= end) {
+      out.push(iso);
+      taken.add(iso);
+    }
+    d.setDate(d.getDate() + Math.max(gap - tries, 1));
+  }
+  return out;
+}
+
 function toISODate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function formatFriday(iso: string, isAr: boolean) {
+function formatDate(iso: string, isAr: boolean) {
   const d = new Date(iso + "T00:00:00");
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   if (isAr) {
-    return d.toLocaleDateString("ar-SA", { day: "numeric", month: "short" });
+    return d.toLocaleDateString("ar-SA", { weekday: "short", day: "numeric", month: "short" });
   }
-  return `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+  return `${dayNames[d.getDay()]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
 }
 
 export default function AnnualPlanPage() {
@@ -278,6 +323,7 @@ export default function AnnualPlanPage() {
   }));
 
   const fridays = useMemo(() => fridaysInYear(year), [year]);
+  const weeks = useMemo(() => weeksInYear(year), [year]);
   const takenDates = useMemo(() => {
     const m = new Map<string, Sermon>();
     for (const s of yearSermons) if (s.scheduled_date) m.set(s.scheduled_date.slice(0, 10), s);
@@ -295,10 +341,34 @@ export default function AnnualPlanPage() {
     return seasonFridayISOs(theme).filter((iso) => !takenDates.has(iso) || iso === keep);
   }
 
-  function nextFridayForTheme(theme: Theme): string | null {
-    const seasonISOs = seasonFridayISOs(theme);
-    const free = seasonISOs.find((iso) => !takenDates.has(iso));
-    return free ?? seasonISOs[seasonISOs.length - 1] ?? null;
+  function nextDateForTheme(theme: Theme): string | null {
+    const si = seasonIndexOf(theme.month);
+    const range = seasonDateRange(si, year);
+    const today = toISODate(new Date());
+    const startISO = range.min > today ? range.min : today;
+    const takenSet = new Set(takenDates.keys());
+    const allocated = autoAllocateDates(si, year, DEFAULT_FRIDAY_SLOTS, new Set(takenSet));
+    const free = allocated.find((iso) => !takenDates.has(iso) && iso >= startISO);
+    if (free) return free;
+    const start = new Date(range.min + "T00:00:00");
+    const end = new Date(range.max + "T00:00:00");
+    const d = new Date(startISO + "T00:00:00");
+    while (d <= end) {
+      const iso = toISODate(d);
+      if (!takenDates.has(iso)) return iso;
+      d.setDate(d.getDate() + 1);
+    }
+    const d2 = new Date(start);
+    while (d2 <= end) {
+      const iso = toISODate(d2);
+      if (!takenDates.has(iso)) return iso;
+      d2.setDate(d2.getDate() + 1);
+    }
+    return range.min;
+  }
+
+  function seasonRangeFor(theme: Theme): { min: string; max: string } {
+    return seasonDateRange(seasonIndexOf(theme.month), year);
   }
 
   function themeIdForDate(iso: string): string | null {
@@ -382,7 +452,7 @@ export default function AnnualPlanPage() {
     setAddTitleText("");
     setAddType(type);
     if (type === "friday") {
-      setAddDate(nextFridayForTheme(theme) ?? "");
+      setAddDate(nextDateForTheme(theme) ?? "");
     } else {
       setAddDate("");
     }
@@ -402,7 +472,7 @@ export default function AnnualPlanPage() {
       const res = await fetch("/api/sermons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, themeId: theme.id, subTopicId: addSubTopicId, type: addType, status: "draft", scheduledDate: addDate || (addType === "friday" ? nextFridayForTheme(theme) : null) }),
+        body: JSON.stringify({ title, themeId: theme.id, subTopicId: addSubTopicId, type: addType, status: "draft", scheduledDate: addDate || (addType === "friday" ? nextDateForTheme(theme) : null) }),
       });
       if (!res.ok) { setAddBusy(false); return; }
       setAddTitleText("");
@@ -603,7 +673,7 @@ export default function AnnualPlanPage() {
           ) : view === "hijri" ? (
             <HijriEventsTab year={year} onSermonCreated={fetchAll} />
           ) : view === "grid" ? (
-            <YearGrid fridays={fridays} taken={takenDates} year={year}
+            <YearGrid weeks={fridays} taken={takenDates} year={year}
               gridAddIso={gridAddIso} gridAddText={gridAddText} setGridAddText={setGridAddText}
               onStartGridAdd={startGridAdd} onCancelGridAdd={cancelGridAdd} onSubmitGridAdd={submitGridAdd} gridBusy={gridBusy} />
           ) : yearThemes.length === 0 ? (
@@ -626,6 +696,7 @@ export default function AnnualPlanPage() {
                     addDate={addDate}
                     setAddDate={setAddDate}
                     dateOptionsFor={(t) => openSeasonFridays(t, addDate)}
+                    seasonRangeFor={seasonRangeFor}
                     submitAddTitle={submitAddTitle}
                     addBusy={addBusy}
                     addType={addType}
@@ -834,7 +905,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function SeasonBlock({
   season, allSeasons, themeSermons, onEditTheme, onAddThemeToSeason,
   addingKey, onStartAdd, onCancelAdd, addTitleText, setAddTitleText,
-  addDate, setAddDate, dateOptionsFor, submitAddTitle, addBusy,
+  addDate, setAddDate, dateOptionsFor, seasonRangeFor, submitAddTitle, addBusy,
   addType, onToggleType, onSeasonFull, deliveryCounts, onCycleDelivery,
 }: {
   season: { n: number; label: string; ar: string; range: string; startMonth: number; themes: Theme[] };
@@ -850,6 +921,7 @@ function SeasonBlock({
   addDate: string;
   setAddDate: (v: string) => void;
   dateOptionsFor: (t: Theme) => string[];
+  seasonRangeFor: (t: Theme) => { min: string; max: string };
   addType: string;
   submitAddTitle: (t: Theme) => void;
   addBusy: boolean;
@@ -999,7 +1071,6 @@ function SeasonBlock({
                   const key = `${theme.id}:${si}`;
                   const isAdding = addingKey === key;
                   const isAddingOccasion = addingKey === `occasion:${season.n}:${si}`;
-                  const dateOpts = isAdding ? dateOptionsFor(theme) : [];
                   const hasSubTopic = sub !== null;
 
                   const isHeavy = slotCount >= 6;
@@ -1049,8 +1120,8 @@ function SeasonBlock({
                                     className="flex items-center gap-2.5 py-[7px] -mx-2 px-2 hover:bg-ink/[0.03] transition-all duration-200">
                                     <span className={`w-[5px] h-[5px] rounded-full shrink-0 ${isOccasion ? "bg-accent-gold/60" : ""}`}
                                       style={isOccasion ? {} : { backgroundColor: st.dot }} />
-                                    <span className="text-[11px] text-mute/70 font-medium tabular-nums w-[42px] shrink-0">
-                                      {sr.scheduled_date ? formatFriday(sr.scheduled_date.slice(0, 10), isAr) : "—"}
+                                    <span className="text-[11px] text-mute/70 font-medium tabular-nums w-[72px] shrink-0">
+                                      {sr.scheduled_date ? formatDate(sr.scheduled_date.slice(0, 10), isAr) : "—"}
                                     </span>
                                     <span className="text-[13px] text-ink font-medium truncate min-w-0 flex-1 group-hover:text-primary transition-colors duration-200">
                                       {sr.title}
@@ -1120,13 +1191,11 @@ function SeasonBlock({
                                   className="text-[12.5px] text-ink font-medium bg-white border border-line/60 px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-mute/40" />
                                 <div className="flex items-center gap-1.5">
                                   <span className="material-symbols-outlined text-[14px] text-mute/50 shrink-0">event</span>
-                                  <select value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
-                                    className="flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none focus:border-primary transition-all duration-200">
-                                    {dateOpts.length === 0 && <option value="">{t("themes.noOpenFridays")}</option>}
-                                    {dateOpts.map((iso) => (
-                                      <option key={iso} value={iso}>{isAr ? t("type.friday") : "Fri"} {formatFriday(iso, isAr)}</option>
-                                    ))}
-                                  </select>
+                                  {(() => { const range = seasonRangeFor(theme); return (
+                                    <input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} disabled={addBusy}
+                                      min={range.min} max={range.max}
+                                      className="flex-1 min-w-0 text-[11px] font-semibold text-ink bg-white border border-line/60 px-2 py-1.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200" />
+                                  ); })()}
                                   <button onClick={() => submitAddTitle(theme)} disabled={!addTitleText.trim() || addBusy}
                                     className={`text-[11px] font-bold px-3 py-1.5 transition-all duration-200 ${
                                       addTitleText.trim() && !addBusy ? "bg-primary text-white hover:bg-secondary" : "bg-ink/[0.06] text-mute cursor-not-allowed"
@@ -1214,10 +1283,10 @@ function SeasonBlock({
 
 /* ── Year grid ── */
 function YearGrid({
-  fridays, taken, year,
+  weeks, taken, year,
   gridAddIso, gridAddText, setGridAddText, onStartGridAdd, onCancelGridAdd, onSubmitGridAdd, gridBusy,
 }: {
-  fridays: Date[];
+  weeks: Date[];
   taken: Map<string, Sermon>;
   year: number;
   gridAddIso: string | null;
@@ -1231,14 +1300,14 @@ function YearGrid({
   const { t, isAr } = useI18n();
   const STATUS_MAP = useStatusMap();
   const cols = 4;
-  const perCol = Math.ceil(fridays.length / cols);
-  const groups = Array.from({ length: cols }, (_, i) => fridays.slice(i * perCol, (i + 1) * perCol));
-  const openCount = fridays.filter((d) => !taken.has(toISODate(d))).length;
+  const perCol = Math.ceil(weeks.length / cols);
+  const groups = Array.from({ length: cols }, (_, i) => weeks.slice(i * perCol, (i + 1) * perCol));
+  const openCount = weeks.filter((d) => !taken.has(toISODate(d))).length;
 
   return (
     <div className="max-w-6xl">
       <p className="text-[12px] text-mute mb-4">
-        {t("themes.everyFriday")} <span className="font-bold text-ink">{year}</span> — {fridays.length} {t("themes.inTotal")}, {openCount} {t("themes.stillOpen")}
+        {t("themes.everyWeek") || t("themes.everyFriday")} <span className="font-bold text-ink">{year}</span> — {weeks.length} {t("themes.inTotal")}, {openCount} {t("themes.stillOpen")}
         {" "}{t("themes.gridHint")} <span className="text-primary font-semibold">{t("themes.openLabel")}</span> {t("themes.gridHint2")}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1254,7 +1323,7 @@ function YearGrid({
               const lead = (
                 <>
                   <span className="text-[10px] font-bold text-mute/70 tabular-nums w-5 shrink-0">{idx + 1}</span>
-                  <span className="text-[10px] text-mute tabular-nums w-[42px] shrink-0">{formatFriday(iso, isAr)}</span>
+                  <span className="text-[10px] text-mute tabular-nums w-[72px] shrink-0">{formatDate(iso, isAr)}</span>
                 </>
               );
 

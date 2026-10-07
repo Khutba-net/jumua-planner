@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, use } from "react";
+import { useEffect, useState, useCallback, useRef, use, lazy, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
+
+const RichEditor = lazy(() => import("@/components/RichEditor"));
 
 interface Sermon {
   id: string;
@@ -23,7 +25,8 @@ interface Sermon {
 
 function wordCount(text: string | null) {
   if (!text) return 0;
-  return text.trim().split(/\s+/).filter(Boolean).length;
+  const plain = text.replace(/<[^>]*>/g, " ");
+  return plain.trim().split(/\s+/).filter(Boolean).length;
 }
 
 const allStatuses = ["draft", "ready", "submitted", "in_review", "approved", "delivered", "archived", "skipped"];
@@ -100,7 +103,7 @@ export default function SermonEditorPage({
   const [conflictDetected, setConflictDetected] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [recoveredDraft, setRecoveredDraft] = useState<{ title: string; content: string; notes: string } | null>(null);
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
 
   const locale = isAr ? "ar-SA" : "en-US";
 
@@ -559,16 +562,16 @@ export default function SermonEditorPage({
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-h-0 px-5 sm:px-8 pb-6">
-              <textarea
-                ref={editorRef}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={t("editor.contentPlaceholder")}
-                className="w-full h-full min-h-0 leading-[2.2] text-ink bg-transparent border-none resize-none outline-none"
-                style={{ fontSize: `${editorFontSize}px` }}
-                dir="auto"
-              />
+            <div className="flex-1 min-h-0">
+              <Suspense fallback={<div className="px-8 py-4 text-mute/40 text-sm">Loading editor…</div>}>
+                <RichEditor
+                  content={content}
+                  onChange={setContent}
+                  placeholder={t("editor.contentPlaceholder")}
+                  fontSize={editorFontSize}
+                  dir="auto"
+                />
+              </Suspense>
             </div>
           </div>
 
