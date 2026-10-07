@@ -79,9 +79,15 @@ export async function POST(req: NextRequest) {
       if (themes.length > 0) {
         themeId = themes[0].id;
 
-        // Pick the first sub-topic if available
+        // Pick the sub-bouquet with the fewest sermons
         const subs = await query(
-          `SELECT id FROM sub_topics WHERE theme_id = $1 ORDER BY week_number ASC LIMIT 1`,
+          `SELECT st.id, COUNT(s.id) AS sermon_count
+           FROM sub_topics st
+           LEFT JOIN sermons s ON s.sub_topic_id = st.id
+           WHERE st.theme_id = $1
+           GROUP BY st.id, st.week_number
+           ORDER BY sermon_count ASC, st.week_number ASC
+           LIMIT 1`,
           [themeId]
         );
         if (subs.length > 0) subTopicId = subs[0].id;
