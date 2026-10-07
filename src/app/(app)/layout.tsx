@@ -105,7 +105,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
     const isOrgAdmin = (user.role === "admin" || user.role === "mosque_admin") && user.account_type !== "individual";
     const khatibOnlyRoutes = ["/sermons", "/themes", "/calendar", "/resources"];
     if (isOrgAdmin && khatibOnlyRoutes.some((r) => pathname.startsWith(r))) {
-      router.push("/dashboard");
+      router.push("/org/dashboard");
+    }
+    if (isOrgAdmin && pathname === "/dashboard") {
+      router.replace("/org/dashboard");
     }
     if (user.role === "mosque_admin" && pathname.startsWith("/org/mosques")) {
       router.push("/org/dashboard");
@@ -205,7 +208,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           ) : navKeys
             .filter((item) => {
               if (user?.role !== "admin" || user?.account_type === "individual") return true;
-              return item.href === "/dashboard";
+              return false;
             })
             .map((item) => {
             const isActive = pathname.startsWith(item.href);
