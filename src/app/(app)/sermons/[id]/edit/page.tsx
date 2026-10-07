@@ -30,6 +30,7 @@ function wordCount(text: string | null) {
 }
 
 const allStatuses = ["draft", "ready", "submitted", "in_review", "approved", "delivered", "archived", "skipped"];
+const individualStatuses = ["draft", "ready", "delivered", "archived", "skipped"];
 
 const statusStyle: Record<string, string> = {
   draft: "bg-[#f3f0ea] text-[#8a7968]",
@@ -379,7 +380,7 @@ export default function SermonEditorPage({
               onChange={(e) => changeStatus(e.target.value)}
               className="text-xs font-medium text-ink bg-transparent border-none outline-none w-full"
             >
-              {allStatuses.map((s) => (
+              {(hasOrg ? allStatuses : individualStatuses).map((s) => (
                 <option key={s} value={s}>{statusLabel[s]}</option>
               ))}
             </select>
