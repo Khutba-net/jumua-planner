@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { getEffectiveSubscription } from "@/lib/subscription";
+import { getOrgContext } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -66,56 +67,77 @@ export async function GET() {
   const thisFriday = getThisFriday();
   const lastFriday = getLastFriday();
 
+  const ctx = await getOrgContext(userId);
+
+  // Context filter: org context = sermons linked to org themes, personal = sermons with personal themes or no org theme
+  const ctxFilter = ctx
+    ? "AND (s.theme_id IS NULL OR s.theme_id IN (SELECT id FROM themes WHERE organization_id = $CTX))"
+    : "AND (s.theme_id IS NULL OR s.theme_id IN (SELECT id FROM themes WHERE owner_id = $CTX AND organization_id IS NULL))";
+  const ctxVal = ctx ? ctx.orgId : userId;
+
+  function injectCtx(sql: string, baseParams: unknown[]): { sql: string; params: unknown[] } {
+    const idx = baseParams.length + 1;
+    return { sql: sql.replace(/\$CTX/g, `$${idx}`), params: [...baseParams, ctxVal] };
+  }
+
+  const q1 = injectCtx(`SELECT COUNT(*) as count FROM sermons s WHERE author_id = $1 ${ctxFilter}`, [userId]);
+  const q2 = injectCtx(`SELECT COUNT(*) as count FROM sermons s WHERE author_id = $1 AND status = 'draft' ${ctxFilter}`, [userId]);
+  const q3 = injectCtx(`SELECT COUNT(*) as count FROM sermons s WHERE author_id = $1 AND status = 'ready' ${ctxFilter}`, [userId]);
+  const q4 = injectCtx(`SELECT COUNT(*) as count FROM sermons s WHERE author_id = $1 AND status = 'delivered' ${ctxFilter}`, [userId]);
+  const q5 = injectCtx(`SELECT COALESCE(SUM(LENGTH(content) - LENGTH(REPLACE(content, ' ', '')) + 1), 0) as count FROM sermons s WHERE author_id = $1 AND content != '' ${ctxFilter}`, [userId]);
+  const q6 = injectCtx(`
+    SELECT s.id, s.title, s.status, s.content, s.scheduled_date, s.updated_at,
+           t.name as theme_name, t.color as theme_color
+    FROM sermons s
+    LEFT JOIN themes t ON s.theme_id = t.id
+    WHERE s.author_id = $1 ${ctxFilter}
+    ORDER BY s.updated_at DESC
+    LIMIT 5
+  `, [userId]);
+  const q7 = injectCtx(`
+    SELECT s.id, s.title, s.scheduled_date, s.status,
+           t.name as theme_name
+    FROM sermons s
+    LEFT JOIN themes t ON s.theme_id = t.id
+    WHERE s.author_id = $1 AND s.scheduled_date >= $2 AND s.status NOT IN ('delivered', 'skipped') ${ctxFilter}
+    ORDER BY s.scheduled_date ASC
+    LIMIT 4
+  `, [userId, today]);
+  const q8 = injectCtx(`
+    SELECT s.id, s.title, s.status, s.scheduled_date, s.content,
+           t.name as theme_name, t.color as theme_color
+    FROM sermons s
+    LEFT JOIN themes t ON s.theme_id = t.id
+    WHERE s.author_id = $1 AND s.scheduled_date = $2 AND (s.type = 'friday' OR s.type IS NULL) ${ctxFilter}
+    LIMIT 1
+  `, [userId, thisFriday]);
+  const q9 = injectCtx(`
+    SELECT s.id, s.title, s.status, s.scheduled_date
+    FROM sermons s
+    WHERE s.author_id = $1 AND s.scheduled_date = $2 AND (s.type = 'friday' OR s.type IS NULL) ${ctxFilter}
+    LIMIT 1
+  `, [userId, lastFriday]);
+  const q10 = injectCtx(`
+    SELECT s.id, s.title, s.status, s.scheduled_date,
+           t.name as theme_name
+    FROM sermons s
+    LEFT JOIN themes t ON s.theme_id = t.id
+    WHERE s.author_id = $1 AND s.scheduled_date < $2 AND s.status NOT IN ('delivered', 'archived', 'skipped')
+      AND (s.type = 'friday' OR s.type IS NULL) ${ctxFilter}
+    ORDER BY s.scheduled_date DESC
+  `, [userId, today]);
+
   const [totalRow, draftRow, readyRow, deliveredRow, wordsRow, recentSermons, upcomingSermons, thisFridaySermon, lastFridaySermon, backlogSermons] = await Promise.all([
-    queryOne<{ count: string }>("SELECT COUNT(*) as count FROM sermons WHERE author_id = $1", [userId]),
-    queryOne<{ count: string }>("SELECT COUNT(*) as count FROM sermons WHERE author_id = $1 AND status = 'draft'", [userId]),
-    queryOne<{ count: string }>("SELECT COUNT(*) as count FROM sermons WHERE author_id = $1 AND status = 'ready'", [userId]),
-    queryOne<{ count: string }>("SELECT COUNT(*) as count FROM sermons WHERE author_id = $1 AND status = 'delivered'", [userId]),
-    queryOne<{ count: string }>(
-      "SELECT COALESCE(SUM(LENGTH(content) - LENGTH(REPLACE(content, ' ', '')) + 1), 0) as count FROM sermons WHERE author_id = $1 AND content != ''",
-      [userId]
-    ),
-    query(`
-      SELECT s.id, s.title, s.status, s.content, s.scheduled_date, s.updated_at,
-             t.name as theme_name, t.color as theme_color
-      FROM sermons s
-      LEFT JOIN themes t ON s.theme_id = t.id
-      WHERE s.author_id = $1
-      ORDER BY s.updated_at DESC
-      LIMIT 5
-    `, [userId]),
-    query(`
-      SELECT s.id, s.title, s.scheduled_date, s.status,
-             t.name as theme_name
-      FROM sermons s
-      LEFT JOIN themes t ON s.theme_id = t.id
-      WHERE s.author_id = $1 AND s.scheduled_date >= $2 AND s.status NOT IN ('delivered', 'skipped')
-      ORDER BY s.scheduled_date ASC
-      LIMIT 4
-    `, [userId, today]),
-    queryOne<Record<string, unknown>>(`
-      SELECT s.id, s.title, s.status, s.scheduled_date, s.content,
-             t.name as theme_name, t.color as theme_color
-      FROM sermons s
-      LEFT JOIN themes t ON s.theme_id = t.id
-      WHERE s.author_id = $1 AND s.scheduled_date = $2 AND (s.type = 'friday' OR s.type IS NULL)
-      LIMIT 1
-    `, [userId, thisFriday]),
-    queryOne<Record<string, unknown>>(`
-      SELECT s.id, s.title, s.status, s.scheduled_date
-      FROM sermons s
-      WHERE s.author_id = $1 AND s.scheduled_date = $2 AND (s.type = 'friday' OR s.type IS NULL)
-      LIMIT 1
-    `, [userId, lastFriday]),
-    query<{ id: string; title: string; status: string; scheduled_date: string; theme_name: string | null }>(`
-      SELECT s.id, s.title, s.status, s.scheduled_date,
-             t.name as theme_name
-      FROM sermons s
-      LEFT JOIN themes t ON s.theme_id = t.id
-      WHERE s.author_id = $1 AND s.scheduled_date < $2 AND s.status NOT IN ('delivered', 'archived', 'skipped')
-        AND (s.type = 'friday' OR s.type IS NULL)
-      ORDER BY s.scheduled_date DESC
-    `, [userId, today]),
+    queryOne<{ count: string }>(q1.sql, q1.params),
+    queryOne<{ count: string }>(q2.sql, q2.params),
+    queryOne<{ count: string }>(q3.sql, q3.params),
+    queryOne<{ count: string }>(q4.sql, q4.params),
+    queryOne<{ count: string }>(q5.sql, q5.params),
+    query(q6.sql, q6.params),
+    query(q7.sql, q7.params),
+    queryOne<Record<string, unknown>>(q8.sql, q8.params),
+    queryOne<Record<string, unknown>>(q9.sql, q9.params),
+    query<{ id: string; title: string; status: string; scheduled_date: string; theme_name: string | null }>(q10.sql, q10.params),
   ]);
 
   const totalSermons = Number(totalRow?.count ?? 0);
@@ -128,15 +150,20 @@ export async function GET() {
 
   const planningYear = (user.planning_year as number) || new Date().getFullYear();
 
+  const themeFilter = ctx
+    ? "t.organization_id = $1"
+    : "(t.owner_id = $1 AND t.organization_id IS NULL)";
+  const themeFilterVal = ctx ? ctx.orgId : userId;
+
   const [allThemes, planSermonStats, feedbackRow] = await Promise.all([
     query<{ id: string; name: string; month: number; year: number; sub_topic_count: string }>(`
       SELECT t.id, t.name, t.month, t.year,
              (SELECT COUNT(*) FROM sub_topics st WHERE st.theme_id = t.id) as sub_topic_count
       FROM themes t
-      WHERE (t.owner_id = $1 OR t.organization_id IN (SELECT organization_id FROM users WHERE id = $2))
-        AND t.year = $3
+      WHERE ${themeFilter}
+        AND t.year = $2
       ORDER BY t.month
-    `, [userId, userId, planningYear]),
+    `, [themeFilterVal, planningYear]),
     queryOne<{ total: string; titled: string; delivered: string }>(`
       SELECT COUNT(*) as total,
              SUM(CASE WHEN s.title != 'Untitled Sermon' AND s.title != '' THEN 1 ELSE 0 END) as titled,
@@ -208,20 +235,22 @@ export async function GET() {
 
   let myAssignments: unknown[] = [];
   let orgName: string | null = null;
-  if (user.organization_id) {
+  const contextOrgId = ctx?.orgId || (user.organization_id as string | null);
+  if (contextOrgId) {
     const [org, member] = await Promise.all([
-      queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id as string]),
+      queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [contextOrgId]),
       queryOne<{ id: string }>(
         "SELECT id FROM org_members WHERE user_id = $1 AND organization_id = $2",
-        [userId, user.organization_id as string]
+        [userId, contextOrgId]
       ),
     ]);
     orgName = org?.name || null;
 
     if (member) {
       myAssignments = await query(`
-        SELECT fa.friday_date, fa.notes
+        SELECT fa.friday_date, fa.notes, m.name as mosque_name
         FROM friday_assignments fa
+        LEFT JOIN mosques m ON fa.mosque_id = m.id
         WHERE fa.member_id = $1 AND fa.friday_date >= $2
         ORDER BY fa.friday_date ASC
         LIMIT 8
@@ -260,9 +289,10 @@ export async function GET() {
     },
     planningYear,
     orgName,
+    orgContext: ctx ? { orgId: ctx.orgId, orgName: ctx.orgName, orgType: ctx.orgType, role: ctx.role, mosqueName: ctx.mosqueName } : null,
     myAssignments,
     nextYearPrompt: null,
-    subscription: await getEffectiveSubscription(userId),
+    subscription: await getEffectiveSubscription(userId, ctx?.orgId),
   };
 
   const currentYear = new Date().getFullYear();

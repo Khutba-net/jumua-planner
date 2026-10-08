@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
 
+  const ctx = await getOrgContext(userId);
+
   let sql = `
     SELECT s.*, t.name as theme_name, t.color as theme_color,
            u.name as author_name
@@ -26,9 +28,17 @@ export async function GET(req: NextRequest) {
   `;
   const params: unknown[] = [userId];
 
+  if (ctx) {
+    params.push(ctx.orgId);
+    sql += ` AND (s.theme_id IS NULL OR s.theme_id IN (SELECT id FROM themes WHERE organization_id = $${params.length}))`;
+  } else {
+    params.push(userId);
+    sql += ` AND (s.theme_id IS NULL OR s.theme_id IN (SELECT id FROM themes WHERE owner_id = $${params.length} AND organization_id IS NULL))`;
+  }
+
   if (status) {
-    sql += " AND s.status = $2";
     params.push(status);
+    sql += ` AND s.status = $${params.length}`;
   }
 
   sql += " ORDER BY s.updated_at DESC";

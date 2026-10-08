@@ -73,7 +73,8 @@ interface DashboardData {
   };
   planningYear: number;
   orgName: string | null;
-  myAssignments: { friday_date: string; notes: string | null }[];
+  orgContext: { orgId: string; orgName: string; orgType: string; role: string; mosqueName: string | null } | null;
+  myAssignments: { friday_date: string; notes: string | null; mosque_name?: string | null }[];
   nextYearPrompt: { nextYear: number; hasThemes: boolean } | null;
 }
 
@@ -314,7 +315,7 @@ export default function DashboardPage() {
     return <div className="flex items-center justify-center h-full text-mute">{t("dash.failedToLoad")}</div>;
   }
 
-  const { user, stats, recentSermons, upcomingSermons, thisFriday, lastFriday, backlogCount, backlogSermons, seasons, checklist, orgName, myAssignments, nextYearPrompt } = data;
+  const { user, stats, recentSermons, upcomingSermons, thisFriday, lastFriday, backlogCount, backlogSermons, seasons, checklist, orgName, orgContext, myAssignments, nextYearPrompt } = data;
   const isOrgAdmin = user.role === "admin" && user.account_type !== "individual";
   const eidOnFriday = isEidDate(thisFriday.date);
 
@@ -354,6 +355,17 @@ export default function DashboardPage() {
               <p className="text-xs text-accent-gold font-medium mt-1 flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">mosque</span>
                 {getDayContext()}
+              </p>
+            )}
+            {orgContext && orgContext.role === "khatib" && (
+              <p className="text-xs text-primary font-medium mt-1 flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">
+                  {orgContext.orgType === "institution" ? "account_balance" : "corporate_fare"}
+                </span>
+                {orgContext.orgName}
+                {orgContext.mosqueName && (
+                  <span className="text-mute">· {orgContext.mosqueName}</span>
+                )}
               </p>
             )}
           </div>
@@ -592,6 +604,7 @@ export default function DashboardPage() {
                       <p className="text-sm text-ink">
                         {new Date(a.friday_date + "T00:00:00").toLocaleDateString(isAr ? "ar-SA" : "en-US", { weekday: "long", month: "long", day: "numeric" })}
                       </p>
+                      {a.mosque_name && <p className="text-[11px] text-mute/70 mt-0.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[11px]">mosque</span>{a.mosque_name}</p>}
                       {a.notes && <p className="text-[11px] text-mute mt-0.5">{a.notes}</p>}
                     </div>
                     {isThisWeek && (

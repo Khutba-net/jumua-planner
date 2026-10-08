@@ -14,16 +14,24 @@ export async function GET() {
   }
 
   const ctx = await getOrgContext(userId);
-  const orgId = ctx?.orgId || "";
 
-  const themes = await query(`
-    SELECT t.*,
-      (SELECT COUNT(*) FROM sub_topics WHERE theme_id = t.id) as sub_topic_count,
-      (SELECT COUNT(*) FROM sermons WHERE theme_id = t.id) as sermon_count
-    FROM themes t
-    WHERE t.owner_id = $1 OR (t.organization_id = $2 AND t.organization_id IS NOT NULL)
-    ORDER BY t.year DESC, t.month ASC
-  `, [userId, orgId]);
+  const themes = ctx
+    ? await query(`
+      SELECT t.*,
+        (SELECT COUNT(*) FROM sub_topics WHERE theme_id = t.id) as sub_topic_count,
+        (SELECT COUNT(*) FROM sermons WHERE theme_id = t.id) as sermon_count
+      FROM themes t
+      WHERE t.organization_id = $1
+      ORDER BY t.year DESC, t.month ASC
+    `, [ctx.orgId])
+    : await query(`
+      SELECT t.*,
+        (SELECT COUNT(*) FROM sub_topics WHERE theme_id = t.id) as sub_topic_count,
+        (SELECT COUNT(*) FROM sermons WHERE theme_id = t.id) as sermon_count
+      FROM themes t
+      WHERE t.owner_id = $1 AND t.organization_id IS NULL
+      ORDER BY t.year DESC, t.month ASC
+    `, [userId]);
 
   const themeIds = themes.map(t => t.id as string);
   let allSubTopics: Record<string, unknown>[] = [];
