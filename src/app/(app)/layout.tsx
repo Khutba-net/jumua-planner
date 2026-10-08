@@ -28,8 +28,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
+  const [orgContext, setOrgContext] = useState<{ orgId: string; orgName: string; orgType: string; role: string; mosqueId: string | null; mosqueName: string | null } | null>(null);
+  const [memberships, setMemberships] = useState<{ orgId: string; orgName: string; orgType: string; role: string; mosqueId: string | null; mosqueName: string | null }[]>([]);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
 
-  const planLabel = subPlan?.includes("institution") ? "Institution"
+  const planLabel = orgContext?.orgType === "institution" ? "Institution"
+    : orgContext?.orgType === "organization" ? "Organization"
+    : subPlan?.includes("institution") ? "Institution"
     : subPlan?.includes("organization") ? "Organization"
     : subPlan?.includes("individual") ? "Individual"
     : user?.account_type === "institution" ? "Institution"
@@ -52,7 +58,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         if (r.status === 403) return r.json().then((d: { onboarding?: boolean }) => { if (d.onboarding === false) router.push("/setup"); return null; });
         return r.json();
       })
-      .then((d) => { if (d) { setUser(d.user); setSubStatus(d.subscription?.status ?? "none"); setSubPlan(d.subscription?.plan ?? null); setSubIsOrgManaged(d.subscription?.isOrgManaged ?? false); setSubOrgName(d.subscription?.orgName ?? null); } })
+      .then((d) => { if (d) { setUser(d.user); setSubStatus(d.subscription?.status ?? "none"); setSubPlan(d.subscription?.plan ?? null); setSubIsOrgManaged(d.subscription?.isOrgManaged ?? false); setSubOrgName(d.subscription?.orgName ?? null); setOrgContext(d.orgContext ?? null); setMemberships(d.memberships ?? []); } })
       .catch(() => { router.push("/auth/login"); })
       .finally(() => setLoading(false));
   }, []);
@@ -79,10 +85,21 @@ function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) setSwitcherOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  async function switchOrg(orgId: string | null) {
+    setSwitcherOpen(false);
+    await fetch("/api/context", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orgId: orgId || "personal" }),
+    });
+    window.location.reload();
+  }
 
   async function markAllRead() {
     await fetch("/api/notifications", { method: "PATCH" });
@@ -102,7 +119,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       router.replace("/admin");
       return;
     }
-    const isOrgAdmin = (user.role === "admin" || user.role === "mosque_admin") && user.account_type !== "individual";
+    const isOrgAdmin = orgContext && (orgContext.role === "admin" || orgContext.role === "mosque_admin");
     const khatibOnlyRoutes = ["/sermons", "/themes", "/calendar", "/resources"];
     if (isOrgAdmin && khatibOnlyRoutes.some((r) => pathname.startsWith(r))) {
       router.push("/org/dashboard");
@@ -110,7 +127,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
     if (isOrgAdmin && pathname === "/dashboard") {
       router.replace("/org/dashboard");
     }
-    if (user.role === "mosque_admin" && pathname.startsWith("/org/mosques")) {
+    if (orgContext?.role === "mosque_admin" && pathname.startsWith("/org/mosques")) {
       router.push("/org/dashboard");
     }
   }, [user, pathname]);
@@ -191,6 +208,55 @@ function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
+        {/* Org Switcher */}
+        {memberships.length > 0 && user?.is_platform_admin !== 1 && (
+          <div ref={switcherRef} className="px-3 pt-3 relative">
+            <button
+              onClick={() => setSwitcherOpen(!switcherOpen)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-surface hover:bg-line/50 transition-colors text-sm"
+            >
+              <span className="material-symbols-outlined text-base text-primary">
+                {orgContext ? (orgContext.orgType === "institution" ? "account_balance" : "corporate_fare") : "person"}
+              </span>
+              <span className="flex-1 text-start font-medium text-ink truncate">
+                {orgContext ? orgContext.orgName : (isAr ? "شخصي" : "Personal")}
+              </span>
+              <span className="material-symbols-outlined text-mute text-base">unfold_more</span>
+            </button>
+            {switcherOpen && (
+              <div className={`absolute ${isAr ? "right-3" : "left-3"} top-full mt-1 w-[calc(100%-1.5rem)] bg-white border border-line rounded-xl shadow-lg z-50 py-1`}>
+                <button
+                  onClick={() => switchOrg(null)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface transition-colors ${!orgContext ? "text-primary font-semibold" : "text-ink"}`}
+                >
+                  <span className="material-symbols-outlined text-base">person</span>
+                  <span className="truncate">{isAr ? "شخصي" : "Personal"}</span>
+                  {!orgContext && <span className="material-symbols-outlined text-primary text-sm ml-auto">check</span>}
+                </button>
+                {memberships.map((m) => (
+                  <button
+                    key={m.orgId}
+                    onClick={() => switchOrg(m.orgId)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface transition-colors ${orgContext?.orgId === m.orgId ? "text-primary font-semibold" : "text-ink"}`}
+                  >
+                    <span className="material-symbols-outlined text-base">
+                      {m.orgType === "institution" ? "account_balance" : "corporate_fare"}
+                    </span>
+                    <div className="flex-1 min-w-0 text-start">
+                      <span className="truncate block">{m.orgName}</span>
+                      {m.mosqueName && <span className="text-[10px] text-mute block truncate">{m.mosqueName}</span>}
+                    </div>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${m.role === "admin" ? "bg-blue-100 text-blue-700" : m.role === "mosque_admin" ? "bg-violet-100 text-violet-700" : "bg-emerald-100 text-emerald-700"}`}>
+                      {m.role === "admin" ? "Admin" : m.role === "mosque_admin" ? "Mosque Admin" : "Khatib"}
+                    </span>
+                    {orgContext?.orgId === m.orgId && <span className="material-symbols-outlined text-primary text-sm">check</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
           {user?.is_platform_admin === 1 ? (
@@ -205,44 +271,19 @@ function AppShell({ children }: { children: React.ReactNode }) {
               <span className="material-symbols-outlined text-xl">admin_panel_settings</span>
               Admin Dashboard
             </Link>
-          ) : navKeys
-            .filter((item) => {
-              if (user?.role !== "admin" || user?.account_type === "individual") return true;
-              return false;
-            })
-            .map((item) => {
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-mute hover:bg-surface hover:text-ink"
-                }`}
-              >
-                <span className="material-symbols-outlined text-xl">{item.icon}</span>
-                {t(item.key)}
-              </Link>
-            );
-          })}
-
-          {user?.is_platform_admin !== 1 && (user?.role === "admin" || user?.role === "khatib" || user?.role === "mosque_admin") && user?.account_type !== "individual" && (
+          ) : orgContext && (orgContext.role === "admin" || orgContext.role === "mosque_admin") ? (
+            // Org admin view — show org nav only
             <>
-              <div className="h-px bg-line my-2" />
-              <p className="px-4 text-[10px] font-bold text-mute uppercase tracking-wider mb-1">{user?.role === "mosque_admin" ? t("nav.mosque") || "Mosque" : t("nav.organization")}</p>
-              {(user.role === "admin" ? [
+              <p className="px-4 text-[10px] font-bold text-mute uppercase tracking-wider mb-1">{orgContext.role === "mosque_admin" ? t("nav.mosque") || "Mosque" : t("nav.organization")}</p>
+              {(orgContext.role === "admin" ? [
                 { href: "/org/dashboard", key: "nav.orgDashboard", icon: "monitoring" },
-                ...(user.account_type === "institution" ? [{ href: "/org/mosques", key: "nav.mosques", icon: "mosque" }] : []),
-                { href: "/org/schedule", key: "nav.schedule", icon: "date_range" },
-                { href: "/org/khatibs", key: "nav.khatibs", icon: "group" },
-              ] : user.role === "mosque_admin" ? [
-                { href: "/org/dashboard", key: "nav.orgDashboard", icon: "monitoring" },
+                ...(orgContext.orgType === "institution" ? [{ href: "/org/mosques", key: "nav.mosques", icon: "mosque" }] : []),
                 { href: "/org/schedule", key: "nav.schedule", icon: "date_range" },
                 { href: "/org/khatibs", key: "nav.khatibs", icon: "group" },
               ] : [
+                { href: "/org/dashboard", key: "nav.orgDashboard", icon: "monitoring" },
                 { href: "/org/schedule", key: "nav.schedule", icon: "date_range" },
+                { href: "/org/khatibs", key: "nav.khatibs", icon: "group" },
               ]).map((item) => {
                 const isActive = pathname.startsWith(item.href);
                 return (
@@ -260,6 +301,50 @@ function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
+            </>
+          ) : (
+            // Personal / khatib view — show khatib nav + org schedule if in org context
+            <>
+              {navKeys.map((item) => {
+                const isActive = pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-mute hover:bg-surface hover:text-ink"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-xl">{item.icon}</span>
+                    {t(item.key)}
+                  </Link>
+                );
+              })}
+              {orgContext && orgContext.role === "khatib" && (
+                <>
+                  <div className="h-px bg-line my-2" />
+                  <p className="px-4 text-[10px] font-bold text-mute uppercase tracking-wider mb-1">{orgContext.orgName}</p>
+                  <Link
+                    href="/org/schedule"
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      pathname.startsWith("/org/schedule")
+                        ? "bg-primary/10 text-primary"
+                        : "text-mute hover:bg-surface hover:text-ink"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-xl">date_range</span>
+                    {t("nav.schedule")}
+                  </Link>
+                  {orgContext.mosqueName && (
+                    <p className="px-4 text-[10px] text-mute mt-1">
+                      <span className="material-symbols-outlined text-xs align-middle mr-1">mosque</span>
+                      {orgContext.mosqueName}
+                    </p>
+                  )}
+                </>
+              )}
             </>
           )}
         </nav>

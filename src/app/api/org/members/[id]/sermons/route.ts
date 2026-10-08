@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { requireOrgContext, OrgContextError } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -13,17 +14,16 @@ export async function GET(_req: Request, { params }: Params) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
-    "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
-  );
 
-  if (!user?.organization_id || user.role !== "admin") {
-    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   const member = await queryOne<{ id: string; name: string; user_id: string | null; status: string }>(
     "SELECT id, name, user_id, status FROM org_members WHERE id = $1 AND organization_id = $2",
-    [id, user.organization_id]
+    [id, ctx.orgId]
   );
 
   if (!member) {

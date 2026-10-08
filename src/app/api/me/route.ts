@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { queryOne, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { getEffectiveSubscription } from "@/lib/subscription";
+import { getOrgContext, getUserMemberships } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,9 @@ export async function GET() {
     return NextResponse.json({ error: "Onboarding incomplete", onboarding: false }, { status: 403 });
   }
 
-  const subscription = await getEffectiveSubscription(userId);
+  const orgContext = await getOrgContext(userId);
+  const memberships = await getUserMemberships(userId);
+  const subscription = await getEffectiveSubscription(userId, orgContext?.orgId);
 
-  return NextResponse.json(toJSON({ user, subscription }));
+  return NextResponse.json(toJSON({ user, subscription, orgContext, memberships }));
 }

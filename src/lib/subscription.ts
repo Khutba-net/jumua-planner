@@ -43,23 +43,18 @@ export async function getSubscriptionStatus(userId: string): Promise<{
   };
 }
 
-export async function getEffectiveSubscription(userId: string): Promise<EffectiveSubscription> {
-  const user = await queryOne<{
-    organization_id: string | null;
-    account_type: string;
-    role: string;
-  }>(
-    "SELECT organization_id, account_type, role FROM users WHERE id = $1",
-    [userId]
-  );
+export async function getEffectiveSubscription(userId: string, contextOrgId?: string): Promise<EffectiveSubscription> {
+  let orgId = contextOrgId || null;
 
-  if (!user) {
-    return { status: "none", plan: null, trialEnd: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, isOrgManaged: false, orgName: null };
+  if (!orgId) {
+    const user = await queryOne<{ organization_id: string | null }>(
+      "SELECT organization_id FROM users WHERE id = $1",
+      [userId]
+    );
+    orgId = user?.organization_id || null;
   }
 
-  const isOrgUser = user.organization_id && (user.account_type === "organization" || user.account_type === "institution");
-
-  if (isOrgUser) {
+  if (orgId) {
     const orgSub = await queryOne<{
       status: string;
       plan: string;
@@ -73,7 +68,7 @@ export async function getEffectiveSubscription(userId: string): Promise<Effectiv
        JOIN organizations o ON o.id = s.organization_id
        WHERE s.organization_id = $1
        ORDER BY s.created_at DESC LIMIT 1`,
-      [user.organization_id]
+      [orgId]
     );
 
     if (orgSub) {
@@ -90,7 +85,7 @@ export async function getEffectiveSubscription(userId: string): Promise<Effectiv
 
     const orgName = await queryOne<{ name: string }>(
       "SELECT name FROM organizations WHERE id = $1",
-      [user.organization_id]
+      [orgId]
     );
 
     return {

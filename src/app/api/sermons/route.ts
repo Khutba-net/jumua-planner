@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { sermonCreateSchema, parseBody } from "@/lib/validations";
+import { getOrgContext } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -69,8 +70,8 @@ export async function POST(req: NextRequest) {
       const seasonStartMonth = Math.floor((currentMonth - 1) / 3) * 3 + 1;
 
       // Find a theme in the current season
-      const userRow = await query("SELECT organization_id FROM users WHERE id = $1", [userId]);
-      const orgId = userRow[0]?.organization_id || "";
+      const ctx = await getOrgContext(userId);
+      const orgId = ctx?.orgId || "";
       const themes = await query(
         `SELECT id FROM themes WHERE (owner_id = $1 OR (organization_id = $2 AND organization_id IS NOT NULL)) AND year = $3 AND month >= $4 AND month <= $5 ORDER BY month ASC LIMIT 1`,
         [userId, orgId, currentYear, seasonStartMonth, seasonStartMonth + 2]

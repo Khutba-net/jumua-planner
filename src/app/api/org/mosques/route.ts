@@ -5,27 +5,23 @@ import { getUserId, AuthError } from "@/lib/auth";
 import { sendMosqueInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
 import { orgMosqueCreateSchema, parseBody } from "@/lib/validations";
+import { requireOrgContext, OrgContextError } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
-async function getInstAdmin() {
-  const userId = await getUserId();
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string; account_type: string }>(
-    "SELECT id, organization_id, role, account_type FROM users WHERE id = $1", [userId]
-  );
-  if (!user?.organization_id || user.role !== "admin" || user.account_type !== "institution") {
-    return null;
-  }
-  return user;
-}
-
 export async function GET() {
-  let user;
-  try { user = await getInstAdmin(); } catch (e) {
+  let userId: string;
+  try { userId = await getUserId(); } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
+
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
+  }
+  if (ctx.orgType !== "institution") return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
 
   const mosques = await query(`
     SELECT m.*,
@@ -34,26 +30,28 @@ export async function GET() {
     FROM mosques m
     WHERE m.organization_id = $1
     ORDER BY m.created_at ASC
-  `, [user.organization_id]);
+  `, [ctx.orgId]);
 
   return NextResponse.json(toJSON(mosques));
 }
 
 export async function POST(req: Request) {
   let userId: string;
-  let user;
-  try {
-    userId = await getUserId();
-    user = await queryOne<{ id: string; organization_id: string | null; role: string; account_type: string; name: string }>(
-      "SELECT id, organization_id, role, account_type, name FROM users WHERE id = $1", [userId]
-    );
-  } catch (e) {
+  try { userId = await getUserId(); } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  if (!user?.organization_id || user.role !== "admin" || user.account_type !== "institution") {
+
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
+  }
+  if (ctx.orgType !== "institution") {
     return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
   }
+
+  const user = await queryOne<{ name: string }>("SELECT name FROM users WHERE id = $1", [userId]);
 
   const body = await req.json();
   const parsed = parseBody(orgMosqueCreateSchema, body);
@@ -64,11 +62,11 @@ export async function POST(req: Request) {
   const { capacity } = body;
 
   const org = await queryOne<{ max_mosques: number | null }>(
-    "SELECT max_mosques FROM organizations WHERE id = $1", [user.organization_id]
+    "SELECT max_mosques FROM organizations WHERE id = $1", [ctx.orgId]
   );
   const maxMosques = org?.max_mosques ?? 20;
   const countRow = await queryOne<{ count: string }>(
-    "SELECT COUNT(*) as count FROM mosques WHERE organization_id = $1", [user.organization_id]
+    "SELECT COUNT(*) as count FROM mosques WHERE organization_id = $1", [ctx.orgId]
   );
   if (Number(countRow?.count ?? 0) >= maxMosques) {
     return NextResponse.json({ error: `Maximum ${maxMosques} mosques reached` }, { status: 400 });
@@ -88,7 +86,7 @@ export async function POST(req: Request) {
       city?.trim()?.slice(0, 100) || null,
       country?.trim()?.slice(0, 100) || null,
       capacity ? Math.max(0, Math.min(Number(capacity), 100000)) : null,
-      user.organization_id,
+      ctx.orgId,
       admin_email?.trim()?.toLowerCase() || null,
       inviteCode,
       expiresAt,
@@ -97,12 +95,12 @@ export async function POST(req: Request) {
   );
 
   if (admin_email && typeof admin_email === "string" && process.env.RESEND_API_KEY) {
-    const org = await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id]);
+    const org = await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [ctx.orgId]);
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100";
     const inviteUrl = `${APP_URL}/mosque-invite/${inviteCode}`;
     await sendMosqueInvitation(
       admin_email.trim().toLowerCase(),
-      user.name,
+      user?.name ?? "Admin",
       name.trim(),
       org?.name ?? "your institution",
       inviteUrl

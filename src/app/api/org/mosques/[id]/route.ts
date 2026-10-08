@@ -5,24 +5,25 @@ import { getUserId, AuthError } from "@/lib/auth";
 import { sendMosqueInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
 import { createNotification } from "@/lib/notifications";
+import { requireOrgContext, OrgContextError } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
 async function getInstAdmin() {
   const userId = await getUserId();
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string; account_type: string; name: string }>(
-    "SELECT id, organization_id, role, account_type, name FROM users WHERE id = $1", [userId]
+  const ctx = await requireOrgContext(userId, ["admin"]);
+  if (ctx.orgType !== "institution") return null;
+  const user = await queryOne<{ id: string; name: string }>(
+    "SELECT id, name FROM users WHERE id = $1", [userId]
   );
-  if (!user?.organization_id || user.role !== "admin" || user.account_type !== "institution") {
-    return null;
-  }
-  return user;
+  if (!user) return null;
+  return { ...user, organization_id: ctx.orgId, role: ctx.role, account_type: ctx.orgType };
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await getInstAdmin(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
+    if (e instanceof AuthError || e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status ?? 403 });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
@@ -57,7 +58,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await getInstAdmin(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
+    if (e instanceof AuthError || e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status ?? 403 });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
@@ -95,7 +96,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await getInstAdmin(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
+    if (e instanceof AuthError || e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status ?? 403 });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });
@@ -153,7 +154,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await getInstAdmin(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
+    if (e instanceof AuthError || e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status ?? 403 });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an institution admin" }, { status: 403 });

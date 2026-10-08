@@ -5,33 +5,30 @@ import { getUserId, AuthError } from "@/lib/auth";
 import { sendInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
 import { orgMemberCreateSchema, parseBody } from "@/lib/validations";
+import { requireOrgContext, OrgContextError, getMosqueIdForAdmin } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
 async function getAdminUser() {
   const userId = await getUserId();
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string; name: string }>(
-    "SELECT id, organization_id, role, name FROM users WHERE id = $1", [userId]
+  const ctx = await requireOrgContext(userId, ["admin", "mosque_admin"]);
+  const user = await queryOne<{ id: string; name: string }>(
+    "SELECT id, name FROM users WHERE id = $1", [userId]
   );
-  if (!user?.organization_id || (user.role !== "admin" && user.role !== "mosque_admin")) {
-    return null;
-  }
+  if (!user) return null;
+
   let mosqueId: string | null = null;
-  if (user.role === "mosque_admin") {
-    const mosque = await queryOne<{ id: string }>(
-      "SELECT id FROM mosques WHERE admin_user_id = $1 AND organization_id = $2",
-      [userId, user.organization_id]
-    );
-    if (!mosque) return null;
-    mosqueId = mosque.id;
+  if (ctx.role === "mosque_admin") {
+    mosqueId = ctx.mosqueId || await getMosqueIdForAdmin(userId, ctx.orgId);
+    if (!mosqueId) return null;
   }
-  return { ...user, mosqueId };
+  return { ...user, organization_id: ctx.orgId, role: ctx.role, mosqueId };
 }
 
 export async function GET() {
   let user;
   try { user = await getAdminUser(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
+    if (e instanceof AuthError || e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status ?? 403 });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
@@ -55,7 +52,7 @@ export async function GET() {
 export async function POST(req: Request) {
   let user;
   try { user = await getAdminUser(); } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
+    if (e instanceof AuthError || e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status ?? 403 });
     throw e;
   }
   if (!user) return NextResponse.json({ error: "Not an org admin" }, { status: 403 });

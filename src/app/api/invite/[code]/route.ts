@@ -79,10 +79,16 @@ export async function POST(req: Request, { params }: Params) {
         "UPDATE org_members SET user_id = $1, status = 'active', email = $2, updated_at = NOW() WHERE id = $3",
         [userId, email, member.id]
       );
-      await client.query(
-        "UPDATE users SET organization_id = $1, account_type = $2, role = 'khatib', updated_at = NOW() WHERE id = $3",
-        [member.organization_id, member.org_type, userId]
-      );
+      // Only set organization_id if user doesn't already have one
+      const currentUser = await client.query("SELECT organization_id FROM users WHERE id = $1", [userId]);
+      if (!currentUser.rows[0]?.organization_id) {
+        await client.query(
+          "UPDATE users SET organization_id = $1, account_type = $2, role = 'khatib', updated_at = NOW() WHERE id = $3",
+          [member.organization_id, member.org_type, userId]
+        );
+      } else {
+        await client.query("UPDATE users SET updated_at = NOW() WHERE id = $1", [userId]);
+      }
     });
   } else {
     if (!name) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, exec, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
+import { requireOrgContext, OrgContextError, getMosqueIdForAdmin } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +12,11 @@ export async function GET(req: Request) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
-    "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
-  );
 
-  if (!user?.organization_id) {
-    return NextResponse.json({ error: "Not part of an organization" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   const url = new URL(req.url);
@@ -24,15 +24,11 @@ export async function GET(req: Request) {
   const weeks = Math.min(Math.max(parseInt(url.searchParams.get("weeks") || "12") || 12, 1), 52);
   let mosqueId = url.searchParams.get("mosque_id");
 
-  if (user.role === "mosque_admin" && !mosqueId) {
-    const mosque = await queryOne<{ id: string }>(
-      "SELECT id FROM mosques WHERE admin_user_id = $1 AND organization_id = $2",
-      [userId, user.organization_id]
-    );
-    if (mosque) mosqueId = mosque.id;
+  if (ctx.role === "mosque_admin" && !mosqueId) {
+    mosqueId = ctx.mosqueId || await getMosqueIdForAdmin(userId, ctx.orgId);
   }
 
-  const assignmentParams: unknown[] = [user.organization_id, from, weeks];
+  const assignmentParams: unknown[] = [ctx.orgId, from, weeks];
   let assignmentWhere = "fa.organization_id = $1 AND fa.friday_date >= $2";
   if (mosqueId) {
     assignmentWhere += " AND fa.mosque_id = $4";
@@ -49,7 +45,7 @@ export async function GET(req: Request) {
     LIMIT $3
   `, assignmentParams);
 
-  const memberParams: unknown[] = [user.organization_id];
+  const memberParams: unknown[] = [ctx.orgId];
   let memberWhere = "organization_id = $1 AND role = 'khatib' AND status = 'active'";
   if (mosqueId) {
     memberWhere += " AND mosque_id = $2";
@@ -63,10 +59,10 @@ export async function GET(req: Request) {
 
   const myMember = await queryOne<{ id: string }>(
     "SELECT id FROM org_members WHERE user_id = $1 AND organization_id = $2",
-    [userId, user.organization_id]
+    [userId, ctx.orgId]
   );
 
-  return NextResponse.json(toJSON({ assignments, members, isAdmin: user.role === "admin" || user.role === "mosque_admin", myMemberId: myMember?.id || null }));
+  return NextResponse.json(toJSON({ assignments, members, isAdmin: ctx.role === "admin" || ctx.role === "mosque_admin", myMemberId: myMember?.id || null }));
 }
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -77,23 +73,18 @@ export async function POST(req: Request) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
-    "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
-  );
 
-  if (!user?.organization_id || (user.role !== "admin" && user.role !== "mosque_admin")) {
-    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin", "mosque_admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   const body = await req.json();
   let { friday_date, member_id, guest_name, notes, mosque_id } = body;
 
-  if (user.role === "mosque_admin" && !mosque_id) {
-    const mosque = await queryOne<{ id: string }>(
-      "SELECT id FROM mosques WHERE admin_user_id = $1 AND organization_id = $2",
-      [userId, user.organization_id]
-    );
-    if (mosque) mosque_id = mosque.id;
+  if (ctx.role === "mosque_admin" && !mosque_id) {
+    mosque_id = ctx.mosqueId || await getMosqueIdForAdmin(userId, ctx.orgId);
   }
 
   if (!friday_date || typeof friday_date !== "string" || !DATE_REGEX.test(friday_date)) {
@@ -113,11 +104,11 @@ export async function POST(req: Request) {
   }
 
   if (mosque_id) {
-    const mosque = await queryOne("SELECT id FROM mosques WHERE id = $1 AND organization_id = $2", [mosque_id, user.organization_id]);
+    const mosque = await queryOne("SELECT id FROM mosques WHERE id = $1 AND organization_id = $2", [mosque_id, ctx.orgId]);
     if (!mosque) return NextResponse.json({ error: "Mosque not found" }, { status: 400 });
   }
 
-  const existingParams: unknown[] = [user.organization_id, friday_date];
+  const existingParams: unknown[] = [ctx.orgId, friday_date];
   let existingWhere = "organization_id = $1 AND friday_date = $2";
   if (mosque_id) {
     existingWhere += " AND mosque_id = $3";
@@ -137,7 +128,7 @@ export async function POST(req: Request) {
   if (member_id) {
     const member = await queryOne(
       "SELECT id FROM org_members WHERE id = $1 AND organization_id = $2 AND status = 'active'",
-      [member_id, user.organization_id]
+      [member_id, ctx.orgId]
     );
     if (!member) {
       return NextResponse.json({ error: "Khatib not found or not active" }, { status: 400 });
@@ -147,7 +138,7 @@ export async function POST(req: Request) {
   const id = cuid();
   await query(
     "INSERT INTO friday_assignments (id, organization_id, mosque_id, member_id, friday_date, guest_name, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-    [id, user.organization_id, mosque_id || null, member_id || null, friday_date, guest_name?.slice(0, 200) || null, notes?.slice(0, 1000) || null]
+    [id, ctx.orgId, mosque_id || null, member_id || null, friday_date, guest_name?.slice(0, 200) || null, notes?.slice(0, 1000) || null]
   );
 
   const assignment = await queryOne("SELECT * FROM friday_assignments WHERE id = $1", [id]);
@@ -190,12 +181,11 @@ export async function PUT(req: Request) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
-    "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
-  );
 
-  if (!user?.organization_id || user.role !== "admin") {
-    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   const body = await req.json();
@@ -207,7 +197,7 @@ export async function PUT(req: Request) {
 
   const assignment = await queryOne(
     "SELECT id FROM friday_assignments WHERE id = $1 AND organization_id = $2",
-    [id, user.organization_id]
+    [id, ctx.orgId]
   );
 
   if (!assignment) {
@@ -217,7 +207,7 @@ export async function PUT(req: Request) {
   if (member_id) {
     const member = await queryOne(
       "SELECT id FROM org_members WHERE id = $1 AND organization_id = $2 AND status = 'active'",
-      [member_id, user.organization_id]
+      [member_id, ctx.orgId]
     );
     if (!member) {
       return NextResponse.json({ error: "Khatib not found or not active" }, { status: 400 });
@@ -317,12 +307,11 @@ export async function PATCH(req: Request) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
-    "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
-  );
 
-  if (!user?.organization_id || user.role !== "admin") {
-    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   const body = await req.json();
@@ -334,11 +323,11 @@ export async function PATCH(req: Request) {
 
   const fromMember = await queryOne(
     "SELECT id FROM org_members WHERE id = $1 AND organization_id = $2",
-    [from_member_id, user.organization_id]
+    [from_member_id, ctx.orgId]
   );
   const toMember = await queryOne(
     "SELECT id FROM org_members WHERE id = $1 AND organization_id = $2 AND status = 'active'",
-    [to_member_id, user.organization_id]
+    [to_member_id, ctx.orgId]
   );
 
   if (!fromMember) return NextResponse.json({ error: "Source khatib not found" }, { status: 400 });
@@ -347,7 +336,7 @@ export async function PATCH(req: Request) {
   const today = new Date().toISOString().split("T")[0];
   const result = await query(
     "UPDATE friday_assignments SET member_id = $1, updated_at = NOW() WHERE organization_id = $2 AND member_id = $3 AND friday_date >= $4",
-    [to_member_id, user.organization_id, from_member_id, today]
+    [to_member_id, ctx.orgId, from_member_id, today]
   );
 
   const updatedCount = Array.isArray(result) ? result.length : 0;
@@ -397,12 +386,11 @@ export async function DELETE(req: Request) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
-    "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
-  );
 
-  if (!user?.organization_id || user.role !== "admin") {
-    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   const url = new URL(req.url);
@@ -414,7 +402,7 @@ export async function DELETE(req: Request) {
 
   const assignment = await queryOne<{ id: string; member_id: string | null; friday_date: string; mosque_id: string | null }>(
     "SELECT id, member_id, friday_date, mosque_id FROM friday_assignments WHERE id = $1 AND organization_id = $2",
-    [id, user.organization_id]
+    [id, ctx.orgId]
   );
 
   if (!assignment) {

@@ -9,11 +9,15 @@ export async function getUserId(opts?: { skipSubscriptionCheck?: boolean }): Pro
   if (token) {
     const userId = await verifySession(token);
     if (userId) {
-      const deactivated = await queryOne(
-        "SELECT id FROM org_members WHERE user_id = $1 AND status = 'deactivated'",
+      const activeCount = await queryOne<{ cnt: string }>(
+        "SELECT COUNT(*) as cnt FROM org_members WHERE user_id = $1 AND status = 'active'",
         [userId]
       );
-      if (deactivated) {
+      const allDeactivated = await queryOne<{ cnt: string }>(
+        "SELECT COUNT(*) as cnt FROM org_members WHERE user_id = $1 AND status = 'deactivated'",
+        [userId]
+      );
+      if (Number(allDeactivated?.cnt) > 0 && Number(activeCount?.cnt) === 0) {
         await deleteSession(token);
         throw new AuthError("Account deactivated");
       }
@@ -45,7 +49,9 @@ export class SubscriptionError extends AuthError {
 
 export async function requireSubscription(userId: string): Promise<void> {
   const { getEffectiveSubscription } = await import("@/lib/subscription");
-  const sub = await getEffectiveSubscription(userId);
+  const { getOrgContext } = await import("@/lib/org-context");
+  const ctx = await getOrgContext(userId);
+  const sub = await getEffectiveSubscription(userId, ctx?.orgId);
   if (sub.status !== "active" && sub.status !== "trialing") {
     const user = await queryOne<{ is_platform_admin: number }>(
       "SELECT is_platform_admin FROM users WHERE id = $1", [userId]

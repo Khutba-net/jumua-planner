@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
+import { requireOrgContext, OrgContextError, getMosqueIdForAdmin } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -10,28 +11,23 @@ export async function GET() {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string; planning_year: number }>(
-    "SELECT id, organization_id, role, planning_year FROM users WHERE id = $1", [userId]
-  );
 
-  if (!user?.organization_id || (user.role !== "admin" && user.role !== "mosque_admin")) {
-    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin", "mosque_admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   let scopedMosqueId: string | null = null;
-  if (user.role === "mosque_admin") {
-    const mosque = await queryOne<{ id: string }>(
-      "SELECT id FROM mosques WHERE admin_user_id = $1 AND organization_id = $2",
-      [userId, user.organization_id]
-    );
-    if (!mosque) return NextResponse.json({ error: "Mosque not found" }, { status: 403 });
-    scopedMosqueId = mosque.id;
+  if (ctx.role === "mosque_admin") {
+    scopedMosqueId = ctx.mosqueId || await getMosqueIdForAdmin(userId, ctx.orgId);
+    if (!scopedMosqueId) return NextResponse.json({ error: "Mosque not found" }, { status: 403 });
   }
 
-  const org = await queryOne("SELECT id, name, type, city, country FROM organizations WHERE id = $1", [user.organization_id]);
+  const org = await queryOne("SELECT id, name, type, city, country FROM organizations WHERE id = $1", [ctx.orgId]);
 
   const mosqueFilter = scopedMosqueId ? " AND mosque_id = $2" : "";
-  const memberParams: string[] = [user.organization_id];
+  const memberParams: string[] = [ctx.orgId];
   if (scopedMosqueId) memberParams.push(scopedMosqueId);
 
   const members = await query<{ id: string; name: string; email: string | null; role: string; status: string; user_id: string | null; mosque_id: string | null; mosque_name: string | null }>(
@@ -86,7 +82,7 @@ export async function GET() {
   const thisFridayDate = friday.toISOString().split("T")[0];
 
   const assignmentMosqueFilter = scopedMosqueId ? " AND fa.mosque_id = $3" : "";
-  const assignmentParams: string[] = [user.organization_id, thisFridayDate];
+  const assignmentParams: string[] = [ctx.orgId, thisFridayDate];
   if (scopedMosqueId) assignmentParams.push(scopedMosqueId);
 
   const thisFridayAssignment = await queryOne<{ id: string; friday_date: string; guest_name: string | null; khatib_name: string | null; notes: string | null }>(`
@@ -107,7 +103,7 @@ export async function GET() {
       FROM mosques m
       WHERE m.organization_id = $1
       ORDER BY m.created_at ASC
-    `, [user.organization_id]);
+    `, [ctx.orgId]);
 
     const mosqueSchedules = [];
     for (const mosque of mosques) {

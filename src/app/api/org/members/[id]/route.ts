@@ -6,6 +6,7 @@ import { getUserId, AuthError } from "@/lib/auth";
 import { sendInvitation } from "@/lib/email";
 import { logger } from "@/lib/logger";
 import { createNotification } from "@/lib/notifications";
+import { requireOrgContext, OrgContextError } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -18,27 +19,22 @@ export async function PUT(req: Request, { params }: Params) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
-    "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
-  );
 
-  if (!user?.organization_id || (user.role !== "admin" && user.role !== "mosque_admin")) {
-    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin", "mosque_admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   const member = await queryOne<Record<string, unknown>>(
-    "SELECT * FROM org_members WHERE id = $1 AND organization_id = $2", [id, user.organization_id]
+    "SELECT * FROM org_members WHERE id = $1 AND organization_id = $2", [id, ctx.orgId]
   );
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
-  if (user.role === "mosque_admin") {
-    const adminMember = await queryOne<{ mosque_id: string | null }>(
-      "SELECT mosque_id FROM org_members WHERE user_id = $1 AND organization_id = $2",
-      [userId, user.organization_id]
-    );
-    if (adminMember?.mosque_id && member.mosque_id !== adminMember.mosque_id) {
+  if (ctx.role === "mosque_admin") {
+    if (ctx.mosqueId && member.mosque_id !== ctx.mosqueId) {
       return NextResponse.json({ error: "You can only manage members in your mosque" }, { status: 403 });
     }
   }
@@ -55,7 +51,7 @@ export async function PUT(req: Request, { params }: Params) {
     await exec("UPDATE org_members SET invite_code = $1, invite_expires_at = $2, updated_at = NOW() WHERE id = $3", [newCode, newExpiry, id]);
 
     if (member.email && process.env.RESEND_API_KEY) {
-      const org = await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [user.organization_id]);
+      const org = await queryOne<{ name: string }>("SELECT name FROM organizations WHERE id = $1", [ctx.orgId]);
       const admin = await queryOne<{ name: string }>("SELECT name FROM users WHERE id = $1", [userId]);
       const mosqueName = member.mosque_id ? (await queryOne<{ name: string }>("SELECT name FROM mosques WHERE id = $1", [member.mosque_id]))?.name : null;
       const orgLabel = mosqueName ? `${org?.name ?? "your organization"} — ${mosqueName}` : (org?.name ?? "your organization");
@@ -85,7 +81,7 @@ export async function PUT(req: Request, { params }: Params) {
     }
     await exec("UPDATE org_members SET role = 'admin', updated_at = NOW() WHERE id = $1", [id]);
     await exec("UPDATE users SET role = 'admin', updated_at = NOW() WHERE id = $1", [member.user_id]);
-    const adminMember = await queryOne("SELECT id FROM org_members WHERE user_id = $1 AND organization_id = $2", [userId, user.organization_id]);
+    const adminMember = await queryOne("SELECT id FROM org_members WHERE user_id = $1 AND organization_id = $2", [userId, ctx.orgId]);
     if (adminMember) {
       await exec("UPDATE org_members SET role = 'khatib', updated_at = NOW() WHERE id = $1", [adminMember.id]);
     }
@@ -93,7 +89,7 @@ export async function PUT(req: Request, { params }: Params) {
   } else if (action === "assign_mosque") {
     const { mosque_id } = body;
     if (mosque_id) {
-      const mosque = await queryOne("SELECT id FROM mosques WHERE id = $1 AND organization_id = $2", [mosque_id, user.organization_id]);
+      const mosque = await queryOne("SELECT id FROM mosques WHERE id = $1 AND organization_id = $2", [mosque_id, ctx.orgId]);
       if (!mosque) return NextResponse.json({ error: "Mosque not found" }, { status: 400 });
     }
     await exec("UPDATE org_members SET mosque_id = $1, updated_at = NOW() WHERE id = $2", [mosque_id || null, id]);
@@ -112,27 +108,21 @@ export async function DELETE(_req: Request, { params }: Params) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: (e as AuthError).status });
     throw e;
   }
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
-    "SELECT id, organization_id, role FROM users WHERE id = $1", [userId]
-  );
-
-  if (!user?.organization_id || (user.role !== "admin" && user.role !== "mosque_admin")) {
-    return NextResponse.json({ error: "Not an org admin" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin", "mosque_admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   const member = await queryOne<Record<string, unknown>>(
-    "SELECT * FROM org_members WHERE id = $1 AND organization_id = $2", [id, user.organization_id]
+    "SELECT * FROM org_members WHERE id = $1 AND organization_id = $2", [id, ctx.orgId]
   );
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
-  if (user.role === "mosque_admin") {
-    const adminMember = await queryOne<{ mosque_id: string | null }>(
-      "SELECT mosque_id FROM org_members WHERE user_id = $1 AND organization_id = $2",
-      [userId, user.organization_id]
-    );
-    if (adminMember?.mosque_id && member.mosque_id !== adminMember.mosque_id) {
+  if (ctx.role === "mosque_admin") {
+    if (ctx.mosqueId && member.mosque_id !== ctx.mosqueId) {
       return NextResponse.json({ error: "You can only manage members in your mosque" }, { status: 403 });
     }
   }

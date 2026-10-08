@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { themeCreateSchema, parseBody } from "@/lib/validations";
+import { getOrgContext } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +13,8 @@ export async function GET() {
     throw e;
   }
 
-  const user = await queryOne<{ organization_id: string | null; role: string }>(
-    "SELECT organization_id, role FROM users WHERE id = $1", [userId]
-  );
+  const ctx = await getOrgContext(userId);
+  const orgId = ctx?.orgId || "";
 
   const themes = await query(`
     SELECT t.*,
@@ -23,7 +23,7 @@ export async function GET() {
     FROM themes t
     WHERE t.owner_id = $1 OR (t.organization_id = $2 AND t.organization_id IS NOT NULL)
     ORDER BY t.year DESC, t.month ASC
-  `, [userId, user?.organization_id || ""]);
+  `, [userId, orgId]);
 
   const themeIds = themes.map(t => t.id as string);
   let allSubTopics: Record<string, unknown>[] = [];
@@ -50,9 +50,7 @@ export async function POST(req: Request) {
     throw e;
   }
 
-  const admin = await queryOne<{ organization_id: string | null; role: string }>(
-    "SELECT organization_id, role FROM users WHERE id = $1", [userId]
-  );
+  const ctx = await getOrgContext(userId);
 
   const body = await req.json();
   const parsed = parseBody(themeCreateSchema, body);
@@ -61,11 +59,11 @@ export async function POST(req: Request) {
   }
   const { name, description, month, year, color, mosqueId } = parsed.data;
 
-  const isOrgAdmin = admin?.role === "admin" && admin?.organization_id;
+  const isOrgAdmin = ctx?.role === "admin" && ctx?.orgId;
   const id = cuid();
   await query(
     "INSERT INTO themes (id, name, description, month, year, color, owner_id, organization_id, mosque_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-    [id, name, description ?? "", month, year, color ?? "#00666d", userId, isOrgAdmin ? admin.organization_id : null, mosqueId || null]
+    [id, name, description ?? "", month, year, color ?? "#00666d", userId, isOrgAdmin ? ctx.orgId : null, mosqueId || null]
   );
 
   if (parsed.data.subTopics && Array.isArray(parsed.data.subTopics)) {

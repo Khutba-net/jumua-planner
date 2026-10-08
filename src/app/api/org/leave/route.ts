@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { queryOne, query, exec, withTransaction } from "@/lib/db";
+import { queryOne, query, withTransaction } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
+import { requireOrgContext, OrgContextError, getUserMemberships } from "@/lib/org-context";
 
 export async function POST() {
   let userId: string;
@@ -10,20 +11,18 @@ export async function POST() {
     throw e;
   }
 
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string; name: string }>(
-    "SELECT id, organization_id, role, name FROM users WHERE id = $1",
-    [userId]
-  );
-
-  if (!user?.organization_id) {
-    return NextResponse.json({ error: "Not part of an organization" }, { status: 400 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 400 });
+    throw e;
   }
 
-  if (user.role === "admin") {
+  if (ctx.role === "admin") {
     return NextResponse.json({ error: "Admins must transfer admin role before leaving" }, { status: 400 });
   }
 
-  const orgId = user.organization_id;
+  const user = await queryOne<{ name: string }>("SELECT name FROM users WHERE id = $1", [userId]);
+  const orgId = ctx.orgId;
 
   await withTransaction(async (client) => {
     const member = await queryOne<{ id: string }>(
@@ -40,10 +39,20 @@ export async function POST() {
       await client.query("DELETE FROM org_members WHERE id = $1", [member.id]);
     }
 
-    await client.query(
-      "UPDATE users SET organization_id = NULL, role = 'khatib', account_type = 'individual', updated_at = NOW() WHERE id = $1",
-      [userId]
-    );
+    // Check if user has other memberships — if not, reset to individual
+    const remaining = await getUserMemberships(userId);
+    if (remaining.filter((m) => m.orgId !== orgId).length === 0) {
+      await client.query(
+        "UPDATE users SET organization_id = NULL, role = 'khatib', account_type = 'individual', updated_at = NOW() WHERE id = $1",
+        [userId]
+      );
+    } else if ((await queryOne<{ organization_id: string | null }>("SELECT organization_id FROM users WHERE id = $1", [userId]))?.organization_id === orgId) {
+      // If leaving the org that's on users.organization_id, clear it
+      await client.query(
+        "UPDATE users SET organization_id = NULL, updated_at = NOW() WHERE id = $1",
+        [userId]
+      );
+    }
   });
 
   const admins = await query<{ user_id: string }>(
@@ -55,7 +64,7 @@ export async function POST() {
       admin.user_id,
       "khatib_left",
       "Member left",
-      `${user.name} has left the organization.`,
+      `${user?.name ?? "A member"} has left the organization.`,
       "/org/khatibs"
     ).catch(() => {});
   }

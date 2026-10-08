@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { queryOne, query, cuid, withTransaction } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
+import { requireOrgContext, OrgContextError } from "@/lib/org-context";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,25 +15,22 @@ export async function POST(_req: Request, { params }: Params) {
 
   const { id: mosqueId } = await params;
 
-  const user = await queryOne<{ id: string; organization_id: string | null; role: string }>(
-    "SELECT id, organization_id, role FROM users WHERE id = $1",
-    [userId]
-  );
-
-  if (!user?.organization_id || user.role !== "admin") {
-    return NextResponse.json({ error: "Only institution admins can detach mosques" }, { status: 403 });
+  let ctx;
+  try { ctx = await requireOrgContext(userId, ["admin"]); } catch (e) {
+    if (e instanceof OrgContextError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
   }
 
   const mosque = await queryOne<{ id: string; name: string; admin_user_id: string | null; organization_id: string }>(
     "SELECT id, name, admin_user_id, organization_id FROM mosques WHERE id = $1 AND organization_id = $2",
-    [mosqueId, user.organization_id]
+    [mosqueId, ctx.orgId]
   );
 
   if (!mosque) {
     return NextResponse.json({ error: "Mosque not found" }, { status: 404 });
   }
 
-  const oldOrgId = user.organization_id;
+  const oldOrgId = ctx.orgId;
 
   await withTransaction(async (client) => {
     const newOrgId = cuid();
