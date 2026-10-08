@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserId, AuthError } from "@/lib/auth";
 import { getOrgContext, getUserMemberships, orgContextCookieOptions } from "@/lib/org-context";
-import { getEffectiveSubscription } from "@/lib/subscription";
 import { toJSON } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -27,17 +26,19 @@ export async function POST(req: NextRequest) {
   }
 
   const { orgId } = await req.json();
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set("org_context", orgId || "personal", orgContextCookieOptions());
 
   if (orgId && orgId !== "personal") {
-    const context = await getOrgContext(userId);
-    if (!context) {
+    const memberships = await getUserMemberships(userId);
+    const isMember = memberships.some((m) => m.orgId === orgId);
+    if (!isMember) {
       return NextResponse.json({ error: "Not a member of this organization" }, { status: 403 });
     }
-    const sub = await getEffectiveSubscription(userId, orgId);
-    return NextResponse.json(toJSON({ context, subscription: sub }));
+    const res = NextResponse.json(toJSON({ ok: true }));
+    res.cookies.set("org_context", orgId, orgContextCookieOptions());
+    return res;
   }
 
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set("org_context", "personal", orgContextCookieOptions());
   return res;
 }
