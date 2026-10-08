@@ -64,9 +64,9 @@ export async function POST(req: NextRequest) {
   // Auto-allocate to annual plan if no theme specified
   if (!themeId) {
     try {
-      const now = new Date();
-      const currentMonth = now.getMonth() + 1;
-      const currentYear = now.getFullYear();
+      const refDate = scheduledDate ? new Date(scheduledDate + "T00:00:00") : new Date();
+      const currentMonth = refDate.getMonth() + 1;
+      const currentYear = refDate.getFullYear();
       const seasonStartMonth = Math.floor((currentMonth - 1) / 3) * 3 + 1;
 
       // Find a theme in the current season
@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
 
         // Auto-assign the next available date after today
         if (!scheduledDate) {
+          const now = new Date();
           const seasonEnd = new Date(currentYear, seasonStartMonth + 2, 0);
           const existing = await query(
             `SELECT scheduled_date FROM sermons WHERE theme_id = $1 AND scheduled_date IS NOT NULL`,
