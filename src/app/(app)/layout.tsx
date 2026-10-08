@@ -58,7 +58,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
         if (r.status === 403) return r.json().then((d: { onboarding?: boolean }) => { if (d.onboarding === false) router.push("/setup"); return null; });
         return r.json();
       })
-      .then((d) => { if (d) { setUser(d.user); setSubStatus(d.subscription?.status ?? "none"); setSubPlan(d.subscription?.plan ?? null); setSubIsOrgManaged(d.subscription?.isOrgManaged ?? false); setSubOrgName(d.subscription?.orgName ?? null); setOrgContext(d.orgContext ?? null); setMemberships(d.memberships ?? []); } })
+      .then((d) => {
+        if (d) {
+          setUser(d.user); setSubStatus(d.subscription?.status ?? "none"); setSubPlan(d.subscription?.plan ?? null); setSubIsOrgManaged(d.subscription?.isOrgManaged ?? false); setSubOrgName(d.subscription?.orgName ?? null); setOrgContext(d.orgContext ?? null); setMemberships(d.memberships ?? []);
+          // Admin-only users without personal context: auto-switch to their first org
+          const ms = d.memberships ?? [];
+          const hasPersonal = d.user?.account_type === "individual" || ms.some((m: { role: string }) => m.role === "khatib");
+          if (!d.orgContext && !hasPersonal && ms.length > 0) {
+            switchOrg(ms[0].orgId);
+          }
+        }
+      })
       .catch(() => { router.push("/auth/login"); })
       .finally(() => setLoading(false));
   }, []);
@@ -225,14 +235,16 @@ function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             {switcherOpen && (
               <div className={`absolute ${isAr ? "right-3" : "left-3"} top-full mt-1 w-[calc(100%-1.5rem)] bg-white border border-line rounded-xl shadow-lg z-50 py-1`}>
-                <button
-                  onClick={() => switchOrg(null)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface transition-colors ${!orgContext ? "text-primary font-semibold" : "text-ink"}`}
-                >
-                  <span className="material-symbols-outlined text-base">person</span>
-                  <span className="truncate">{isAr ? "شخصي" : "Personal"}</span>
-                  {!orgContext && <span className="material-symbols-outlined text-primary text-sm ml-auto">check</span>}
-                </button>
+                {(user?.account_type === "individual" || memberships.some((m) => m.role === "khatib")) && (
+                  <button
+                    onClick={() => switchOrg(null)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface transition-colors ${!orgContext ? "text-primary font-semibold" : "text-ink"}`}
+                  >
+                    <span className="material-symbols-outlined text-base">person</span>
+                    <span className="truncate">{isAr ? "شخصي" : "Personal"}</span>
+                    {!orgContext && <span className="material-symbols-outlined text-primary text-sm ml-auto">check</span>}
+                  </button>
+                )}
                 {memberships.map((m) => (
                   <button
                     key={m.orgId}
