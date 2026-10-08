@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, exec, cuid, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { settingsUpdateSchema, parseBody } from "@/lib/validations";
+import { getOrgContext, getEffectiveAccountType } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,10 @@ export async function GET() {
     [userId]
   );
 
-  return NextResponse.json(toJSON({ user, settings, orgMemberships }));
+  const orgContext = await getOrgContext(userId);
+  const effectiveAccountType = getEffectiveAccountType(orgContext);
+
+  return NextResponse.json(toJSON({ user, settings, orgMemberships, orgContext, effectiveAccountType }));
 }
 
 export async function PUT(req: NextRequest) {

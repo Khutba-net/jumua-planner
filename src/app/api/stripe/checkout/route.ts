@@ -3,6 +3,7 @@ import { getUserId } from "@/lib/auth";
 import { handleApiError } from "@/lib/api-utils";
 import { query, queryOne } from "@/lib/db";
 import { stripe, getOrCreateCustomer, getOrCreateOrgCustomer, PLANS, PlanId } from "@/lib/stripe";
+import { getOrgContext } from "@/lib/org-context";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,31 +15,25 @@ export async function POST(req: NextRequest) {
     }
 
     const planId = plan as PlanId;
-    const user = await queryOne<{ email: string; name: string; account_type: string; role: string; organization_id: string | null }>(
-      "SELECT email, name, account_type, role, organization_id FROM users WHERE id = $1",
+    const user = await queryOne<{ email: string; name: string }>(
+      "SELECT email, name FROM users WHERE id = $1",
       [userId]
     );
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const ctx = await getOrgContext(userId);
     const isOrgPlan = planId === "organization" || planId === "institution";
     let customerId: string;
     let organizationId: string | null = null;
 
     if (isOrgPlan) {
-      if (user.role !== "admin") {
-        return NextResponse.json({ error: "Only admins can subscribe for an organization" }, { status: 403 });
+      if (!ctx || ctx.role !== "admin") {
+        return NextResponse.json({ error: "Only org admins can subscribe for an organization" }, { status: 403 });
       }
-      if (!user.organization_id) {
-        return NextResponse.json({ error: "No organization found" }, { status: 400 });
-      }
-      organizationId = user.organization_id;
-      const org = await queryOne<{ name: string }>(
-        "SELECT name FROM organizations WHERE id = $1",
-        [organizationId]
-      );
-      customerId = await getOrCreateOrgCustomer(organizationId, user.email, org?.name || "Organization");
+      organizationId = ctx.orgId;
+      customerId = await getOrCreateOrgCustomer(organizationId, user.email, ctx.orgName);
     } else {
       customerId = await getOrCreateCustomer(userId, user.email, user.name);
     }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { getEffectiveSubscription } from "@/lib/subscription";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, getEffectiveAccountType } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -290,6 +290,7 @@ export async function GET() {
     planningYear,
     orgName,
     orgContext: ctx ? { orgId: ctx.orgId, orgName: ctx.orgName, orgType: ctx.orgType, role: ctx.role, mosqueName: ctx.mosqueName } : null,
+    effectiveAccountType: getEffectiveAccountType(ctx),
     myAssignments,
     nextYearPrompt: null,
     subscription: await getEffectiveSubscription(userId, ctx?.orgId),

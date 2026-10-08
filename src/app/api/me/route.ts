@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { queryOne, toJSON } from "@/lib/db";
 import { getUserId, AuthError } from "@/lib/auth";
 import { getEffectiveSubscription } from "@/lib/subscription";
-import { getOrgContext, getUserMemberships } from "@/lib/org-context";
+import { getOrgContext, getUserMemberships, getEffectiveAccountType } from "@/lib/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -27,5 +27,7 @@ export async function GET() {
   const memberships = await getUserMemberships(userId);
   const subscription = await getEffectiveSubscription(userId, orgContext?.orgId);
 
-  return NextResponse.json(toJSON({ user, subscription, orgContext, memberships }));
+  const effectiveAccountType = getEffectiveAccountType(orgContext);
+
+  return NextResponse.json(toJSON({ user, subscription, orgContext, memberships, effectiveAccountType }));
 }

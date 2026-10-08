@@ -3,29 +3,30 @@ import { getUserId } from "@/lib/auth";
 import { handleApiError } from "@/lib/api-utils";
 import { queryOne } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
+import { getOrgContext } from "@/lib/org-context";
 
 export async function POST(req: NextRequest) {
   try {
     const userId = await getUserId({ skipSubscriptionCheck: true });
 
-    const user = await queryOne<{ role: string; organization_id: string | null; account_type: string; stripe_customer_id: string | null }>(
-      "SELECT role, organization_id, account_type, stripe_customer_id FROM users WHERE id = $1",
+    const user = await queryOne<{ stripe_customer_id: string | null }>(
+      "SELECT stripe_customer_id FROM users WHERE id = $1",
       [userId]
     );
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const isOrgUser = user.organization_id && (user.account_type === "organization" || user.account_type === "institution");
+    const ctx = await getOrgContext(userId);
     let customerId: string | null = null;
 
-    if (isOrgUser) {
-      if (user.role !== "admin") {
+    if (ctx) {
+      if (ctx.role !== "admin") {
         return NextResponse.json({ error: "Billing is managed by your organization admin" }, { status: 403 });
       }
       const org = await queryOne<{ stripe_customer_id: string }>(
         "SELECT stripe_customer_id FROM organizations WHERE id = $1",
-        [user.organization_id]
+        [ctx.orgId]
       );
       customerId = org?.stripe_customer_id || null;
     } else {

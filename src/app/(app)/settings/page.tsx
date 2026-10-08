@@ -117,9 +117,8 @@ export default function SettingsPage() {
 
   const [nameError, setNameError] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [switchingType, setSwitchingType] = useState(false);
-  const [selectedType, setSelectedType] = useState("");
-  const [switchOrgName, setSwitchOrgName] = useState("");
+  const [effectiveAccountType, setEffectiveAccountType] = useState<string>("individual");
+  const [orgContext, setOrgContext] = useState<{ orgId: string; orgName: string; orgType: string; role: string } | null>(null);
   const [myOrgs, setMyOrgs] = useState<{ org_id: string; org_name: string; role: string; active: boolean }[]>([]);
   const [switchingOrg, setSwitchingOrg] = useState<string | null>(null);
 
@@ -155,12 +154,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (user && activeSection === "subscription") {
-      const uIsOrg = user.account_type === "organization" || user.account_type === "institution";
-      if (uIsOrg && user.role !== "admin") {
+      if (orgContext && orgContext.role !== "admin") {
         setActiveSection("profile");
       }
     }
-  }, [user, activeSection]);
+  }, [user, activeSection, orgContext]);
 
   useEffect(() => {
     fetch("/api/stripe/subscription")
@@ -253,7 +251,8 @@ export default function SettingsPage() {
         setEmailAssigned(!!s.email_assigned);
         setThemeMode(s.theme_mode);
         setEditorFontSize(String(s.editor_font_size));
-        setSelectedType(u.account_type);
+        setEffectiveAccountType(data.effectiveAccountType || u.account_type);
+        setOrgContext(data.orgContext || null);
         if (data.orgMemberships && Array.isArray(data.orgMemberships)) {
           setMyOrgs(data.orgMemberships.map((m: { org_id: string; org_name: string; role: string }) => ({
             ...m,
@@ -398,9 +397,9 @@ export default function SettingsPage() {
     saveSection("profile", { name: name.trim(), email: email.trim() });
   }
 
-  const isOrg = user?.account_type === "organization" || user?.account_type === "institution";
-  const isOrgAdmin = isOrg && (user?.role === "admin" || user?.role === "mosque_admin");
-  const showSubscriptionTab = !isOrg || user?.role === "admin";
+  const isOrg = !!orgContext;
+  const isOrgAdmin = isOrg && (orgContext?.role === "admin" || orgContext?.role === "mosque_admin");
+  const showSubscriptionTab = !isOrg || orgContext?.role === "admin";
   const navSections = allNavSections.filter((s) => s.id !== "subscription" || showSubscriptionTab);
 
   if (loading) return <SettingsSkeleton />;
@@ -523,7 +522,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-ink">{name || "—"}</p>
-                <p className="text-xs text-mute capitalize">{user?.account_type ?? ""}</p>
+                <p className="text-xs text-mute capitalize">{effectiveAccountType}</p>
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
@@ -561,65 +560,21 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">{t("settings.accountType")}</label>
-                {isOrg ? (
-                  <div className="border border-line p-4 bg-surface">
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-primary text-xl">
-                        {user?.account_type === "institution" ? "domain" : "mosque"}
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold text-ink capitalize">{user?.account_type}</p>
-                        <p className="text-xs text-mute">
-                          {isAr ? "لتغيير نوع حسابك، يجب مغادرة المؤسسة أولاً من إعدادات المؤسسة." : "To change your account type, leave your organization first from the Organization settings."}
-                        </p>
-                      </div>
+                <div className="border border-line p-4 bg-surface">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-primary text-xl">
+                      {effectiveAccountType === "institution" ? "domain" : effectiveAccountType === "organization" ? "mosque" : "person"}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-ink capitalize">{effectiveAccountType}</p>
+                      <p className="text-xs text-mute">
+                        {isOrg
+                          ? (isAr ? `أنت تعمل حالياً ضمن ${orgContext?.orgName}` : `You are currently working within ${orgContext?.orgName}`)
+                          : (isAr ? "حسابك الشخصي للتخطيط الفردي" : "Your personal account for individual planning")}
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-3 gap-2">
-                      {([
-                        { value: "individual", label: t("settings.typeIndividual"), desc: t("settings.typeIndividualDesc"), icon: "person" },
-                        { value: "organization", label: t("settings.typeOrganization"), desc: t("settings.typeOrganizationDesc"), icon: "mosque" },
-                        { value: "institution", label: t("settings.typeInstitution"), desc: t("settings.typeInstitutionDesc"), icon: "domain" },
-                      ] as const).map((opt) => (
-                        <button
-                          key={opt.value}
-                          onClick={() => setSelectedType(opt.value)}
-                          className={`flex flex-col items-center gap-1.5 p-3 border text-center transition-colors ${
-                            selectedType === opt.value
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-line bg-white text-mute hover:text-ink"
-                          }`}
-                        >
-                          <span className="material-symbols-outlined text-xl">{opt.icon}</span>
-                          <span className="text-xs font-semibold">{opt.label}</span>
-                          <span className="text-[10px] leading-tight">{opt.desc}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {selectedType !== user?.account_type && selectedType !== "individual" && (
-                      <div className="mt-3">
-                        <label className="text-[10px] font-bold text-mute tracking-[1.5px] uppercase block mb-1.5">
-                          {isAr ? "اسم المؤسسة" : "Organization Name"}
-                        </label>
-                        <input
-                          type="text"
-                          value={switchOrgName}
-                          onChange={(e) => setSwitchOrgName(e.target.value)}
-                          placeholder={isAr ? "مثال: مسجد النور" : "e.g. Masjid Al-Noor"}
-                          className="w-full border border-line px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary"
-                        />
-                      </div>
-                    )}
-                    {selectedType !== user?.account_type && (
-                      <div className="mt-3 bg-amber-50 border border-amber-200 p-3 flex items-start gap-2">
-                        <span className="material-symbols-outlined text-amber-600 text-base mt-0.5">info</span>
-                        <p className="text-xs text-amber-800">{t("settings.switchWarning")}</p>
-                      </div>
-                    )}
-                  </>
-                )}
+                </div>
               </div>
             </div>
 
@@ -632,36 +587,6 @@ export default function SettingsPage() {
                 {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
                 {saving ? t("settings.saving") : t("settings.saveChanges")}
               </button>
-              {selectedType !== user?.account_type && !isOrg && (
-                <button
-                  onClick={async () => {
-                    if (selectedType !== "individual" && !switchOrgName.trim()) {
-                      showToast(t("settings.orgNameRequired"), "error");
-                      return;
-                    }
-                    setSwitchingType(true);
-                    try {
-                      const res = await fetch("/api/settings", {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ section: "account_type", account_type: selectedType, org_name: switchOrgName.trim() || undefined }),
-                      });
-                      if (!res.ok) { const d = await res.json(); showToast(d.error || "Failed", "error"); return; }
-                      showToast(isAr ? "تم تغيير نوع الحساب" : "Account type updated");
-                      setTimeout(() => window.location.reload(), 800);
-                    } catch {
-                      showToast(isAr ? "فشل تغيير نوع الحساب" : "Failed to switch account type", "error");
-                    } finally {
-                      setSwitchingType(false);
-                    }
-                  }}
-                  disabled={switchingType}
-                  className="px-6 py-2.5 bg-accent-gold text-white text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {switchingType && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-                  {t("settings.switchConfirm")} {selectedType === "individual" ? t("settings.typeIndividual") : selectedType === "organization" ? t("settings.typeOrganization") : t("settings.typeInstitution")}
-                </button>
-              )}
             </div>
           </div>
         )}

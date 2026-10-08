@@ -170,6 +170,10 @@ export class OrgContextError extends Error {
   }
 }
 
+export function getEffectiveAccountType(ctx: OrgContext | null): "individual" | "organization" | "institution" {
+  return ctx ? ctx.orgType : "individual";
+}
+
 export function orgContextCookieOptions() {
   return {
     path: "/",
